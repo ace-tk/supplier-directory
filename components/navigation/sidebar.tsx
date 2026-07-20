@@ -6,8 +6,8 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Building2,
-  Users,
-  ShoppingCart,
+  MessageSquare,
+  ShoppingBag,
   BarChart3,
   Settings,
   HelpCircle,
@@ -30,8 +30,8 @@ const navItems = [
     items: [
       { label: "Supplier Directory", href: "/directory", icon: Building2 },
       { label: "Supplier Portal", href: "/supplier-portal", icon: Sparkles, badge: "New" },
-      { label: "CRM", href: "/crm", icon: Users },
-      { label: "Shop", href: "/shop", icon: ShoppingCart },
+      { label: "CRM Inbox", href: "/dashboard/crm", icon: MessageSquare },
+      { label: "Shop", href: "/dashboard/shop", icon: ShoppingBag },
     ],
   },
   {

@@ -33,6 +33,7 @@ import { type Supplier } from "@/types/supplier";
 import { DeleteDialog } from "./delete-dialog";
 import { SupplierForm } from "./supplier-form";
 import { type SupplierFormValues } from "@/lib/validations/supplier";
+import Link from "next/link";
 
 interface SupplierDrawerProps {
   supplier: Supplier | null;
@@ -369,10 +370,13 @@ export function SupplierDrawer({
 
           {/* Footer contact strip */}
           <div className="flex-none border-t border-border p-4 flex items-center gap-2">
-            <Button variant="outline" size="sm" className="flex-1 gap-1.5 h-8 text-xs">
+            <Link
+              href={"/dashboard/crm?supplierId=" + supplier.id}
+              className="flex flex-1 items-center justify-center gap-1.5 h-8 text-xs rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground transition-colors font-medium"
+            >
               <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
               WhatsApp
-            </Button>
+            </Link>
             <Button variant="outline" size="sm" className="flex-1 gap-1.5 h-8 text-xs">
               <Mail className="h-3.5 w-3.5 text-blue-500" />
               Email

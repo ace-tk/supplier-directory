@@ -85,6 +85,7 @@ model SupplierListing {
   updatedAt       DateTime @updatedAt
 
   catalogProducts Product[]
+  conversation    Conversation?
 
   @@index([country])
   @@index([industry])
@@ -192,4 +193,91 @@ model PortalDocument {
   createdAt DateTime       @default(now())
 
   @@index([portalId])
+}
+
+// CRM Models for WhatsApp Module
+model Conversation {
+  id              String   @id @default(cuid())
+  supplierId      String   @unique
+  supplier        SupplierListing @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  unreadCount     Int      @default(0)
+  pinned          Boolean  @default(false)
+  archived        Boolean  @default(false)
+  assigned        Boolean  @default(false)
+  highPriority    Boolean  @default(false)
+  lastMessageAt   DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  messages        Message[]
+  notes           CrmNote[]
+  tasks           Task[]
+  activities      Activity[]
+
+  @@index([supplierId])
+  @@index([lastMessageAt])
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  PDF
+  PRODUCT
+  QUOTATION
+  VOICE
+  LOCATION
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          String   // 'user' or 'supplier'
+  type            MessageType @default(TEXT)
+  content         String?
+  attachmentUrl   String?
+  productId       String?
+  status          String   @default("sent") // sent, delivered, seen
+  createdAt       DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+model CrmNote {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  content         String
+  author          String   @default("Me")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([conversationId])
+}
+
+model Task {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  title           String
+  dueDate         DateTime?
+  priority        String   @default("Medium") // Low, Medium, High
+  assignedTo      String   @default("Me")
+  completed       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([conversationId])
+}
+
+model Activity {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  type            String   @default("System") // Message, Quote, Call, Meeting, System
+  createdAt       DateTime @default(now())
+
+  @@index([conversationId])
 }

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { type Supplier } from "@/types/supplier";
+import Link from "next/link";
 
 interface SupplierCardProps {
   supplier: Supplier;
@@ -197,15 +198,15 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
             View Profile
           </Button>
           <div className="grid grid-cols-3 gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-0 gap-1 text-[11px]"
+            <Link
+              href={"/dashboard/crm?supplierId=" + supplier.id}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 h-7 flex items-center justify-center gap-1 text-[11px] rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground transition-colors font-medium"
               title={`WhatsApp ${supplier.whatsapp}`}
             >
               <MessageCircle className="h-3 w-3 text-emerald-500" />
               <span>Chat</span>
-            </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"

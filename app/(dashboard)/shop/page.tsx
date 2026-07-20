@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FilterBar } from "@/components/shop/FilterBar";
 import { MasonryGrid } from "@/components/shop/MasonryGrid";
 import { ProductDrawer } from "@/components/shop/ProductDrawer";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
-import { motion } from "framer-motion";
 import { PackageSearch } from "lucide-react";
 import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
 
@@ -28,43 +27,51 @@ export default function ShopPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
+  // Track previous filter values to detect filter changes vs page changes
+  const prevFilters = useRef({ searchQuery, activeCategory, activeSort });
+
   // Fetch products
   useEffect(() => {
-    async function fetchProducts(isLoadMore = false) {
+    const filtersChanged =
+      prevFilters.current.searchQuery !== searchQuery ||
+      prevFilters.current.activeCategory !== activeCategory ||
+      prevFilters.current.activeSort !== activeSort;
+
+    const currentPage = filtersChanged ? 1 : page;
+    if (filtersChanged) {
+      prevFilters.current = { searchQuery, activeCategory, activeSort };
+    }
+
+    const isLoadMore = !filtersChanged && page > 1;
+
+    async function fetchProducts() {
       if (!isLoadMore) setLoading(true);
       try {
         const url = new URL("/api/products", window.location.origin);
         if (activeCategory !== "All Categories") url.searchParams.set("category", activeCategory);
         if (searchQuery) url.searchParams.set("search", searchQuery);
         if (activeSort) url.searchParams.set("sort", activeSort.toLowerCase());
-        url.searchParams.set("page", isLoadMore ? page.toString() : "1");
-        
+        url.searchParams.set("page", currentPage.toString());
+
         const res = await fetch(url.toString());
         const data = await res.json();
-        
+
         if (isLoadMore) {
           setProducts(prev => [...prev, ...data]);
         } else {
           setProducts(data);
         }
-        
-        if (data.length < 20) setHasMore(false);
-        else setHasMore(true);
+        setHasMore(data.length >= 20);
       } catch (err) {
         console.error("Failed to load products:", err);
       } finally {
         setLoading(false);
       }
     }
-    
-    const timer = setTimeout(() => fetchProducts(page > 1), 300);
+
+    const timer = setTimeout(fetchProducts, filtersChanged ? 300 : 0);
     return () => clearTimeout(timer);
   }, [searchQuery, activeCategory, activeSort, page]);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, activeCategory, activeSort]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">

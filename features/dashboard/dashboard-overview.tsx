@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Building2,
@@ -75,6 +76,12 @@ const roleLabel: Record<string, string> = {
 };
 
 export function DashboardOverview({ user }: DashboardOverviewProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div className="space-y-8">
       {/* Welcome */}
@@ -163,7 +170,7 @@ export function DashboardOverview({ user }: DashboardOverviewProps) {
                     <p className="text-xs text-muted-foreground mt-0.5">{item.meta}</p>
                   </div>
                   <span className="text-[11px] text-muted-foreground shrink-0 mt-0.5">
-                    {formatRelativeTime(item.time)}
+                    {mounted ? formatRelativeTime(item.time) : ""}
                   </span>
                 </div>
               ))}

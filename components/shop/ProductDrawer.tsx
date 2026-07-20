@@ -5,6 +5,7 @@ import { X, Bookmark, Share2, MessageCircle, Mail, ExternalLink, ShieldCheck, Fa
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
 import { useState } from "react";
+import Link from "next/link";
 
 export function ProductDrawer({
   product,
@@ -162,9 +163,9 @@ export function ProductDrawer({
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                        <button className="flex items-center justify-center gap-2 w-full py-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-semibold transition-colors">
+                        <Link href={"/dashboard/crm?supplierId=" + product.supplier.id} className="flex items-center justify-center gap-2 w-full py-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-semibold transition-colors">
                           <MessageCircle className="w-5 h-5" /> WhatsApp
-                        </button>
+                        </Link>
                         <button className="flex items-center justify-center gap-2 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold transition-colors">
                           <Mail className="w-5 h-5" /> Contact Supplier
                         </button>
