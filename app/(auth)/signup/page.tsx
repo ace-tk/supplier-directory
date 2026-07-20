@@ -43,8 +43,8 @@ export default function SignupPage() {
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } = useForm<SignupFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- zodResolver type diverges from RHF Resolver generic
     resolver: zodResolver(signupSchema) as any,
     defaultValues: { role: "BUYER" },
   });

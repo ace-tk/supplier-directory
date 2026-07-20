@@ -28,8 +28,8 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } = useForm<LoginFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- zodResolver type diverges from RHF Resolver generic
     resolver: zodResolver(loginSchema) as any,
     defaultValues: { rememberMe: false },
   });
