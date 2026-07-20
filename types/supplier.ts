@@ -16,27 +16,29 @@ export interface Supplier {
   id: string;
   companyName: string;
   description: string;
-  industry: Industry;
-  supplierType: SupplierType;
+  industry: string;
+  supplierType: string;
   country: string;
   city: string;
   rating: number;
   reviewCount: number;
   verified: boolean;
   products: string[];
-  responseTime: string;
-  minimumOrder: string;
-  phone: string;
-  email: string;
-  website: string;
-  whatsapp: string;
-  linkedin: string;
-  companyLogo?: string;
+  responseTime: string | null;
+  minimumOrder: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  whatsapp: string | null;
+  linkedin: string | null;
   initials: string;
   logoColor: string;
-  yearEstablished: number;
-  employees: string;
+  yearEstablished: number | null;
+  employees: string | null;
+  notes: string | null;
   savedCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type FilterKey =
@@ -54,3 +56,22 @@ export type FilterKey =
   | "Food & Beverage"
   | "Furniture"
   | "Automotive";
+
+export const INDUSTRIES: Industry[] = [
+  "Electronics",
+  "Furniture",
+  "Food & Beverage",
+  "Textiles",
+  "Packaging",
+  "Agriculture",
+  "Industrial Equipment",
+  "Medical",
+  "Automotive",
+  "Beauty & Personal Care",
+];
+
+export const SUPPLIER_TYPES: SupplierType[] = [
+  "Manufacturer",
+  "Exporter",
+  "Wholesaler",
+];

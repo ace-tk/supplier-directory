@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, LayoutGrid, List, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,26 +10,44 @@ import { SupplierFilters } from "@/components/suppliers/supplier-filters";
 import { SupplierSearch } from "@/components/suppliers/supplier-search";
 import { SkeletonCard, SkeletonListItem } from "@/components/suppliers/skeleton-card";
 import { SuppliersEmptyState } from "@/components/suppliers/suppliers-empty-state";
-import { SUPPLIERS } from "@/data/suppliers";
+import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
+import { SupplierForm } from "@/components/suppliers/supplier-form";
+import { useSuppliers } from "@/hooks/use-suppliers";
 import { useDebounce } from "@/hooks/use-debounce";
-import { type FilterKey } from "@/types/supplier";
+import { type Supplier, type FilterKey } from "@/types/supplier";
+import { type SupplierFormValues } from "@/lib/validations/supplier";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "grid" | "list";
 
 export default function DirectoryPage() {
+  const { suppliers, loading, createSupplier, updateSupplier, deleteSupplier } = useSuppliers();
+
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<FilterKey[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [loading, setLoading] = useState(true);
+
+  // Drawer state
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Create modal state
+  const [createOpen, setCreateOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search, 250);
 
-  // Simulate initial load
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 700);
-    return () => clearTimeout(t);
-  }, []);
+  function openDrawer(supplier: Supplier) {
+    setSelectedSupplier(supplier);
+    setDrawerOpen(true);
+  }
+
+  function handleDrawerOpenChange(open: boolean) {
+    setDrawerOpen(open);
+    if (!open) {
+      // Keep selectedSupplier for exit animation
+      setTimeout(() => setSelectedSupplier(null), 300);
+    }
+  }
 
   const toggleFilter = (key: FilterKey) => {
     setActiveFilters((prev) =>
@@ -43,9 +61,8 @@ export default function DirectoryPage() {
   };
 
   const filtered = useMemo(() => {
-    let result = SUPPLIERS;
+    let result = suppliers;
 
-    // Text search
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
       result = result.filter(
@@ -59,32 +76,45 @@ export default function DirectoryPage() {
       );
     }
 
-    // Filter chips
     if (activeFilters.length > 0) {
-      result = result.filter((s) => {
-        return activeFilters.every((f) => {
+      result = result.filter((s) =>
+        activeFilters.every((f) => {
           if (f === "verified") return s.verified;
           if (f === "Manufacturer" || f === "Exporter" || f === "Wholesaler")
             return s.supplierType === f;
           if (f === "India" || f === "China" || f === "USA" || f === "Germany" || f === "Turkey")
             return s.country === f;
           if (
-            f === "Electronics" ||
-            f === "Textiles" ||
-            f === "Food & Beverage" ||
-            f === "Furniture" ||
-            f === "Automotive"
+            f === "Electronics" || f === "Textiles" || f === "Food & Beverage" ||
+            f === "Furniture" || f === "Automotive"
           )
             return s.industry === f;
           return true;
-        });
-      });
+        })
+      );
     }
 
     return result;
-  }, [debouncedSearch, activeFilters]);
+  }, [debouncedSearch, activeFilters, suppliers]);
 
   const hasActiveQuery = debouncedSearch.trim().length > 0 || activeFilters.length > 0;
+
+  async function handleCreate(values: SupplierFormValues) {
+    const created = await createSupplier(values);
+    if (created) setCreateOpen(false);
+  }
+
+  async function handleUpdate(id: string, values: SupplierFormValues) {
+    const updated = await updateSupplier(id, values);
+    if (updated) {
+      // Keep drawer open but refresh selected supplier
+      setSelectedSupplier(updated);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    await deleteSupplier(id);
+  }
 
   return (
     <div className="space-y-6">
@@ -109,7 +139,11 @@ export default function DirectoryPage() {
           </p>
         </div>
 
-        <Button size="sm" className="gap-1.5 shrink-0 self-start sm:self-auto">
+        <Button
+          size="sm"
+          className="gap-1.5 shrink-0 self-start sm:self-auto"
+          onClick={() => setCreateOpen(true)}
+        >
           <Plus className="h-4 w-4" />
           Add Supplier
         </Button>
@@ -123,28 +157,36 @@ export default function DirectoryPage() {
         className="grid grid-cols-2 sm:grid-cols-4 gap-3"
       >
         {[
-          { label: "Total Suppliers", value: SUPPLIERS.length },
+          { label: "Total Suppliers", value: loading ? "—" : suppliers.length },
           {
             label: "Verified",
-            value: SUPPLIERS.filter((s) => s.verified).length,
+            value: loading ? "—" : suppliers.filter((s) => s.verified).length,
             accent: "text-emerald-600 dark:text-emerald-400",
           },
-          { label: "Countries", value: new Set(SUPPLIERS.map((s) => s.country)).size },
-          { label: "Industries", value: new Set(SUPPLIERS.map((s) => s.industry)).size },
+          {
+            label: "Countries",
+            value: loading ? "—" : new Set(suppliers.map((s) => s.country)).size,
+          },
+          {
+            label: "Industries",
+            value: loading ? "—" : new Set(suppliers.map((s) => s.industry)).size,
+          },
         ].map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-xl bg-card border border-border px-4 py-3"
-          >
+          <div key={stat.label} className="rounded-xl bg-card border border-border px-4 py-3">
             <p className="text-xs text-muted-foreground mb-0.5">{stat.label}</p>
-            <p className={cn("text-xl font-semibold tabular-nums", stat.accent ?? "text-foreground")}>
+            <p
+              className={cn(
+                "text-xl font-semibold tabular-nums",
+                stat.accent ?? "text-foreground"
+              )}
+            >
               {stat.value}
             </p>
           </div>
         ))}
       </motion.div>
 
-      {/* Search + view toggle row */}
+      {/* Search + view toggle */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -157,8 +199,6 @@ export default function DirectoryPage() {
           resultCount={hasActiveQuery ? filtered.length : undefined}
           className="flex-1"
         />
-
-        {/* View toggle */}
         <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 shrink-0">
           {(["grid", "list"] as ViewMode[]).map((mode) => (
             <button
@@ -195,20 +235,16 @@ export default function DirectoryPage() {
 
       {/* Result count */}
       {!loading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center justify-between"
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <p className="text-xs text-muted-foreground">
             Showing{" "}
             <span className="font-medium text-foreground">{filtered.length}</span>{" "}
-            of {SUPPLIERS.length} suppliers
+            of {suppliers.length} suppliers
           </p>
         </motion.div>
       )}
 
-      {/* Grid / List */}
+      {/* Content */}
       {loading ? (
         <div
           className={cn(
@@ -218,18 +254,11 @@ export default function DirectoryPage() {
           )}
         >
           {Array.from({ length: 6 }).map((_, i) =>
-            viewMode === "grid" ? (
-              <SkeletonCard key={i} />
-            ) : (
-              <SkeletonListItem key={i} />
-            )
+            viewMode === "grid" ? <SkeletonCard key={i} /> : <SkeletonListItem key={i} />
           )}
         </div>
       ) : filtered.length === 0 ? (
-        <SuppliersEmptyState
-          hasSearch={hasActiveQuery}
-          onReset={clearFilters}
-        />
+        <SuppliersEmptyState hasSearch={hasActiveQuery} onReset={clearFilters} />
       ) : (
         <AnimatePresence mode="popLayout">
           {viewMode === "grid" ? (
@@ -246,6 +275,7 @@ export default function DirectoryPage() {
                   key={supplier.id}
                   supplier={supplier}
                   delay={Math.min(i * 0.04, 0.3)}
+                  onClick={openDrawer}
                 />
               ))}
             </motion.div>
@@ -263,12 +293,31 @@ export default function DirectoryPage() {
                   key={supplier.id}
                   supplier={supplier}
                   delay={Math.min(i * 0.03, 0.2)}
+                  onClick={openDrawer}
                 />
               ))}
             </motion.div>
           )}
         </AnimatePresence>
       )}
+
+      {/* Drawer */}
+      <SupplierDrawer
+        supplier={selectedSupplier}
+        open={drawerOpen}
+        onOpenChange={handleDrawerOpenChange}
+        onUpdate={handleUpdate}
+        onDelete={handleDelete}
+      />
+
+      {/* Create modal */}
+      <SupplierForm
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSubmit={handleCreate}
+        defaultValues={null}
+        mode="create"
+      />
     </div>
   );
 }

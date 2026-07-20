@@ -1,6 +1,8 @@
-import { Supplier } from "@/types/supplier";
+import { type Supplier } from "@/types/supplier";
 
-export const SUPPLIERS: Supplier[] = [
+type SeedSupplier = Omit<Supplier, "notes" | "createdAt" | "updatedAt">;
+
+export const SUPPLIERS: SeedSupplier[] = [
   {
     id: "sup-001",
     companyName: "Shenzhen TechCore Electronics",

@@ -54,3 +54,37 @@ model Buyer {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+// Standalone supplier directory listing — not tied to auth
+model SupplierListing {
+  id              String   @id @default(cuid())
+  companyName     String
+  description     String   @default("")
+  industry        String
+  supplierType    String
+  country         String
+  city            String
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+  verified        Boolean  @default(false)
+  products        String[]
+  responseTime    String?
+  minimumOrder    String?
+  phone           String?
+  email           String?
+  website         String?
+  whatsapp        String?
+  linkedin        String?
+  initials        String   @default("")
+  logoColor       String   @default("#6366F1")
+  yearEstablished Int?
+  employees       String?
+  notes           String?
+  savedCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([country])
+  @@index([industry])
+  @@index([verified])
+}

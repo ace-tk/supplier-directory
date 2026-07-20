@@ -23,6 +23,7 @@ import { type Supplier } from "@/types/supplier";
 interface SupplierCardProps {
   supplier: Supplier;
   delay?: number;
+  onClick?: (supplier: Supplier) => void;
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -46,7 +47,7 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
-export function SupplierCard({ supplier, delay = 0 }: SupplierCardProps) {
+export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps) {
   const [saved, setSaved] = useState(false);
 
   return (
@@ -56,7 +57,8 @@ export function SupplierCard({ supplier, delay = 0 }: SupplierCardProps) {
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.3, delay, ease: [0.4, 0, 0.2, 1] }}
       whileHover={{ y: -3, transition: { duration: 0.15 } }}
-      className="group relative rounded-xl bg-card border border-border shadow-sm hover:shadow-md hover:border-border/80 transition-shadow duration-200 flex flex-col overflow-hidden"
+      onClick={() => onClick?.(supplier)}
+      className="group relative rounded-xl bg-card border border-border shadow-sm hover:shadow-md hover:border-border/80 transition-shadow duration-200 flex flex-col overflow-hidden cursor-pointer"
     >
       {/* Top stripe */}
       <div
@@ -208,7 +210,7 @@ export function SupplierCard({ supplier, delay = 0 }: SupplierCardProps) {
               variant="outline"
               size="sm"
               className="h-7 px-0 gap-1 text-[11px]"
-              title={supplier.email}
+              title={supplier.email ?? undefined}
             >
               <Mail className="h-3 w-3 text-blue-500" />
               <span>Email</span>
@@ -217,7 +219,7 @@ export function SupplierCard({ supplier, delay = 0 }: SupplierCardProps) {
               variant="outline"
               size="sm"
               className="h-7 px-0 gap-1 text-[11px]"
-              title={supplier.phone}
+              title={supplier.phone ?? undefined}
             >
               <Phone className="h-3 w-3 text-violet-500" />
               <span>Call</span>

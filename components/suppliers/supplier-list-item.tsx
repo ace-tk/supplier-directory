@@ -22,9 +22,10 @@ import { type Supplier } from "@/types/supplier";
 interface SupplierListItemProps {
   supplier: Supplier;
   delay?: number;
+  onClick?: (supplier: Supplier) => void;
 }
 
-export function SupplierListItem({ supplier, delay = 0 }: SupplierListItemProps) {
+export function SupplierListItem({ supplier, delay = 0, onClick }: SupplierListItemProps) {
   const [saved, setSaved] = useState(false);
 
   return (
@@ -33,7 +34,8 @@ export function SupplierListItem({ supplier, delay = 0 }: SupplierListItemProps)
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 8 }}
       transition={{ duration: 0.25, delay, ease: [0.4, 0, 0.2, 1] }}
-      className="group rounded-xl bg-card border border-border hover:border-border/80 hover:shadow-md transition-all duration-200 p-4"
+      onClick={() => onClick?.(supplier)}
+      className="group rounded-xl bg-card border border-border hover:border-border/80 hover:shadow-md transition-all duration-200 p-4 cursor-pointer"
     >
       <div className="flex items-start gap-4">
         {/* Logo */}
@@ -136,10 +138,10 @@ export function SupplierListItem({ supplier, delay = 0 }: SupplierListItemProps)
                 <Button variant="outline" size="icon" className="h-7 w-7" title="WhatsApp">
                   <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
                 </Button>
-                <Button variant="outline" size="icon" className="h-7 w-7" title={supplier.email}>
+                <Button variant="outline" size="icon" className="h-7 w-7" title={supplier.email ?? undefined}>
                   <Mail className="h-3.5 w-3.5 text-blue-500" />
                 </Button>
-                <Button variant="outline" size="icon" className="h-7 w-7" title={supplier.phone}>
+                <Button variant="outline" size="icon" className="h-7 w-7" title={supplier.phone ?? undefined}>
                   <Phone className="h-3.5 w-3.5 text-violet-500" />
                 </Button>
                 <Button size="sm" className="h-7 gap-1 text-xs">
