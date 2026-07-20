@@ -1,0 +1,56 @@
+// SupplyBase — B2B Wholesale CRM & Supplier Management Platform
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  SUPPLIER
+  BUYER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(BUYER)
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier Supplier?
+  buyer    Buyer?
+
+  @@index([email])
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  companyName String
+  city        String?
+  country     String?
+  description String?
+  logo        String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Buyer {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  companyName String
+  city        String?
+  country     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
