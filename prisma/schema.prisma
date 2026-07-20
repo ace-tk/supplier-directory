@@ -84,9 +84,37 @@ model SupplierListing {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  catalogProducts Product[]
+
   @@index([country])
   @@index([industry])
   @@index([verified])
+}
+
+// Global Product catalog for the Shop page
+model Product {
+  id             String          @id @default(cuid())
+  supplierId     String
+  supplier       SupplierListing @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  name           String
+  description    String?
+  moq            String?
+  priceRange     String?
+  category       String?
+  material       String?
+  specifications String?
+  country        String?
+  leadTime       String?
+  images         String[]
+  savedCount     Int             @default(0)
+  
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  
+  @@index([supplierId])
+  @@index([category])
+  @@index([country])
 }
 
 // Auto-incrementing sequence for SB-XXXXXX supplier IDs
