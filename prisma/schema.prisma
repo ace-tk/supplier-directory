@@ -88,3 +88,80 @@ model SupplierListing {
   @@index([industry])
   @@index([verified])
 }
+
+// Auto-incrementing sequence for SB-XXXXXX supplier IDs
+model SupplierIdSequence {
+  id Int @id @default(autoincrement())
+}
+
+// Supplier self-onboarding portal
+model SupplierPortal {
+  id           String   @id @default(cuid())
+  supplierCode String?  @unique  // SB-000001
+  status       String   @default("draft") // draft | submitted | approved
+
+  // Step 1 — Business Info
+  companyName  String?
+  businessType String?
+  industry     String?
+  gst          String?
+  country      String?
+  state        String?
+  city         String?
+  website      String?
+  linkedin     String?
+  instagram    String?
+  whatsapp     String?
+  contactName  String?
+  email        String?
+  phone        String?
+
+  // Profile extras
+  logoUrl      String?
+  coverUrl     String?
+  description  String?
+
+  // Step 2 — Categories (stored as array)
+  categories   String[]
+
+  // Step 3 — Products
+  products     PortalProduct[]
+
+  // Step 4 — Documents
+  documents    PortalDocument[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status])
+  @@index([supplierCode])
+}
+
+model PortalProduct {
+  id          String         @id @default(cuid())
+  portalId    String
+  portal      SupplierPortal @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  name        String
+  category    String
+  moq         String?
+  priceRange  String?
+  description String?
+  images      String[]
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+
+  @@index([portalId])
+}
+
+model PortalDocument {
+  id        String         @id @default(cuid())
+  portalId  String
+  portal    SupplierPortal @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  docType   String         // logo | cover | license | gst | catalog | certificate
+  fileName  String
+  fileUrl   String
+  fileSize  Int?
+  createdAt DateTime       @default(now())
+
+  @@index([portalId])
+}

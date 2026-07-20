@@ -13,6 +13,7 @@ import {
   HelpCircle,
   Boxes,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,8 @@ const navItems = [
   {
     group: "Commerce",
     items: [
-      { label: "Supplier Directory", href: "/directory", icon: Building2, badge: "New" },
+      { label: "Supplier Directory", href: "/directory", icon: Building2 },
+      { label: "Supplier Portal", href: "/supplier-portal", icon: Sparkles, badge: "New" },
       { label: "CRM", href: "/crm", icon: Users },
       { label: "Shop", href: "/shop", icon: ShoppingCart },
     ],
