@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+
     "db:generate": "prisma generate",
-    "db:push": "dotenvx run -f .env.local -- prisma db push"
+    "db:push": "dotenvx run -f .env.local -- prisma db push",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

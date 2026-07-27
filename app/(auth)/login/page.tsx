@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from") ?? "/dashboard";
@@ -36,10 +36,12 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginFormValues) {
     const result = await loginAction(values);
+
     if (!result.success) {
       toast.error(result.error);
       return;
     }
+
     toast.success("Welcome back!");
     router.push(from);
     router.refresh();
@@ -57,8 +59,11 @@ export default function LoginPage() {
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary">
             <span className="text-primary-foreground font-bold text-sm">S</span>
           </div>
-          <span className="font-semibold text-foreground tracking-tight">SupplyBase</span>
+          <span className="font-semibold text-foreground tracking-tight">
+            SupplyBase
+          </span>
         </Link>
+
         <ThemeToggle />
       </div>
 
@@ -73,12 +78,17 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="space-y-4"
+          noValidate
+        >
           {/* Email */}
           <div className="space-y-1.5">
             <Label htmlFor="email" className="text-xs font-medium">
               Email address
             </Label>
+
             <Input
               id="email"
               type="email"
@@ -87,6 +97,7 @@ export default function LoginPage() {
               aria-invalid={!!errors.email}
               {...register("email")}
             />
+
             {errors.email && (
               <motion.p
                 initial={{ opacity: 0, y: -4 }}
@@ -104,6 +115,7 @@ export default function LoginPage() {
               <Label htmlFor="password" className="text-xs font-medium">
                 Password
               </Label>
+
               <Link
                 href="/forgot-password"
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -111,6 +123,7 @@ export default function LoginPage() {
                 Forgot password?
               </Link>
             </div>
+
             <div className="relative">
               <Input
                 id="password"
@@ -121,6 +134,7 @@ export default function LoginPage() {
                 className="pr-10"
                 {...register("password")}
               />
+
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
@@ -134,6 +148,7 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+
             {errors.password && (
               <motion.p
                 initial={{ opacity: 0, y: -4 }}
@@ -153,6 +168,7 @@ export default function LoginPage() {
               className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
               {...register("rememberMe")}
             />
+
             <Label
               htmlFor="rememberMe"
               className="text-xs text-muted-foreground cursor-pointer select-none"
@@ -195,5 +211,19 @@ export default function LoginPage() {
         <span className="underline cursor-pointer">Privacy Policy</span>.
       </p>
     </motion.div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
