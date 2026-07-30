@@ -1,152 +1,282 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { FilterBar } from "@/components/shop/FilterBar";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { PackageSearch } from "lucide-react";
+import { ShopHero } from "@/components/shop/ShopHero";
+import { ShopCategories } from "@/components/shop/ShopCategories";
+import { FilterBar, type ShopFilters, DEFAULT_FILTERS } from "@/components/shop/FilterBar";
 import { MasonryGrid } from "@/components/shop/MasonryGrid";
+import { CollectionRow } from "@/components/shop/CollectionRow";
 import { ProductDrawer } from "@/components/shop/ProductDrawer";
+import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
-import { PackageSearch } from "lucide-react";
-import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
+import { FASHION_CATEGORIES, COLLECTIONS } from "@/lib/shop-data";
+import { getMoqNumber, getPriceMin, isReadyStock } from "@/lib/product-tags";
+
+const PAGE_SIZE = 24;
 
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [discoveryPool, setDiscoveryPool] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Filters
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pageRef = useRef(1);
+  const [hasMore, setHasMore] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All Categories");
   const [activeSort, setActiveSort] = useState("Trending");
-  
-  // Drawer
+  const [filters, setFilters] = useState<ShopFilters>(DEFAULT_FILTERS);
+
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierDrawerOpen, setSupplierDrawerOpen] = useState(false);
 
-  // Pagination
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  // Track previous filter values to detect filter changes vs page changes
-  const prevFilters = useRef({ searchQuery, activeCategory, activeSort });
+  function buildUrl(pageNum: number) {
+    const url = new URL("/api/products", window.location.origin);
+    if (activeCategory !== "All Categories") url.searchParams.set("category", activeCategory);
+    if (searchQuery) url.searchParams.set("search", searchQuery);
+    if (activeSort) url.searchParams.set("sort", activeSort.toLowerCase());
+    if (filters.city !== "All Cities") url.searchParams.set("city", filters.city);
+    if (filters.verifiedOnly) url.searchParams.set("verified", "true");
+    if (filters.material !== "All Materials") url.searchParams.set("material", filters.material);
+    if (filters.country !== "All Countries") url.searchParams.set("country", filters.country);
+    if (filters.exportOnly) url.searchParams.set("export", "true");
+    url.searchParams.set("page", pageNum.toString());
+    url.searchParams.set("limit", PAGE_SIZE.toString());
+    return url;
+  }
 
-  // Fetch products
+  const filterKey = JSON.stringify({
+    searchQuery,
+    activeCategory,
+    activeSort,
+    city: filters.city,
+    verifiedOnly: filters.verifiedOnly,
+    material: filters.material,
+    country: filters.country,
+    exportOnly: filters.exportOnly,
+  });
+
+  // Fetch page 1 whenever search/category/sort/server-side filters change.
   useEffect(() => {
-    const filtersChanged =
-      prevFilters.current.searchQuery !== searchQuery ||
-      prevFilters.current.activeCategory !== activeCategory ||
-      prevFilters.current.activeSort !== activeSort;
+    let cancelled = false;
+    pageRef.current = 1;
 
-    const currentPage = filtersChanged ? 1 : page;
-    if (filtersChanged) {
-      prevFilters.current = { searchQuery, activeCategory, activeSort };
-    }
-
-    const isLoadMore = !filtersChanged && page > 1;
-
-    async function fetchProducts() {
-      if (!isLoadMore) setLoading(true);
+    async function fetchFirstPage() {
+      setLoading(true);
       try {
-        const url = new URL("/api/products", window.location.origin);
-        if (activeCategory !== "All Categories") url.searchParams.set("category", activeCategory);
-        if (searchQuery) url.searchParams.set("search", searchQuery);
-        if (activeSort) url.searchParams.set("sort", activeSort.toLowerCase());
-        url.searchParams.set("page", currentPage.toString());
-
-        const res = await fetch(url.toString());
-        const data = await res.json();
-
-        if (isLoadMore) {
-          setProducts(prev => [...prev, ...data]);
-        } else {
-          setProducts(data);
-        }
-        setHasMore(data.length >= 20);
+        const res = await fetch(buildUrl(1).toString());
+        const data: Product[] = await res.json();
+        if (cancelled) return;
+        setProducts(data);
+        setHasMore(data.length >= PAGE_SIZE);
       } catch (err) {
         console.error("Failed to load products:", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
-    const timer = setTimeout(fetchProducts, filtersChanged ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [searchQuery, activeCategory, activeSort, page]);
+    const timer = setTimeout(fetchFirstPage, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]);
+
+  // Curation pool for category-agnostic homepage collections — fetched once.
+  useEffect(() => {
+    fetch(`/api/products?limit=150&sort=trending`)
+      .then((res) => res.json())
+      .then((data: Product[]) => setDiscoveryPool(data))
+      .catch((err) => console.error("Failed to load discovery pool:", err));
+  }, []);
+
+  async function loadMore() {
+    const nextPage = pageRef.current + 1;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(buildUrl(nextPage).toString());
+      const data: Product[] = await res.json();
+      setProducts((prev) => [...prev, ...data]);
+      setHasMore(data.length >= PAGE_SIZE);
+      pageRef.current = nextPage;
+    } catch (err) {
+      console.error("Failed to load more products:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  // Client-side filters that don't map cleanly to a DB column (heuristic tags, buckets).
+  const visibleProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (filters.readyStockOnly && !isReadyStock(p)) return false;
+
+      if (filters.moqBucket !== "Any") {
+        const moq = getMoqNumber(p) ?? 0;
+        if (filters.moqBucket === "Under 100" && !(moq < 100)) return false;
+        if (filters.moqBucket === "100-300" && !(moq >= 100 && moq <= 300)) return false;
+        if (filters.moqBucket === "300+" && !(moq > 300)) return false;
+      }
+
+      if (filters.priceBucket !== "Any") {
+        const min = getPriceMin(p);
+        if (filters.priceBucket === "Under ₹300" && !(min < 300)) return false;
+        if (filters.priceBucket === "₹300–₹700" && !(min >= 300 && min < 700)) return false;
+        if (filters.priceBucket === "₹700–₹1500" && !(min >= 700 && min < 1500)) return false;
+        if (filters.priceBucket === "Above ₹1500" && !(min >= 1500)) return false;
+      }
+
+      if (filters.productionTypes.length > 0) {
+        const supplierType = p.supplier?.supplierType;
+        const effective = new Set(
+          filters.productionTypes.flatMap((t) => (t === "OEM" || t === "ODM" ? ["Manufacturer"] : [t]))
+        );
+        if (!supplierType || !effective.has(supplierType)) return false;
+      }
+
+      return true;
+    });
+  }, [products, filters.readyStockOnly, filters.moqBucket, filters.priceBucket, filters.productionTypes]);
+
+  const collections = useMemo(
+    () =>
+      COLLECTIONS.map((c) => ({ ...c, items: discoveryPool.filter(c.filter).slice(0, 10) })).filter(
+        (c) => c.items.length > 0
+      ),
+    [discoveryPool]
+  );
+
+  function isChipActive(chip: string) {
+    if (FASHION_CATEGORIES.includes(chip)) return activeCategory === chip;
+    if (chip === "Export Quality") return filters.exportOnly;
+    if (chip === "Ready Stock") return filters.readyStockOnly;
+    if (chip === "MOQ <100") return filters.moqBucket === "Under 100";
+    return false;
+  }
+
+  function onChipToggle(chip: string) {
+    if (FASHION_CATEGORIES.includes(chip)) {
+      setActiveCategory((prev) => (prev === chip ? "All Categories" : chip));
+      return;
+    }
+    if (chip === "Export Quality") setFilters((f) => ({ ...f, exportOnly: !f.exportOnly }));
+    else if (chip === "Ready Stock") setFilters((f) => ({ ...f, readyStockOnly: !f.readyStockOnly }));
+    else if (chip === "MOQ <100")
+      setFilters((f) => ({ ...f, moqBucket: f.moqBucket === "Under 100" ? "Any" : "Under 100" }));
+  }
+
+  function onCategorySelect(category: string) {
+    setActiveCategory(category === "All Categories" ? "All Categories" : category);
+    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openProduct(product: Product) {
+    setSelectedProduct(product);
+  }
+
+  function openSupplier(supplier: Supplier) {
+    setSelectedSupplier(supplier);
+    setSupplierDrawerOpen(true);
+  }
+
+  function clearAllFilters() {
+    setSearchQuery("");
+    setActiveCategory("All Categories");
+    setFilters(DEFAULT_FILTERS);
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header section */}
-      <div className="pt-12 pb-8 px-4 sm:px-6 lg:px-8 max-w-[2000px] mx-auto w-full text-center sm:text-left">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">
-          Shop
-        </h1>
-        <p className="text-lg text-slate-600 max-w-2xl">
-          Discover products from verified wholesale suppliers. Browse the latest trends and connect directly with manufacturers globally.
-        </p>
-      </div>
-
-      <FilterBar 
+    <div className="max-w-[1600px] mx-auto w-full">
+      <ShopHero
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        activeCategory={activeCategory}
-        setActiveCategory={setActiveCategory}
-        activeSort={activeSort}
-        setActiveSort={setActiveSort}
+        onChipToggle={onChipToggle}
+        onCategorySelect={onCategorySelect}
+        isChipActive={isChipActive}
       />
 
-      <main className="flex-1 max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8 w-full pb-20">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 opacity-50">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-slate-500 font-medium animate-pulse">Loading products...</p>
-          </div>
-        ) : products.length > 0 ? (
-          <>
-            <MasonryGrid 
-              products={products} 
-              onProductClick={(p) => setSelectedProduct(p)} 
-            />
-            {hasMore && (
-              <div className="flex justify-center mt-12 mb-8">
-                <button
-                  onClick={() => setPage(p => p + 1)}
-                  className="px-8 py-3 bg-white border border-slate-200 text-slate-700 font-semibold rounded-full hover:bg-slate-50 hover:shadow-sm transition-all"
-                >
-                  Load More Products
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-              <PackageSearch className="w-10 h-10 text-slate-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-slate-900 mb-2">No products found</h3>
-            <p className="text-slate-500 max-w-md">
-              We couldn&apos;t find any products matching your current filters. Try adjusting your search or category selection.
-            </p>
-            <button 
-              onClick={() => {
-                setSearchQuery("");
-                setActiveCategory("All Categories");
-              }}
-              className="mt-8 px-6 py-3 bg-slate-900 text-white rounded-full font-semibold hover:bg-slate-800 transition-colors"
-            >
-              Clear all filters
-            </button>
-          </div>
-        )}
-      </main>
+      <ShopCategories onSelect={onCategorySelect} />
 
-      <ProductDrawer 
-        product={selectedProduct} 
-        isOpen={!!selectedProduct} 
-        onClose={() => setSelectedProduct(null)} 
-        onViewSupplier={(supplier) => {
-          setSelectedSupplier(supplier);
-          setSupplierDrawerOpen(true);
-        }}
+      {collections.length > 0 && (
+        <div className="py-10 space-y-10">
+          {collections.map((c) => (
+            <CollectionRow
+              key={c.title}
+              title={c.title}
+              emoji={c.emoji}
+              products={c.items}
+              onProductClick={openProduct}
+              onViewSupplier={openSupplier}
+            />
+          ))}
+        </div>
+      )}
+
+      <div ref={gridRef} className="pt-4 scroll-mt-4">
+        <FilterBar
+          resultCount={loading ? undefined : visibleProducts.length}
+          activeCategory={activeCategory}
+          setActiveCategory={setActiveCategory}
+          activeSort={activeSort}
+          setActiveSort={setActiveSort}
+          filters={filters}
+          setFilters={setFilters}
+        />
+
+        <div className="pt-6 pb-20">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 opacity-60">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-muted-foreground font-medium animate-pulse">Loading products...</p>
+            </div>
+          ) : visibleProducts.length > 0 ? (
+            <>
+              <MasonryGrid products={visibleProducts} onProductClick={openProduct} onViewSupplier={openSupplier} />
+              {hasMore && (
+                <div className="flex justify-center mt-10 mb-6">
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="px-8 py-3 bg-card border border-border text-foreground font-semibold rounded-full hover:bg-muted hover:shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {loadingMore ? "Loading..." : "Load More Products"}
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">
+                <PackageSearch className="w-10 h-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-2xl font-bold text-foreground mb-2">No products found</h3>
+              <p className="text-muted-foreground max-w-md">
+                We couldn&apos;t find any products matching your current filters. Try adjusting your search or
+                filters.
+              </p>
+              <button
+                onClick={clearAllFilters}
+                className="mt-8 px-6 py-3 bg-primary text-primary-foreground rounded-full font-semibold hover:bg-primary/90 transition-colors"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ProductDrawer
+        product={selectedProduct}
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onViewSupplier={openSupplier}
       />
 
       <SupplierDrawer

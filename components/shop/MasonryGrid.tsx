@@ -1,24 +1,26 @@
 "use client";
 
 import { Product } from "@/types/product";
+import { Supplier } from "@/types/supplier";
 import { ProductCard } from "./ProductCard";
 
-export function MasonryGrid({ 
+export function MasonryGrid({
   products,
-  columns = 4,
-  onProductClick
-}: { 
+  onProductClick,
+  onViewSupplier,
+}: {
   products: Product[];
-  columns?: number;
   onProductClick: (product: Product) => void;
+  onViewSupplier: (supplier: Supplier) => void;
 }) {
   return (
-    <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-6 space-y-6">
+    <div className="columns-2 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-5">
       {products.map((product) => (
-        <ProductCard 
-          key={product.id} 
-          product={product} 
-          onClick={onProductClick} 
+        <ProductCard
+          key={product.id}
+          product={product}
+          onClick={onProductClick}
+          onViewSupplier={onViewSupplier}
         />
       ))}
     </div>

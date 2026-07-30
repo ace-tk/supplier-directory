@@ -199,7 +199,7 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
           </Button>
           <div className="grid grid-cols-3 gap-1.5">
             <Link
-              href={"/dashboard/crm?supplierId=" + supplier.id}
+              href={"/crm?supplierId=" + supplier.id}
               onClick={(e) => e.stopPropagation()}
               className="flex-1 h-7 flex items-center justify-center gap-1 text-[11px] rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground transition-colors font-medium"
               title={`WhatsApp ${supplier.whatsapp}`}

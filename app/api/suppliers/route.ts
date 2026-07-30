@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { supplierSchema } from "@/lib/validations/supplier";
-import { SUPPLIERS as SEED_DATA } from "@/data/suppliers";
+import { ensureSuppliersSeeded } from "@/lib/seed";
 type DbPayload = Parameters<typeof db.supplierListing.create>[0]["data"];
 
 function toDbPayload(data: ReturnType<typeof supplierSchema.parse>, extra?: { initials?: string; logoColor?: string }): DbPayload {
@@ -32,45 +32,12 @@ function toDbPayload(data: ReturnType<typeof supplierSchema.parse>, extra?: { in
 
 export async function GET() {
   try {
-    let suppliers = await db.supplierListing.findMany({
+    // Idempotent backfill — adds any seed suppliers not yet in the DB.
+    await ensureSuppliersSeeded();
+
+    const suppliers = await db.supplierListing.findMany({
       orderBy: { createdAt: "asc" },
     });
-
-    // Auto-seed from static data if DB is empty
-    if (suppliers.length === 0) {
-      await db.supplierListing.createMany({
-        data: SEED_DATA.map((s) => ({
-          id: s.id,
-          companyName: s.companyName,
-          description: s.description,
-          industry: s.industry,
-          supplierType: s.supplierType,
-          country: s.country,
-          city: s.city,
-          rating: s.rating,
-          reviewCount: s.reviewCount,
-          verified: s.verified,
-          products: s.products,
-          responseTime: s.responseTime,
-          minimumOrder: s.minimumOrder,
-          phone: s.phone,
-          email: s.email,
-          website: s.website,
-          whatsapp: s.whatsapp,
-          linkedin: s.linkedin,
-          initials: s.initials,
-          logoColor: s.logoColor,
-          yearEstablished: s.yearEstablished,
-          employees: s.employees,
-          savedCount: s.savedCount,
-          notes: null,
-        })),
-        skipDuplicates: true,
-      });
-      suppliers = await db.supplierListing.findMany({
-        orderBy: { createdAt: "asc" },
-      });
-    }
 
     return NextResponse.json(suppliers);
   } catch (err) {

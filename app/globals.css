@@ -282,6 +282,15 @@
     border-radius: 3px;
   }
 
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Focus ring */
   .focus-ring {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;

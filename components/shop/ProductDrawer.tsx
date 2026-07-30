@@ -1,11 +1,24 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Bookmark, Share2, MessageCircle, Mail, ExternalLink, ShieldCheck, Factory } from "lucide-react";
+import {
+  X,
+  Bookmark,
+  Share2,
+  MessageCircle,
+  Mail,
+  ExternalLink,
+  ShieldCheck,
+  Factory,
+  MapPin,
+  Star,
+} from "lucide-react";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
 import { useState } from "react";
 import Link from "next/link";
+import { getProductTags, getTagColor } from "@/lib/product-tags";
+import { cn } from "@/lib/utils";
 
 export function ProductDrawer({
   product,
@@ -22,6 +35,9 @@ export function ProductDrawer({
 
   if (!product) return null;
 
+  const supplier = product.supplier;
+  const tags = getProductTags(product);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -32,7 +48,7 @@ export function ProductDrawer({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
           />
 
           {/* Drawer */}
@@ -41,38 +57,38 @@ export function ProductDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 w-full md:w-[600px] lg:w-[800px] bg-white z-50 shadow-2xl flex flex-col overflow-hidden"
+            className="fixed inset-y-0 right-0 w-full md:w-[600px] lg:w-[800px] bg-background z-50 shadow-2xl flex flex-col overflow-hidden border-l border-border"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <div className="flex items-center gap-3">
                 <button
                   onClick={onClose}
-                  className="p-2 -ml-2 rounded-full hover:bg-slate-100 transition-colors"
+                  className="p-2 -ml-2 rounded-full hover:bg-muted transition-colors"
                 >
-                  <X className="w-5 h-5 text-slate-500" />
+                  <X className="w-5 h-5 text-muted-foreground" />
                 </button>
-                <h2 className="font-semibold text-slate-900">Product Details</h2>
+                <h2 className="font-semibold text-foreground">Product Details</h2>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
+                <button className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
                   <Share2 className="w-5 h-5" />
                 </button>
-                <button className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors">
+                <button className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
                   <Bookmark className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Content Scroll Area */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto scrollbar-thin">
               {/* Image Gallery */}
-              <div className="bg-slate-50 p-6 flex flex-col items-center border-b border-slate-100">
-                <div className="relative w-full max-w-lg aspect-square rounded-2xl overflow-hidden bg-white shadow-sm mb-4">
+              <div className="bg-muted/40 p-6 flex flex-col items-center border-b border-border">
+                <div className="relative w-full max-w-lg aspect-square rounded-2xl overflow-hidden bg-card shadow-card mb-4">
                   <img
                     src={product.images[activeImage] || product.images[0]}
                     alt={product.name}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-cover"
                   />
                 </div>
                 {product.images.length > 1 && (
@@ -81,9 +97,10 @@ export function ProductDrawer({
                       <button
                         key={idx}
                         onClick={() => setActiveImage(idx)}
-                        className={`relative w-20 h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
-                          activeImage === idx ? "border-indigo-500" : "border-transparent hover:border-slate-300"
-                        }`}
+                        className={cn(
+                          "relative w-20 h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0",
+                          activeImage === idx ? "border-primary" : "border-transparent hover:border-border"
+                        )}
                       >
                         <img src={img} alt="" className="w-full h-full object-cover" />
                       </button>
@@ -94,79 +111,107 @@ export function ProductDrawer({
 
               {/* Product Info */}
               <div className="p-8 max-w-3xl mx-auto">
-                <div className="mb-8">
+                <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-md uppercase tracking-wider">
+                    <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-md uppercase tracking-wider">
                       {product.category}
                     </span>
                   </div>
-                  <h1 className="text-3xl font-bold text-slate-900 mb-4 leading-tight">{product.name}</h1>
-                  <p className="text-slate-600 text-lg leading-relaxed">
+                  <h1 className="text-3xl font-bold text-foreground mb-4 leading-tight">
+                    {product.name}
+                  </h1>
+                  <p className="text-muted-foreground text-base leading-relaxed">
                     {product.description}
                   </p>
                 </div>
 
+                {/* Tags */}
+                <div className="flex flex-wrap gap-1.5 mb-8">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className={cn("px-2.5 py-1 text-xs font-medium rounded-full", getTagColor(tag))}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
                 {/* Key Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <p className="text-xs text-slate-500 mb-1 font-medium">Price Range</p>
-                    <p className="text-lg font-bold text-slate-900">{product.priceRange}</p>
+                  <div className="bg-muted/50 p-4 rounded-2xl border border-border">
+                    <p className="text-xs text-muted-foreground mb-1 font-medium">Price Range</p>
+                    <p className="text-lg font-bold text-foreground">{product.priceRange}</p>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <p className="text-xs text-slate-500 mb-1 font-medium">Min. Order (MOQ)</p>
-                    <p className="text-lg font-bold text-slate-900">{product.moq}</p>
+                  <div className="bg-muted/50 p-4 rounded-2xl border border-border">
+                    <p className="text-xs text-muted-foreground mb-1 font-medium">Min. Order (MOQ)</p>
+                    <p className="text-lg font-bold text-foreground">{product.moq}</p>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <p className="text-xs text-slate-500 mb-1 font-medium">Lead Time</p>
-                    <p className="text-lg font-bold text-slate-900">{product.leadTime}</p>
+                  <div className="bg-muted/50 p-4 rounded-2xl border border-border">
+                    <p className="text-xs text-muted-foreground mb-1 font-medium">Lead Time</p>
+                    <p className="text-lg font-bold text-foreground">{product.leadTime}</p>
                   </div>
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <p className="text-xs text-slate-500 mb-1 font-medium">Material</p>
-                    <p className="text-lg font-bold text-slate-900">{product.material || "N/A"}</p>
+                  <div className="bg-muted/50 p-4 rounded-2xl border border-border">
+                    <p className="text-xs text-muted-foreground mb-1 font-medium">Material</p>
+                    <p className="text-lg font-bold text-foreground">{product.material || "N/A"}</p>
                   </div>
                 </div>
 
                 {/* Supplier Card */}
-                {product.supplier && (
+                {supplier && (
                   <div className="mb-10">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Supplier Information</h3>
-                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Supplier Information</h3>
+                    <div className="bg-card border border-border rounded-3xl p-6 shadow-card hover:shadow-elevated transition-shadow">
+                      <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
                         <div className="flex items-center gap-4">
-                          <div 
-                            className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-sm"
-                            style={{ backgroundColor: product.supplier.logoColor || '#6366F1' }}
+                          <div
+                            className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-sm shrink-0"
+                            style={{ backgroundColor: supplier.logoColor || "#6366F1" }}
                           >
-                            {product.supplier.initials || product.supplier.companyName.substring(0, 2).toUpperCase()}
+                            {supplier.initials || supplier.companyName.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-bold text-slate-900 text-xl">{product.supplier.companyName}</h4>
-                              {product.supplier.verified && (
-                                <ShieldCheck className="w-5 h-5 text-blue-500" />
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <h4 className="font-bold text-foreground text-xl">{supplier.companyName}</h4>
+                              {supplier.verified && (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-500">
+                                  <ShieldCheck className="w-4 h-4" /> Verified
+                                </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-500">
-                              <Factory className="w-4 h-4" />
-                              <span>{product.supplier.supplierType}</span>
-                              <span>•</span>
-                              <span>{product.supplier.city}, {product.supplier.country}</span>
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                              <span className="flex items-center gap-1">
+                                <Factory className="w-3.5 h-3.5" /> {supplier.supplierType}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5" /> {supplier.city}, {supplier.country}
+                              </span>
+                              {supplier.yearEstablished && <span>Since {supplier.yearEstablished}</span>}
+                              {!!supplier.rating && (
+                                <span className="flex items-center gap-1">
+                                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                                  {supplier.rating.toFixed(1)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => onViewSupplier(product.supplier as unknown as Supplier)}
-                          className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-4 py-2 rounded-full transition-colors"
+                        <button
+                          onClick={() => onViewSupplier(supplier as unknown as Supplier)}
+                          className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 bg-primary/10 px-4 py-2 rounded-full transition-colors"
                         >
                           View Profile <ExternalLink className="w-4 h-4" />
                         </button>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                        <Link href={"/dashboard/crm?supplierId=" + product.supplier.id} className="flex items-center justify-center gap-2 w-full py-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-semibold transition-colors">
+                        <Link
+                          href={"/crm?supplierId=" + supplier.id}
+                          className="flex items-center justify-center gap-2 w-full py-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-semibold transition-colors"
+                        >
                           <MessageCircle className="w-5 h-5" /> WhatsApp
                         </Link>
-                        <button className="flex items-center justify-center gap-2 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold transition-colors">
+                        <button className="flex items-center justify-center gap-2 w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold transition-colors">
                           <Mail className="w-5 h-5" /> Contact Supplier
                         </button>
                       </div>
@@ -176,8 +221,8 @@ export function ProductDrawer({
 
                 {/* Specs */}
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Specifications</h3>
-                  <div className="bg-slate-50 rounded-2xl p-6 text-slate-600 border border-slate-100">
+                  <h3 className="text-lg font-semibold text-foreground mb-4">Specifications</h3>
+                  <div className="bg-muted/50 rounded-2xl p-6 text-muted-foreground border border-border">
                     {product.specifications || "No specifications provided."}
                   </div>
                 </div>

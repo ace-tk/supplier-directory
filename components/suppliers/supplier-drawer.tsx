@@ -371,7 +371,7 @@ export function SupplierDrawer({
           {/* Footer contact strip */}
           <div className="flex-none border-t border-border p-4 flex items-center gap-2">
             <Link
-              href={"/dashboard/crm?supplierId=" + supplier.id}
+              href={"/crm?supplierId=" + supplier.id}
               className="flex flex-1 items-center justify-center gap-1.5 h-8 text-xs rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground transition-colors font-medium"
             >
               <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
