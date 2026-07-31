@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Loader2, ArrowRight, Video } from "lucide-react";
 import { toast } from "sonner";
 
 import { loginSchema } from "@/lib/validations/auth";
@@ -21,6 +21,14 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from") ?? "/dashboard";
+  const reason = searchParams.get("reason");
+  const authLinkSuffix = (() => {
+    const params = new URLSearchParams();
+    if (searchParams.get("from")) params.set("from", searchParams.get("from")!);
+    if (reason) params.set("reason", reason);
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  })();
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -69,6 +77,14 @@ function LoginContent() {
 
       {/* Card */}
       <div className="rounded-2xl border border-border bg-card shadow-card p-6">
+        {reason === "video" && (
+          <div className="flex items-start gap-2.5 mb-5 p-3 rounded-xl bg-primary/10 border border-primary/20">
+            <Video className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <p className="text-xs text-foreground leading-relaxed">
+              Sign in to request product videos from suppliers.
+            </p>
+          </div>
+        )}
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-foreground tracking-tight">
             Welcome back
@@ -197,7 +213,7 @@ function LoginContent() {
         <p className="mt-5 text-center text-xs text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
-            href="/signup"
+            href={`/signup${authLinkSuffix}`}
             className="text-foreground font-medium hover:underline underline-offset-4"
           >
             Sign up free

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, ArrowRight, Building2, ShoppingCart } from "lucide-react";
+import { Eye, EyeOff, Loader2, ArrowRight, Building2, ShoppingCart, Video } from "lucide-react";
 import { toast } from "sonner";
 
 import { signupSchema, type SignupFormValues } from "@/lib/validations/auth";
@@ -32,8 +32,19 @@ const ROLES = [
   },
 ];
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from") ?? "/dashboard";
+  const reason = searchParams.get("reason");
+  const authLinkSuffix = (() => {
+    const params = new URLSearchParams();
+    if (searchParams.get("from")) params.set("from", searchParams.get("from")!);
+    if (reason) params.set("reason", reason);
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  })();
+
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"BUYER" | "SUPPLIER">("BUYER");
 
@@ -63,7 +74,7 @@ export default function SignupPage() {
       return;
     }
     toast.success("Account created! Welcome to SupplyBase.");
-    router.push("/dashboard");
+    router.push(from);
     router.refresh();
   }
 
@@ -85,6 +96,14 @@ export default function SignupPage() {
       </div>
 
       <div className="rounded-2xl border border-border bg-card shadow-card p-6">
+        {reason === "video" && (
+          <div className="flex items-start gap-2.5 mb-5 p-3 rounded-xl bg-primary/10 border border-primary/20">
+            <Video className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <p className="text-xs text-foreground leading-relaxed">
+              Please create an account to request product videos from suppliers.
+            </p>
+          </div>
+        )}
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-foreground tracking-tight">
             Create your account
@@ -252,11 +271,25 @@ export default function SignupPage() {
 
         <p className="mt-5 text-center text-xs text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="text-foreground font-medium hover:underline underline-offset-4">
+          <Link href={`/login${authLinkSuffix}`} className="text-foreground font-medium hover:underline underline-offset-4">
             Sign in
           </Link>
         </p>
       </div>
     </motion.div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      }
+    >
+      <SignupContent />
+    </Suspense>
   );
 }

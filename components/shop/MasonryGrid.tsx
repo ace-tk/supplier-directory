@@ -8,10 +8,16 @@ export function MasonryGrid({
   products,
   onProductClick,
   onViewSupplier,
+  onWatchVideo,
+  onRequestVideo,
+  onCounterOffer,
 }: {
   products: Product[];
   onProductClick: (product: Product) => void;
   onViewSupplier: (supplier: Supplier) => void;
+  onWatchVideo: (product: Product) => void;
+  onRequestVideo: (product: Product) => void;
+  onCounterOffer: (product: Product) => void;
 }) {
   return (
     <div className="columns-2 md:columns-3 lg:columns-4 gap-6">
@@ -21,6 +27,9 @@ export function MasonryGrid({
           product={product}
           onClick={onProductClick}
           onViewSupplier={onViewSupplier}
+          onWatchVideo={onWatchVideo}
+          onRequestVideo={onRequestVideo}
+          onCounterOffer={onCounterOffer}
         />
       ))}
     </div>

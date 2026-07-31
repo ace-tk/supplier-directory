@@ -10,12 +10,18 @@ export function CollectionRow({
   products,
   onProductClick,
   onViewSupplier,
+  onWatchVideo,
+  onRequestVideo,
+  onCounterOffer,
 }: {
   title: string;
   emoji?: string;
   products: Product[];
   onProductClick: (product: Product) => void;
   onViewSupplier: (supplier: Supplier) => void;
+  onWatchVideo: (product: Product) => void;
+  onRequestVideo: (product: Product) => void;
+  onCounterOffer: (product: Product) => void;
 }) {
   if (products.length === 0) return null;
 
@@ -28,7 +34,14 @@ export function CollectionRow({
       <div className="flex gap-5 overflow-x-auto hide-scrollbar pb-2 -mx-1 px-1">
         {products.map((product) => (
           <div key={product.id} className="w-[220px] sm:w-[240px] shrink-0">
-            <ProductCard product={product} onClick={onProductClick} onViewSupplier={onViewSupplier} />
+            <ProductCard
+              product={product}
+              onClick={onProductClick}
+              onViewSupplier={onViewSupplier}
+              onWatchVideo={onWatchVideo}
+              onRequestVideo={onRequestVideo}
+              onCounterOffer={onCounterOffer}
+            />
           </div>
         ))}
       </div>

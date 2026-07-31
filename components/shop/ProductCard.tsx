@@ -3,12 +3,28 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Bookmark, Download, Share2, Eye, Building2, MessageCircle, ShieldCheck, MapPin, Star } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Bookmark,
+  Download,
+  Share2,
+  Eye,
+  Building2,
+  MessageCircle,
+  ShieldCheck,
+  MapPin,
+  PlayCircle,
+  Video,
+  Briefcase,
+} from "lucide-react";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
 import { getProductTags, getTagColor } from "@/lib/product-tags";
 import { downloadDetails, shareDetails } from "@/lib/card-actions";
+import { hasProductVideo } from "@/lib/product-engagement";
+import { useSession } from "@/hooks/use-session";
 import { ProductImageSlider } from "./ProductImageSlider";
+import { ViewsPopover } from "./ViewsPopover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -16,15 +32,24 @@ export function ProductCard({
   product,
   onClick,
   onViewSupplier,
+  onWatchVideo,
+  onRequestVideo,
+  onCounterOffer,
 }: {
   product: Product;
   onClick: (product: Product) => void;
   onViewSupplier: (supplier: Supplier) => void;
+  onWatchVideo: (product: Product) => void;
+  onRequestVideo: (product: Product) => void;
+  onCounterOffer: (product: Product) => void;
 }) {
+  const router = useRouter();
+  const session = useSession();
   const [isHovered, setIsHovered] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const tags = getProductTags(product);
   const supplier = product.supplier;
+  const hasVideo = hasProductVideo(product);
 
   function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
@@ -57,6 +82,26 @@ export function ProductCard({
       text: `${product.name} from ${supplier?.companyName ?? "a verified supplier"} — ${product.priceRange ?? ""}`,
       url: `${window.location.origin}/shop?productId=${product.id}`,
     });
+  }
+
+  function handleWatchVideo(e: React.MouseEvent) {
+    e.stopPropagation();
+    onWatchVideo(product);
+  }
+
+  function handleRequestVideoClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!session) {
+      const returnUrl = `/shop?openRequestVideo=${product.id}`;
+      router.push(`/signup?from=${encodeURIComponent(returnUrl)}&reason=video`);
+      return;
+    }
+    onRequestVideo(product);
+  }
+
+  function handleCounterOfferClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    onCounterOffer(product);
   }
 
   return (
@@ -205,11 +250,7 @@ export function ProductCard({
               <MapPin className="w-3 h-3" /> {supplier.city}
             </span>
           )}
-          {!!supplier?.rating && (
-            <span className="flex items-center gap-0.5">
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {supplier.rating.toFixed(1)}
-            </span>
-          )}
+          <ViewsPopover product={product} />
         </div>
 
         <div className="flex flex-wrap gap-1.5 mb-4">
@@ -223,7 +264,7 @@ export function ProductCard({
           ))}
         </div>
 
-        <div className="flex items-end justify-between pt-3 border-t border-border/60">
+        <div className="flex items-end justify-between pt-3 pb-4 border-t border-border/60">
           <div>
             <p className="text-[10px] text-muted-foreground mb-0.5">Price Range</p>
             <p className="font-bold text-foreground text-[15px]">{product.priceRange}</p>
@@ -232,6 +273,31 @@ export function ProductCard({
             <p className="text-[10px] text-muted-foreground mb-0.5">MOQ</p>
             <p className="font-medium text-foreground text-sm">{product.moq}</p>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {hasVideo ? (
+            <button
+              onClick={handleWatchVideo}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-semibold hover:bg-emerald-500/20 transition-colors duration-200"
+            >
+              <PlayCircle className="w-3.5 h-3.5" /> Video Available
+            </button>
+          ) : (
+            <button
+              onClick={handleRequestVideoClick}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-full bg-muted text-muted-foreground text-xs font-semibold hover:bg-accent hover:text-accent-foreground transition-colors duration-200"
+            >
+              <Video className="w-3.5 h-3.5" /> Request Video
+            </button>
+          )}
+
+          <button
+            onClick={handleCounterOfferClick}
+            className="flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors duration-200"
+          >
+            <Briefcase className="w-3.5 h-3.5" /> View / Counter Offer
+          </button>
         </div>
       </div>
     </motion.div>

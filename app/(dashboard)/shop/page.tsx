@@ -1,13 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
-import { PackageSearch } from "lucide-react";
+import { Suspense, useState, useEffect, useMemo, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { PackageSearch, Loader2 } from "lucide-react";
 import { ShopHero } from "@/components/shop/ShopHero";
 import { ShopCategories } from "@/components/shop/ShopCategories";
 import { FilterBar, type ShopFilters, DEFAULT_FILTERS } from "@/components/shop/FilterBar";
 import { MasonryGrid } from "@/components/shop/MasonryGrid";
 import { CollectionRow } from "@/components/shop/CollectionRow";
 import { ProductDrawer } from "@/components/shop/ProductDrawer";
+import { ProductVideoModal } from "@/components/shop/ProductVideoModal";
+import { RequestVideoModal } from "@/components/shop/RequestVideoModal";
+import { CounterOfferModal } from "@/components/shop/CounterOfferModal";
 import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
@@ -16,7 +20,10 @@ import { getMoqNumber, getPriceMin, isReadyStock } from "@/lib/product-tags";
 
 const PAGE_SIZE = 24;
 
-export default function ShopPage() {
+function ShopPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [discoveryPool, setDiscoveryPool] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +39,13 @@ export default function ShopPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierDrawerOpen, setSupplierDrawerOpen] = useState(false);
+
+  const [videoProduct, setVideoProduct] = useState<Product | null>(null);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [requestVideoProduct, setRequestVideoProduct] = useState<Product | null>(null);
+  const [requestVideoModalOpen, setRequestVideoModalOpen] = useState(false);
+  const [counterOfferProduct, setCounterOfferProduct] = useState<Product | null>(null);
+  const [counterOfferModalOpen, setCounterOfferModalOpen] = useState(false);
 
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +109,26 @@ export default function ShopPage() {
       .then((res) => res.json())
       .then((data: Product[]) => setDiscoveryPool(data))
       .catch((err) => console.error("Failed to load discovery pool:", err));
+  }, []);
+
+  // Resume the Request Video flow after a signup/login redirect.
+  useEffect(() => {
+    const openId = searchParams.get("openRequestVideo");
+    if (!openId) return;
+
+    router.replace("/shop");
+
+    fetch(`/api/products?id=${openId}`)
+      .then((res) => res.json())
+      .then((data: Product[]) => {
+        const found = data[0];
+        if (found) {
+          setRequestVideoProduct(found);
+          setRequestVideoModalOpen(true);
+        }
+      })
+      .catch((err) => console.error("Failed to resume video request:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadMore() {
@@ -186,6 +220,21 @@ export default function ShopPage() {
     setSupplierDrawerOpen(true);
   }
 
+  function openVideoModal(product: Product) {
+    setVideoProduct(product);
+    setVideoModalOpen(true);
+  }
+
+  function openRequestVideoModal(product: Product) {
+    setRequestVideoProduct(product);
+    setRequestVideoModalOpen(true);
+  }
+
+  function openCounterOfferModal(product: Product) {
+    setCounterOfferProduct(product);
+    setCounterOfferModalOpen(true);
+  }
+
   function clearAllFilters() {
     setSearchQuery("");
     setActiveCategory("All Categories");
@@ -214,6 +263,9 @@ export default function ShopPage() {
               products={c.items}
               onProductClick={openProduct}
               onViewSupplier={openSupplier}
+              onWatchVideo={openVideoModal}
+              onRequestVideo={openRequestVideoModal}
+              onCounterOffer={openCounterOfferModal}
             />
           ))}
         </div>
@@ -238,7 +290,14 @@ export default function ShopPage() {
             </div>
           ) : visibleProducts.length > 0 ? (
             <>
-              <MasonryGrid products={visibleProducts} onProductClick={openProduct} onViewSupplier={openSupplier} />
+              <MasonryGrid
+                products={visibleProducts}
+                onProductClick={openProduct}
+                onViewSupplier={openSupplier}
+                onWatchVideo={openVideoModal}
+                onRequestVideo={openRequestVideoModal}
+                onCounterOffer={openCounterOfferModal}
+              />
               {hasMore && (
                 <div className="flex justify-center mt-10 mb-6">
                   <button
@@ -286,6 +345,34 @@ export default function ShopPage() {
         onUpdate={async () => {}}
         onDelete={async () => {}}
       />
+
+      <ProductVideoModal product={videoProduct} open={videoModalOpen} onOpenChange={setVideoModalOpen} />
+
+      <RequestVideoModal
+        product={requestVideoProduct}
+        open={requestVideoModalOpen}
+        onOpenChange={setRequestVideoModalOpen}
+      />
+
+      <CounterOfferModal
+        product={counterOfferProduct}
+        open={counterOfferModalOpen}
+        onOpenChange={setCounterOfferModalOpen}
+      />
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-32">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <ShopPageContent />
+    </Suspense>
   );
 }

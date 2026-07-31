@@ -6,6 +6,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
     const category = searchParams.get('category');
     const country = searchParams.get('country');
     const search = searchParams.get('search');
@@ -23,6 +24,7 @@ export async function GET(req: Request) {
 
     // Build filter
     const where: Prisma.ProductWhereInput = {};
+    if (id) where.id = id;
     if (category && category !== 'All Categories') where.category = category;
     if (country && country !== 'All Countries') where.country = country;
     if (supplierId) where.supplierId = supplierId;
