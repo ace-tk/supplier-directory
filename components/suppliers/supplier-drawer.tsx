@@ -15,7 +15,6 @@ import {
   Edit2,
   Trash2,
   Users,
-  Calendar,
   Package,
   FileText,
   ExternalLink,
@@ -259,12 +258,11 @@ export function SupplierDrawer({
               {/* Quick stats */}
               <section>
                 <SectionTitle>Trade Info</SectionTitle>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {[
                     { icon: Clock, label: "Response Time", value: supplier.responseTime },
                     { icon: ShoppingBag, label: "Min. Order", value: supplier.minimumOrder },
                     { icon: Users, label: "Employees", value: supplier.employees },
-                    { icon: Calendar, label: "Established", value: supplier.yearEstablished?.toString() },
                   ].map(({ icon: Icon, label, value }) =>
                     value ? (
                       <div key={label} className="rounded-lg bg-muted/40 border border-border/40 p-3">

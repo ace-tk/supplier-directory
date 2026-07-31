@@ -205,7 +205,6 @@ export function ProductCard({
               <MapPin className="w-3 h-3" /> {supplier.city}
             </span>
           )}
-          {supplier?.yearEstablished && <span>Since {supplier.yearEstablished}</span>}
           {!!supplier?.rating && (
             <span className="flex items-center gap-0.5">
               <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {supplier.rating.toFixed(1)}

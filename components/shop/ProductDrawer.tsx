@@ -186,7 +186,6 @@ export function ProductDrawer({
                               <span className="flex items-center gap-1">
                                 <MapPin className="w-3.5 h-3.5" /> {supplier.city}, {supplier.country}
                               </span>
-                              {supplier.yearEstablished && <span>Since {supplier.yearEstablished}</span>}
                               {!!supplier.rating && (
                                 <span className="flex items-center gap-1">
                                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />

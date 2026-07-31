@@ -249,7 +249,7 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
         </div>
 
         {/* Industry chip */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center mb-4">
           <span
             className="text-[11px] font-medium px-2 py-1 rounded-md"
             style={{
@@ -258,9 +258,6 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
             }}
           >
             {supplier.industry}
-          </span>
-          <span className="text-[11px] text-muted-foreground">
-            Est. {supplier.yearEstablished}
           </span>
         </div>
 
