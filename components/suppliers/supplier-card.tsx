@@ -11,12 +11,16 @@ import {
   Mail,
   MessageCircle,
   Bookmark,
+  Download,
+  Share2,
   ExternalLink,
   BadgeCheck,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { downloadDetails, shareDetails } from "@/lib/card-actions";
 import { cn } from "@/lib/utils";
 import { type Supplier } from "@/types/supplier";
 import Link from "next/link";
@@ -51,6 +55,34 @@ function StarRating({ rating }: { rating: number }) {
 export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps) {
   const [saved, setSaved] = useState(false);
 
+  function handleDownload(e: React.MouseEvent) {
+    e.stopPropagation();
+    downloadDetails({
+      fileName: `${supplier.companyName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.txt`,
+      title: supplier.companyName,
+      lines: [
+        { label: "Supplier Name", value: supplier.companyName },
+        { label: "Location", value: `${supplier.city}, ${supplier.country}` },
+        { label: "Industry", value: supplier.industry },
+        { label: "Supplier Type", value: supplier.supplierType },
+        { label: "MOQ", value: supplier.minimumOrder ?? "N/A" },
+        { label: "Rating", value: `${supplier.rating.toFixed(1)} (${supplier.reviewCount} reviews)` },
+        { label: "Response Time", value: supplier.responseTime ?? "N/A" },
+        { label: "Contact", value: supplier.phone || supplier.email || supplier.whatsapp || "Not available" },
+        { label: "Supplier Profile", value: `${window.location.origin}/directory?supplierId=${supplier.id}` },
+      ],
+    });
+  }
+
+  function handleShare(e: React.MouseEvent) {
+    e.stopPropagation();
+    shareDetails({
+      title: supplier.companyName,
+      text: `${supplier.companyName} — ${supplier.industry} supplier in ${supplier.city}, ${supplier.country}`,
+      url: `${window.location.origin}/directory?supplierId=${supplier.id}`,
+    });
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -79,36 +111,77 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                {supplier.companyName}
-              </h3>
-              <motion.button
-                whileTap={{ scale: 0.85 }}
-                onClick={() => setSaved((v) => !v)}
-                className={cn(
-                  "shrink-0 p-1 rounded-lg transition-colors",
-                  saved
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                aria-label="Save supplier"
-              >
-                <Bookmark
-                  className="h-4 w-4"
-                  fill={saved ? "currentColor" : "none"}
-                />
-              </motion.button>
-            </div>
+            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+              {supplier.companyName}
+            </h3>
 
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <div className="flex items-center gap-0.5 mt-1.5 flex-wrap">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSaved((v) => !v);
+                      }}
+                      className={cn(
+                        "shrink-0 p-1.5 rounded-full transition-colors",
+                        saved ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                      aria-label="Save supplier"
+                    />
+                  }
+                >
+                  <Bookmark className="h-3.5 w-3.5" fill={saved ? "currentColor" : "none"} />
+                </TooltipTrigger>
+                <TooltipContent>Save</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      onClick={handleDownload}
+                      className="shrink-0 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      aria-label="Download supplier details"
+                    />
+                  }
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </TooltipTrigger>
+                <TooltipContent>Download</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      onClick={handleShare}
+                      className="shrink-0 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                      aria-label="Share supplier"
+                    />
+                  }
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                </TooltipTrigger>
+                <TooltipContent>Share</TooltipContent>
+              </Tooltip>
+
               {supplier.verified && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                  <BadgeCheck className="h-3 w-3" />
-                  Verified
-                </span>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span className="shrink-0 p-1.5 rounded-full text-emerald-600 dark:text-emerald-400" />
+                    }
+                  >
+                    <BadgeCheck className="h-3.5 w-3.5" />
+                  </TooltipTrigger>
+                  <TooltipContent>Verified</TooltipContent>
+                </Tooltip>
               )}
-              <Badge variant="secondary" className="text-[11px] h-4 px-1.5">
+
+              <Badge variant="secondary" className="text-[11px] h-4 px-1.5 ml-0.5">
                 {supplier.supplierType}
               </Badge>
             </div>

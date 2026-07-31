@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Bookmark, Eye, Building2, MessageCircle, ShieldCheck, MapPin, Star } from "lucide-react";
+import { Bookmark, Download, Share2, Eye, Building2, MessageCircle, ShieldCheck, MapPin, Star } from "lucide-react";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
 import { getProductTags, getTagColor } from "@/lib/product-tags";
+import { downloadDetails, shareDetails } from "@/lib/card-actions";
 import { ProductImageSlider } from "./ProductImageSlider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export function ProductCard({
@@ -23,6 +25,39 @@ export function ProductCard({
   const [isSaved, setIsSaved] = useState(false);
   const tags = getProductTags(product);
   const supplier = product.supplier;
+
+  function handleDownload(e: React.MouseEvent) {
+    e.stopPropagation();
+    downloadDetails({
+      fileName: `${product.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.txt`,
+      title: product.name,
+      lines: [
+        { label: "Product Name", value: product.name },
+        { label: "Supplier Name", value: supplier?.companyName ?? "N/A" },
+        { label: "Supplier Location", value: supplier ? `${supplier.city}, ${supplier.country}` : "N/A" },
+        { label: "MOQ", value: product.moq ?? "N/A" },
+        { label: "Price Range", value: product.priceRange ?? "N/A" },
+        { label: "Tags", value: tags.join(", ") },
+        {
+          label: "Contact",
+          value: supplier?.phone || supplier?.email || supplier?.whatsapp || "Not available",
+        },
+        {
+          label: "Supplier Profile",
+          value: supplier ? `${window.location.origin}/directory?supplierId=${supplier.id}` : "N/A",
+        },
+      ],
+    });
+  }
+
+  function handleShare(e: React.MouseEvent) {
+    e.stopPropagation();
+    shareDetails({
+      title: product.name,
+      text: `${product.name} from ${supplier?.companyName ?? "a verified supplier"} — ${product.priceRange ?? ""}`,
+      url: `${window.location.origin}/shop?productId=${product.id}`,
+    });
+  }
 
   return (
     <motion.div
@@ -45,21 +80,64 @@ export function ProductCard({
           )}
         />
 
-        {/* Save */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsSaved((v) => !v);
-          }}
+        {/* Save / Download / Share */}
+        <div
           className={cn(
-            "absolute top-3 right-3 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-200",
-            isHovered || isSaved ? "opacity-100" : "opacity-0",
-            isSaved ? "bg-rose-500 text-white" : "bg-black/40 text-white hover:bg-black/60"
+            "absolute top-3 right-3 z-10 flex items-center gap-1.5 transition-opacity duration-200",
+            isHovered || isSaved ? "opacity-100" : "opacity-0"
           )}
-          aria-label="Save product"
         >
-          <Bookmark className="w-4 h-4" fill={isSaved ? "currentColor" : "none"} />
-        </button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSaved((v) => !v);
+                  }}
+                  className={cn(
+                    "p-2 rounded-full backdrop-blur-md transition-colors duration-200",
+                    isSaved ? "bg-rose-500 text-white" : "bg-black/40 text-white hover:bg-black/60"
+                  )}
+                  aria-label="Save product"
+                />
+              }
+            >
+              <Bookmark className="w-4 h-4" fill={isSaved ? "currentColor" : "none"} />
+            </TooltipTrigger>
+            <TooltipContent>Save</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  onClick={handleDownload}
+                  className="p-2 rounded-full backdrop-blur-md bg-black/40 text-white hover:bg-black/60 transition-colors duration-200"
+                  aria-label="Download product details"
+                />
+              }
+            >
+              <Download className="w-4 h-4" />
+            </TooltipTrigger>
+            <TooltipContent>Download</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  onClick={handleShare}
+                  className="p-2 rounded-full backdrop-blur-md bg-black/40 text-white hover:bg-black/60 transition-colors duration-200"
+                  aria-label="Share product"
+                />
+              }
+            >
+              <Share2 className="w-4 h-4" />
+            </TooltipTrigger>
+            <TooltipContent>Share</TooltipContent>
+          </Tooltip>
+        </div>
 
         {/* Quick actions */}
         <div
