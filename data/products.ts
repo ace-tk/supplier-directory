@@ -1,5 +1,7 @@
 // Fashion catalog for the Shop page — B2B wholesale apparel, footwear & accessories.
 
+import { fashionImageSet } from "@/lib/fashion-images";
+
 type SeedItem = {
   name: string;
   material: string;
@@ -147,7 +149,7 @@ export const PRODUCTS = CATEGORIES.flatMap((cat) =>
     const supplierId = cat.supplierIds[i % cat.supplierIds.length];
     const id = padId(counter++);
     const height = IMAGE_HEIGHTS[imgSeed % IMAGE_HEIGHTS.length];
-    const seed = `fashion-${imgSeed++}`;
+    imgSeed++;
     const savedCount = 60 + ((imgSeed * 41 + item.name.length * 7) % 560);
 
     return {
@@ -162,10 +164,7 @@ export const PRODUCTS = CATEGORIES.flatMap((cat) =>
       specifications: "Export-quality finishing with strict QC at every stage. Custom sizing, colorways, and packaging available for bulk orders.",
       country: item.country ?? "India",
       leadTime: `${item.leadDays} Days`,
-      images: [
-        `https://picsum.photos/seed/${seed}/600/${height}`,
-        `https://picsum.photos/seed/${seed}-b/600/600`,
-      ],
+      images: fashionImageSet(cat.category, id, 3, 700, height),
       savedCount,
     };
   })

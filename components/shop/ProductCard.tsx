@@ -7,6 +7,7 @@ import { Bookmark, Eye, Building2, MessageCircle, ShieldCheck, MapPin, Star } fr
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
 import { getProductTags, getTagColor } from "@/lib/product-tags";
+import { ProductImageSlider } from "./ProductImageSlider";
 import { cn } from "@/lib/utils";
 
 export function ProductCard({
@@ -27,27 +28,21 @@ export function ProductCard({
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
-      className="group relative break-inside-avoid mb-5 rounded-2xl overflow-hidden bg-card border border-border shadow-card hover:shadow-elevated transition-shadow duration-300"
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+      className="group relative break-inside-avoid mb-6 rounded-[20px] overflow-hidden bg-card border border-border shadow-card hover:shadow-elevated transition-shadow duration-300"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Image */}
+      {/* Image slider */}
       <div className="relative overflow-hidden bg-muted cursor-pointer" onClick={() => onClick(product)}>
-        <motion.img
-          src={product.images[0]}
-          alt={product.name}
-          className="w-full h-auto object-cover"
-          animate={{ scale: isHovered ? 1.06 : 1 }}
-          transition={{ duration: 0.4 }}
-          loading="lazy"
-        />
+        <ProductImageSlider images={product.images} alt={product.name} />
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isHovered ? 1 : 0 }}
-          transition={{ duration: 0.2 }}
-          className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none"
+        <div
+          className={cn(
+            "absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none transition-opacity duration-300",
+            isHovered ? "opacity-100" : "opacity-0"
+          )}
         />
 
         {/* Save */}
@@ -57,7 +52,7 @@ export function ProductCard({
             setIsSaved((v) => !v);
           }}
           className={cn(
-            "absolute top-3 right-3 p-2 rounded-full backdrop-blur-md transition-all",
+            "absolute top-3 right-3 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-200",
             isHovered || isSaved ? "opacity-100" : "opacity-0",
             isSaved ? "bg-rose-500 text-white" : "bg-black/40 text-white hover:bg-black/60"
           )}
@@ -67,11 +62,11 @@ export function ProductCard({
         </button>
 
         {/* Quick actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 8 }}
-          transition={{ duration: 0.2 }}
-          className="absolute bottom-3 left-3 right-3 flex items-center gap-2"
+        <div
+          className={cn(
+            "absolute bottom-3 left-3 right-3 z-10 flex items-center gap-2 transition-all duration-300",
+            isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+          )}
         >
           <button
             onClick={(e) => {
@@ -104,12 +99,12 @@ export function ProductCard({
               <MessageCircle className="w-3.5 h-3.5" />
             </Link>
           )}
-        </motion.div>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="p-4 cursor-pointer" onClick={() => onClick(product)}>
-        <h3 className="font-semibold text-foreground text-[15px] leading-snug mb-1.5 line-clamp-2">
+      <div className="p-5 cursor-pointer" onClick={() => onClick(product)}>
+        <h3 className="font-semibold text-foreground text-base leading-snug mb-2 line-clamp-2">
           {product.name}
         </h3>
 
@@ -119,7 +114,7 @@ export function ProductCard({
               e.stopPropagation();
               onViewSupplier(supplier as unknown as Supplier);
             }}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2 hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2.5 hover:text-foreground transition-colors"
           >
             <span className="truncate font-medium">{supplier.companyName}</span>
             {supplier.verified && <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
@@ -140,7 +135,7 @@ export function ProductCard({
           )}
         </div>
 
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="flex flex-wrap gap-1.5 mb-4">
           {tags.map((tag) => (
             <span
               key={tag}
@@ -151,10 +146,10 @@ export function ProductCard({
           ))}
         </div>
 
-        <div className="flex items-end justify-between pt-2 border-t border-border/60">
+        <div className="flex items-end justify-between pt-3 border-t border-border/60">
           <div>
             <p className="text-[10px] text-muted-foreground mb-0.5">Price Range</p>
-            <p className="font-semibold text-foreground text-sm">{product.priceRange}</p>
+            <p className="font-bold text-foreground text-[15px]">{product.priceRange}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-muted-foreground mb-0.5">MOQ</p>

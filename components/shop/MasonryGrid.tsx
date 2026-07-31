@@ -14,7 +14,7 @@ export function MasonryGrid({
   onViewSupplier: (supplier: Supplier) => void;
 }) {
   return (
-    <div className="columns-2 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6 gap-5">
+    <div className="columns-2 md:columns-3 lg:columns-4 gap-6">
       {products.map((product) => (
         <ProductCard
           key={product.id}
