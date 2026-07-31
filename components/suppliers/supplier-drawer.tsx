@@ -4,8 +4,6 @@ import { useState } from "react";
 import {
   MapPin,
   Star,
-  Clock,
-  ShoppingBag,
   Globe,
   Mail,
   Phone,
@@ -14,10 +12,10 @@ import {
   BadgeCheck,
   Edit2,
   Trash2,
-  Users,
   Package,
   FileText,
   ExternalLink,
+  History,
   X,
 } from "lucide-react";
 import {
@@ -28,9 +26,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { formatLocation } from "@/lib/geo";
 import { type Supplier } from "@/types/supplier";
 import { DeleteDialog } from "./delete-dialog";
 import { SupplierForm } from "./supplier-form";
+import { CommunicationHistoryModal } from "./communication-history-modal";
 import { type SupplierFormValues } from "@/lib/validations/supplier";
 import Link from "next/link";
 
@@ -100,6 +100,7 @@ export function SupplierDrawer({
 }: SupplierDrawerProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   if (!supplier) return null;
 
@@ -214,9 +215,9 @@ export function SupplierDrawer({
                   <Trash2 className="h-3 w-3" />
                   Delete
                 </Button>
-                <Button size="sm" className="gap-1.5 h-7 text-xs flex-1">
-                  <ExternalLink className="h-3 w-3" />
-                  View Profile
+                <Button size="sm" className="gap-1.5 h-7 text-xs flex-1" onClick={() => setHistoryOpen(true)}>
+                  <History className="h-3 w-3" />
+                  History
                 </Button>
               </div>
             </div>
@@ -255,37 +256,17 @@ export function SupplierDrawer({
                 </section>
               )}
 
-              {/* Quick stats */}
-              <section>
-                <SectionTitle>Trade Info</SectionTitle>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { icon: Clock, label: "Response Time", value: supplier.responseTime },
-                    { icon: ShoppingBag, label: "Min. Order", value: supplier.minimumOrder },
-                    { icon: Users, label: "Employees", value: supplier.employees },
-                  ].map(({ icon: Icon, label, value }) =>
-                    value ? (
-                      <div key={label} className="rounded-lg bg-muted/40 border border-border/40 p-3">
-                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
-                          <Icon className="h-2.5 w-2.5" />
-                          {label}
-                        </div>
-                        <p className="text-xs font-medium text-foreground">{value}</p>
-                      </div>
-                    ) : null
-                  )}
-                </div>
-              </section>
-
               {/* Location */}
               <section>
                 <SectionTitle>
                   <MapPin className="h-3 w-3" />
                   Location
                 </SectionTitle>
-                <div className="rounded-lg border border-border/60 overflow-hidden divide-y divide-border/40">
-                  <InfoRow icon={MapPin} label="City" value={supplier.city} />
-                  <InfoRow icon={Globe} label="Country" value={supplier.country} />
+                <div className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2.5">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <p className="text-xs font-medium text-foreground">
+                    {formatLocation(supplier.city, supplier.country)}
+                  </p>
                 </div>
               </section>
 
@@ -402,6 +383,14 @@ export function SupplierDrawer({
         onOpenChange={setDeleteOpen}
         companyName={supplier.companyName}
         onConfirm={handleDelete}
+      />
+
+      {/* Communication history */}
+      <CommunicationHistoryModal
+        supplierId={supplier.id}
+        companyName={supplier.companyName}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
       />
     </>
   );

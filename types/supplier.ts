@@ -55,7 +55,29 @@ export type FilterKey =
   | "Textiles"
   | "Food & Beverage"
   | "Furniture"
-  | "Automotive";
+  | "Automotive"
+  | "Women"
+  | "Men"
+  | "Kids Wear"
+  | "Footwear"
+  | "Accessories"
+  | "Home Textiles";
+
+// Industry-backed filter keys — used to keep the "browse by industry" filter
+// predicate data-driven instead of a long hardcoded OR chain.
+export const INDUSTRY_FILTER_KEYS: FilterKey[] = [
+  "Electronics",
+  "Textiles",
+  "Food & Beverage",
+  "Furniture",
+  "Automotive",
+  "Women",
+  "Men",
+  "Kids Wear",
+  "Footwear",
+  "Accessories",
+  "Home Textiles",
+];
 
 export const INDUSTRIES: Industry[] = [
   "Electronics",

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { downloadDetails, shareDetails } from "@/lib/card-actions";
+import { LinkedInIcon } from "@/components/icons/linkedin-icon";
 import { cn } from "@/lib/utils";
 import { type Supplier } from "@/types/supplier";
 import Link from "next/link";
@@ -263,6 +264,25 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
 
         {/* Action buttons */}
         <div className="flex flex-col gap-2 mt-auto">
+          {supplier.linkedin && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <a
+                    href={`https://${supplier.linkedin.replace(/^https?:\/\//, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full h-8 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg border border-[#0A66C2]/30 text-[#0A66C2] hover:bg-[#0A66C2]/10 transition-colors dark:border-[#0A66C2]/40"
+                  />
+                }
+              >
+                <LinkedInIcon className="h-3.5 w-3.5" />
+                LinkedIn
+              </TooltipTrigger>
+              <TooltipContent>Open LinkedIn profile</TooltipContent>
+            </Tooltip>
+          )}
           <Button size="sm" className="w-full gap-1.5 h-8 text-xs">
             <ExternalLink className="h-3 w-3" />
             View Profile

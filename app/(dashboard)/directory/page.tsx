@@ -12,9 +12,10 @@ import { SkeletonCard, SkeletonListItem } from "@/components/suppliers/skeleton-
 import { SuppliersEmptyState } from "@/components/suppliers/suppliers-empty-state";
 import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
 import { SupplierForm } from "@/components/suppliers/supplier-form";
+import { BrowseCategories } from "@/components/suppliers/browse-categories";
 import { useSuppliers } from "@/hooks/use-suppliers";
 import { useDebounce } from "@/hooks/use-debounce";
-import { type Supplier, type FilterKey } from "@/types/supplier";
+import { type Supplier, type FilterKey, INDUSTRY_FILTER_KEYS } from "@/types/supplier";
 import { type SupplierFormValues } from "@/lib/validations/supplier";
 import { cn } from "@/lib/utils";
 
@@ -84,10 +85,7 @@ export default function DirectoryPage() {
             return s.supplierType === f;
           if (f === "India" || f === "China" || f === "USA" || f === "Germany" || f === "Turkey")
             return s.country === f;
-          if (
-            f === "Electronics" || f === "Textiles" || f === "Food & Beverage" ||
-            f === "Furniture" || f === "Automotive"
-          )
+          if (INDUSTRY_FILTER_KEYS.includes(f))
             return s.industry === f;
           return true;
         })
@@ -184,6 +182,15 @@ export default function DirectoryPage() {
             </p>
           </div>
         ))}
+      </motion.div>
+
+      {/* Browse by category */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.08 }}
+      >
+        <BrowseCategories suppliers={suppliers} activeFilters={activeFilters} onSelect={toggleFilter} />
       </motion.div>
 
       {/* Search + view toggle */}
