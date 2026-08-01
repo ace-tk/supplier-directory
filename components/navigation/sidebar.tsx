@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { initials } from "@/utils/format";
 import { PORTAL_CONFIG, ROLE_LABELS, type PortalKey } from "@/lib/roles";
+import { useAuth } from "@/hooks/use-session";
 import type { SessionUser } from "@/types/auth";
 
 interface SidebarProps {
@@ -18,6 +19,7 @@ interface SidebarProps {
 export function Sidebar({ user, portal = "admin" }: SidebarProps) {
   const pathname = usePathname();
   const { navGroups, bottomItems, label: portalLabel } = PORTAL_CONFIG[portal];
+  const { logout, isLoggingOut } = useAuth();
 
   return (
     <aside className="hidden md:flex flex-col w-60 shrink-0 h-screen bg-sidebar border-r border-sidebar-border">
@@ -117,6 +119,16 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={logout}
+          disabled={isLoggingOut}
+          className="flex w-full items-center gap-2.5 px-2.5 py-2 mt-1 rounded-lg text-sm font-medium text-red-500/80 hover:bg-red-500/10 hover:text-red-500 transition-all duration-150 disabled:opacity-50"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {isLoggingOut ? "Signing out…" : "Logout"}
+        </button>
       </div>
     </aside>
   );

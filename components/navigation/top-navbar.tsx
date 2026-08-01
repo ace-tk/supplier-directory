@@ -1,7 +1,6 @@
 "use client";
 
 import { Bell, Search, Menu, Settings, LogOut, User, ChevronDown } from "lucide-react";
-import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -15,12 +14,13 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { logoutAction } from "@/services/auth";
+import { useAuth } from "@/hooks/use-session";
 import { initials } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/types/auth";
@@ -36,13 +36,7 @@ interface TopNavbarProps {
 }
 
 export function TopNavbar({ user }: TopNavbarProps) {
-  const [isPending, startTransition] = useTransition();
-
-  function handleLogout() {
-    startTransition(async () => {
-      await logoutAction();
-    });
-  }
+  const { logout, isLoggingOut } = useAuth();
 
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-40">
@@ -100,10 +94,12 @@ export function TopNavbar({ user }: TopNavbarProps) {
               </DropdownMenuTrigger>
 
               <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel className="pb-1">
-                  <p className="font-medium text-foreground truncate">{user.name}</p>
-                  <p className="text-xs text-muted-foreground font-normal truncate">{user.email}</p>
-                </DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="pb-1">
+                    <p className="font-medium text-foreground truncate">{user.name}</p>
+                    <p className="text-xs text-muted-foreground font-normal truncate">{user.email}</p>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="gap-2">
                   <User className="h-4 w-4" />
@@ -116,11 +112,11 @@ export function TopNavbar({ user }: TopNavbarProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10"
-                  onClick={handleLogout}
-                  disabled={isPending}
+                  onClick={logout}
+                  disabled={isLoggingOut}
                 >
                   <LogOut className="h-4 w-4" />
-                  {isPending ? "Signing out…" : "Sign out"}
+                  {isLoggingOut ? "Signing out…" : "Sign out"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

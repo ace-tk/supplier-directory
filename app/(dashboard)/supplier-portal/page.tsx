@@ -19,8 +19,7 @@ import {
   type PortalApiRecord,
   STEP_LABELS,
 } from "@/types/portal";
-
-const DRAFT_KEY = "sb_portal_draft_id";
+import { SUPPLIER_PORTAL_DRAFT_KEY as DRAFT_KEY } from "@/lib/storage-keys";
 const TOTAL_STEPS = 5;
 
 function initialState(): PortalFormState {

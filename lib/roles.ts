@@ -29,6 +29,7 @@ import {
   UserCheck,
   Factory,
   Briefcase,
+  Users2,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -80,6 +81,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
       { label: "Supplier Portal", href: "/supplier-portal", icon: Sparkles, badge: "New" },
       { label: "CRM Inbox", href: "/crm", icon: MessageSquare },
       { label: "Shop", href: "/shop", icon: ShoppingBag },
+      { label: "Buyer Leads", href: "/buyer-leads", icon: Users2 },
     ],
   },
   {
