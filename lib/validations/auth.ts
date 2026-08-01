@@ -16,7 +16,10 @@ export const signupSchema = z
       .regex(/[A-Z]/, "Must contain an uppercase letter")
       .regex(/[0-9]/, "Must contain a number"),
     confirmPassword: z.string(),
-    role: z.enum(["ADMIN", "SUPPLIER", "BUYER"]),
+    // Admin accounts are never created through public signup — only
+    // BUYER/SUPPLIER are valid here, enforced server-side (not just hidden
+    // in the UI), so a crafted request can't self-provision an admin.
+    role: z.enum(["SUPPLIER", "BUYER"]),
     companyName: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {

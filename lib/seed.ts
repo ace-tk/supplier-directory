@@ -43,12 +43,16 @@ export async function ensureProductsSeeded() {
   });
 }
 
+// Admin is never created through public signup (see signupSchema) — this
+// seed is the only way a mock admin account exists, standing in for a real
+// "created internally" provisioning flow (invite, internal tool, etc.)
+// later. Its password is intentionally distinct from the buyer/supplier
+// demo password.
 const DEMO_USERS = [
-  { name: "Demo Buyer", email: "buyer@supplybase.com", role: "BUYER" as const, companyName: "Demo Buyer Co." },
-  { name: "Demo Supplier", email: "supplier@supplybase.com", role: "SUPPLIER" as const, companyName: "Demo Supplier Co." },
-  { name: "Demo Admin", email: "admin@supplybase.com", role: "ADMIN" as const, companyName: undefined },
+  { name: "Demo Buyer", email: "buyer@supplybase.com", role: "BUYER" as const, companyName: "Demo Buyer Co.", password: "Demo@1234" },
+  { name: "Demo Supplier", email: "supplier@supplybase.com", role: "SUPPLIER" as const, companyName: "Demo Supplier Co.", password: "Demo@1234" },
+  { name: "Demo Admin", email: "admin@supplybase.com", role: "ADMIN" as const, companyName: undefined, password: "Admin@123" },
 ];
-const DEMO_PASSWORD = "Demo@1234";
 
 // Idempotent — cheap after the first run (one indexed count query), so it's
 // safe to call from a hot path like loginAction. User.create can't be
@@ -62,7 +66,7 @@ export async function ensureDemoUsersSeeded() {
     const existing = await db.user.findUnique({ where: { email: u.email } });
     if (existing) continue;
 
-    const hashed = await hashPassword(DEMO_PASSWORD);
+    const hashed = await hashPassword(u.password);
     await db.user.create({
       data: {
         name: u.name,
