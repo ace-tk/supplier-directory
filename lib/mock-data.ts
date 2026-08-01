@@ -12,7 +12,7 @@ function toSupplier(s: (typeof SUPPLIERS)[number]): Supplier {
   return { ...s, notes: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" };
 }
 
-function hashString(input: string): number {
+export function hashString(input: string): number {
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
     hash = (hash << 5) - hash + input.charCodeAt(i);
@@ -21,11 +21,11 @@ function hashString(input: string): number {
   return Math.abs(hash);
 }
 
-function pick<T>(arr: T[], seed: string): T {
+export function pick<T>(arr: T[], seed: string): T {
   return arr[hashString(seed) % arr.length];
 }
 
-function dateAgo(days: number): string {
+export function dateAgo(days: number): string {
   const d = new Date("2026-08-01T00:00:00Z");
   d.setDate(d.getDate() - days);
   return d.toISOString();

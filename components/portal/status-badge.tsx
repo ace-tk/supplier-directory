@@ -16,6 +16,23 @@ const STATUS_STYLES: Record<string, string> = {
   Rejected: "bg-red-500/10 text-red-600 dark:text-red-400",
   Declined: "bg-red-500/10 text-red-600 dark:text-red-400",
   Closed: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  "In Stock": "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  Approved: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  Paid: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  Available: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  Completed: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  "Low Stock": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  Scheduled: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  Busy: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  Draft: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  "Out of Stock": "bg-red-500/10 text-red-600 dark:text-red-400",
+  Overdue: "bg-red-500/10 text-red-600 dark:text-red-400",
+  Unavailable: "bg-red-500/10 text-red-600 dark:text-red-400",
+  Deactivated: "bg-red-500/10 text-red-600 dark:text-red-400",
+  Restocked: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  Sold: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  Adjusted: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  Damaged: "bg-red-500/10 text-red-600 dark:text-red-400",
 };
 
 export function StatusBadge({ status }: { status: string }) {

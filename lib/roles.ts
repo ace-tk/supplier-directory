@@ -7,7 +7,6 @@ import {
   BarChart3,
   Settings,
   HelpCircle,
-  Boxes,
   Sparkles,
   Bookmark,
   Handshake,
@@ -19,6 +18,17 @@ import {
   PackagePlus,
   Inbox,
   Users,
+  Warehouse,
+  ClipboardCheck,
+  Mail,
+  MessageCircle,
+  Megaphone,
+  Newspaper,
+  CalendarClock,
+  PieChart,
+  UserCheck,
+  Factory,
+  Briefcase,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -73,11 +83,32 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    group: "Analytics",
+    group: "Inventory",
     items: [
-      { label: "Reports", href: "/reports", icon: BarChart3 },
-      { label: "Inventory", href: "/inventory", icon: Boxes },
+      { label: "Inventory by Admin", href: "/inventory/admin", icon: Warehouse },
+      { label: "Inventory by Supplier", href: "/inventory/supplier", icon: ClipboardCheck },
     ],
+  },
+  {
+    group: "Marketing",
+    items: [
+      { label: "Email Campaigns", href: "/marketing/email-campaigns", icon: Mail },
+      { label: "WhatsApp Campaigns", href: "/marketing/whatsapp-campaigns", icon: MessageCircle },
+      { label: "Promotional Campaigns", href: "/marketing/promotional-campaigns", icon: Megaphone },
+      { label: "Newsletter", href: "/marketing/newsletter", icon: Newspaper },
+      { label: "Scheduled Campaigns", href: "/marketing/scheduled-campaigns", icon: CalendarClock },
+      { label: "Campaign Analytics", href: "/marketing/analytics", icon: PieChart },
+      { label: "Buyer Campaigns", href: "/marketing/buyer-campaigns", icon: UserCheck },
+      { label: "Supplier Campaigns", href: "/marketing/supplier-campaigns", icon: Factory },
+    ],
+  },
+  {
+    group: "Team",
+    items: [{ label: "Freelancers", href: "/freelancers", icon: Briefcase }],
+  },
+  {
+    group: "Analytics",
+    items: [{ label: "Reports", href: "/reports", icon: BarChart3 }],
   },
 ];
 
