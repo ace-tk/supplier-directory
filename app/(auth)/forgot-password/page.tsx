@@ -66,8 +66,11 @@ export default function ForgotPasswordPage() {
               We sent a password reset link to{" "}
               <span className="font-medium text-foreground">{getValues("email")}</span>
             </p>
+            <Link href={`/reset-password?token=demo-token&email=${encodeURIComponent(getValues("email"))}`}>
+              <Button className="mt-4 w-full gap-2">Continue to reset password</Button>
+            </Link>
             <Link href="/login">
-              <Button variant="outline" className="mt-4 w-full gap-2">
+              <Button variant="outline" className="w-full gap-2">
                 <ArrowLeft className="h-4 w-4" />
                 Back to sign in
               </Button>

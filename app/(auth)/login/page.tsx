@@ -16,15 +16,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { roleHome } from "@/lib/roles";
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get("from") ?? "/dashboard";
+  // An explicit `from` (e.g. returning to a product page after a video
+  // request) always wins; otherwise land the user in their own portal.
+  const fromParam = searchParams.get("from");
   const reason = searchParams.get("reason");
   const authLinkSuffix = (() => {
     const params = new URLSearchParams();
-    if (searchParams.get("from")) params.set("from", searchParams.get("from")!);
+    if (fromParam) params.set("from", fromParam);
     if (reason) params.set("reason", reason);
     const qs = params.toString();
     return qs ? `?${qs}` : "";
@@ -51,7 +54,7 @@ function LoginContent() {
     }
 
     toast.success("Welcome back!");
-    router.push(from);
+    router.push(fromParam ?? roleHome(result.data.role));
     router.refresh();
   }
 

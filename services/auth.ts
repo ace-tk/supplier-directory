@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from "@/lib/auth";
 import { createSession, destroySession } from "@/lib/session";
 import { loginSchema, signupSchema } from "@/lib/validations/auth";
 import type { LoginFormValues, SignupFormValues } from "@/lib/validations/auth";
+import { ensureDemoUsersSeeded } from "@/lib/seed";
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -22,6 +23,8 @@ export async function loginAction(
   const { email, password, rememberMe } = parsed.data;
 
   try {
+    await ensureDemoUsersSeeded();
+
     const user = await db.user.findUnique({ where: { email } });
     if (!user) {
       return { success: false, error: "Invalid email or password" };

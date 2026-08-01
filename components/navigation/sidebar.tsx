@@ -3,69 +3,44 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import {
-  LayoutDashboard,
-  Building2,
-  MessageSquare,
-  ShoppingBag,
-  BarChart3,
-  Settings,
-  HelpCircle,
-  Boxes,
-  ChevronRight,
-  Sparkles,
-} from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { initials } from "@/utils/format";
+import { PORTAL_CONFIG, ROLE_LABELS, type PortalKey } from "@/lib/roles";
+import type { SessionUser } from "@/types/auth";
 
-const navItems = [
-  {
-    group: "Overview",
-    items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    ],
-  },
-  {
-    group: "Commerce",
-    items: [
-      { label: "Supplier Directory", href: "/directory", icon: Building2 },
-      { label: "Supplier Portal", href: "/supplier-portal", icon: Sparkles, badge: "New" },
-      { label: "CRM Inbox", href: "/crm", icon: MessageSquare },
-      { label: "Shop", href: "/shop", icon: ShoppingBag },
-    ],
-  },
-  {
-    group: "Analytics",
-    items: [
-      { label: "Reports", href: "/reports", icon: BarChart3 },
-      { label: "Inventory", href: "/inventory", icon: Boxes },
-    ],
-  },
-];
+interface SidebarProps {
+  user?: SessionUser | null;
+  portal?: PortalKey;
+}
 
-const bottomItems = [
-  { label: "Settings", href: "/settings", icon: Settings },
-  { label: "Help & Support", href: "/help", icon: HelpCircle },
-];
-
-export function Sidebar() {
+export function Sidebar({ user, portal = "admin" }: SidebarProps) {
   const pathname = usePathname();
+  const { navGroups, bottomItems, label: portalLabel } = PORTAL_CONFIG[portal];
 
   return (
     <aside className="hidden md:flex flex-col w-60 shrink-0 h-screen bg-sidebar border-r border-sidebar-border">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary">
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
           <span className="text-primary-foreground font-bold text-sm">S</span>
         </div>
-        <span className="font-semibold text-sidebar-foreground tracking-tight">
-          SupplyBase
-        </span>
+        <div className="min-w-0">
+          <span className="block font-semibold text-sidebar-foreground tracking-tight leading-tight">
+            SupplyBase
+          </span>
+          {portalLabel && (
+            <span className="block text-[10px] text-muted-foreground leading-tight truncate">
+              {portalLabel}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6">
-        {navItems.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.group}>
             <p className="px-2 mb-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground">
               {group.group}
@@ -130,16 +105,18 @@ export function Sidebar() {
         ))}
 
         {/* User avatar */}
-        <div className="flex items-center gap-2.5 px-2.5 py-2 mt-2 rounded-lg hover:bg-sidebar-accent transition-all duration-150 cursor-pointer group">
-          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 text-primary text-xs font-semibold shrink-0">
-            T
+        {user && (
+          <div className="flex items-center gap-2.5 px-2.5 py-2 mt-2 rounded-lg hover:bg-sidebar-accent transition-all duration-150 cursor-pointer group">
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 text-primary text-xs font-semibold shrink-0">
+              {initials(user.name)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{ROLE_LABELS[user.role]}</p>
+            </div>
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-sidebar-foreground truncate">Tisha Kharade</p>
-            <p className="text-[11px] text-muted-foreground truncate">Admin</p>
-          </div>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
+        )}
       </div>
     </aside>
   );

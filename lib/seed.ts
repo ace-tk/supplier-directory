@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { SUPPLIERS as SEED_SUPPLIERS } from "@/data/suppliers";
 import { PRODUCTS as SEED_PRODUCTS } from "@/data/products";
+import { hashPassword } from "@/lib/auth";
 
 export async function ensureSuppliersSeeded() {
   await db.supplierListing.createMany({
@@ -40,4 +41,37 @@ export async function ensureProductsSeeded() {
     data: SEED_PRODUCTS,
     skipDuplicates: true,
   });
+}
+
+const DEMO_USERS = [
+  { name: "Demo Buyer", email: "buyer@supplybase.com", role: "BUYER" as const, companyName: "Demo Buyer Co." },
+  { name: "Demo Supplier", email: "supplier@supplybase.com", role: "SUPPLIER" as const, companyName: "Demo Supplier Co." },
+  { name: "Demo Admin", email: "admin@supplybase.com", role: "ADMIN" as const, companyName: undefined },
+];
+const DEMO_PASSWORD = "Demo@1234";
+
+// Idempotent — cheap after the first run (one indexed count query), so it's
+// safe to call from a hot path like loginAction. User.create can't be
+// batched via createMany because of the nested Buyer/Supplier relation
+// creates, so each missing demo user is created individually.
+export async function ensureDemoUsersSeeded() {
+  const existingCount = await db.user.count({ where: { email: { in: DEMO_USERS.map((u) => u.email) } } });
+  if (existingCount >= DEMO_USERS.length) return;
+
+  for (const u of DEMO_USERS) {
+    const existing = await db.user.findUnique({ where: { email: u.email } });
+    if (existing) continue;
+
+    const hashed = await hashPassword(DEMO_PASSWORD);
+    await db.user.create({
+      data: {
+        name: u.name,
+        email: u.email,
+        password: hashed,
+        role: u.role,
+        ...(u.role === "SUPPLIER" ? { supplier: { create: { companyName: u.companyName! } } } : {}),
+        ...(u.role === "BUYER" ? { buyer: { create: { companyName: u.companyName! } } } : {}),
+      },
+    });
+  }
 }
