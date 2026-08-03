@@ -28,6 +28,18 @@ model User {
   supplier Supplier?
   buyer    Buyer?
 
+  ownedSupplyChains       SupplyChain[]          @relation("SupplyChainOwner")
+  buyerSupplyChains       SupplyChain[]          @relation("SupplyChainBuyer")
+  supplierSupplyChains    SupplyChain[]          @relation("SupplyChainSupplier")
+  milestoneParticipations MilestoneParticipant[]
+  uploadedMedia           MilestoneMedia[]
+  uploadedAttachments     MilestoneAttachment[]
+  milestoneComments       MilestoneComment[]
+  milestoneActivities     MilestoneActivity[]
+  sharesReceived          SupplyChainShare[]     @relation("SharedWithUser")
+  sharesGiven             SupplyChainShare[]     @relation("SharedByUser")
+  notifications           Notification[]
+
   @@index([email])
 }
 
@@ -226,6 +238,7 @@ enum MessageType {
   QUOTATION
   VOICE
   LOCATION
+  SUPPLY_CHAIN
 }
 
 model Message {
@@ -237,10 +250,13 @@ model Message {
   content         String?
   attachmentUrl   String?
   productId       String?
+  supplyChainId   String?
+  supplyChain     SupplyChain? @relation(fields: [supplyChainId], references: [id], onDelete: SetNull)
   status          String   @default("sent") // sent, delivered, seen
   createdAt       DateTime @default(now())
 
   @@index([conversationId])
+  @@index([supplyChainId])
 }
 
 model CrmNote {
@@ -280,4 +296,231 @@ model Activity {
   createdAt       DateTime @default(now())
 
   @@index([conversationId])
+}
+
+// ---------------------------------------------------------------------------
+// Supply Chain — collaborative order-lifecycle workspace (Buyer + Supplier
+// portals). Real, DB-backed — no mock data. Permissions are resolved from
+// ownerId + SupplyChainShare rows (see lib/supply-chain-permissions.ts).
+// ---------------------------------------------------------------------------
+
+enum SupplyChainStatus {
+  ACTIVE
+  DELAYED
+  COMPLETED
+  IN_PROGRESS
+}
+
+enum SupplyChainPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  DELAYED
+}
+
+enum BoardColumn {
+  PLANNING
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+}
+
+enum ParticipantKind {
+  ASSIGNEE
+  TAG
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+enum ShareRole {
+  TEAM_EDIT
+  TEAM_VIEW
+  BUYER_VIEW
+  BUYER_COMMENT
+  SUPPLIER_VIEW
+  SUPPLIER_UPDATE
+}
+
+enum NotificationType {
+  MILESTONE_CREATED
+  ASSIGNMENT
+  DUE_DATE_APPROACHING
+  COMMENT_ADDED
+  SUPPLY_CHAIN_SHARED
+  MILESTONE_COMPLETED
+}
+
+model SupplyChain {
+  id               String              @id @default(cuid())
+  name             String
+  orderName        String
+  orderNumber      String
+  description      String?
+  priority         SupplyChainPriority @default(MEDIUM)
+  status           SupplyChainStatus   @default(ACTIVE)
+  expectedDelivery DateTime
+
+  ownerId String
+  owner   User   @relation("SupplyChainOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  buyerUserId String?
+  buyerUser   User?   @relation("SupplyChainBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  buyerName   String
+
+  supplierUserId String?
+  supplierUser   User?  @relation("SupplyChainSupplier", fields: [supplierUserId], references: [id], onDelete: SetNull)
+  supplierName   String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  milestones Milestone[]
+  shares     SupplyChainShare[]
+  messages   Message[]
+
+  @@index([ownerId])
+  @@index([buyerUserId])
+  @@index([supplierUserId])
+}
+
+model Milestone {
+  id            String      @id @default(cuid())
+  supplyChainId String
+  supplyChain   SupplyChain @relation(fields: [supplyChainId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  status      MilestoneStatus     @default(NOT_STARTED)
+  boardColumn BoardColumn         @default(PLANNING)
+  priority    SupplyChainPriority @default(MEDIUM)
+  dueDate     DateTime
+  progress    Int                 @default(0)
+  notes       String?
+  order       Int                 @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants MilestoneParticipant[]
+  media        MilestoneMedia[]
+  attachments  MilestoneAttachment[]
+  comments     MilestoneComment[]
+  activities   MilestoneActivity[]
+
+  @@index([supplyChainId])
+}
+
+model MilestoneParticipant {
+  id          String          @id @default(cuid())
+  milestoneId String
+  milestone   Milestone       @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        ParticipantKind
+  createdAt   DateTime        @default(now())
+
+  @@unique([milestoneId, userId, kind])
+  @@index([milestoneId])
+  @@index([userId])
+}
+
+model MilestoneMedia {
+  id           String    @id @default(cuid())
+  milestoneId  String
+  milestone    Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  kind         MediaKind
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  dataUrl      String    @db.Text
+  uploadedById String
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+
+  @@index([milestoneId])
+}
+
+model MilestoneAttachment {
+  id           String    @id @default(cuid())
+  milestoneId  String
+  milestone    Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  dataUrl      String    @db.Text
+  uploadedById String
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+
+  @@index([milestoneId])
+}
+
+model MilestoneComment {
+  id              String             @id @default(cuid())
+  milestoneId     String
+  milestone       Milestone          @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  authorId        String
+  author          User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content         String
+  parentCommentId String?
+  parentComment   MilestoneComment?  @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         MilestoneComment[] @relation("CommentReplies")
+  edited          Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([milestoneId])
+}
+
+model MilestoneActivity {
+  id          String    @id @default(cuid())
+  milestoneId String
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  type        String
+  description String
+  actorId     String?
+  actor       User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@index([milestoneId])
+}
+
+model SupplyChainShare {
+  id            String      @id @default(cuid())
+  supplyChainId String
+  supplyChain   SupplyChain @relation(fields: [supplyChainId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation("SharedWithUser", fields: [userId], references: [id], onDelete: Cascade)
+  role          ShareRole
+  sharedById    String
+  sharedBy      User        @relation("SharedByUser", fields: [sharedById], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@unique([supplyChainId, userId])
+  @@index([userId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
 }

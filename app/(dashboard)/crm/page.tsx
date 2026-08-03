@@ -54,7 +54,12 @@ function CrmInner() {
     if (window.innerWidth < 1024) setShowLeftSidebar(false);
   };
 
-  const handleSendMessage = async (content: string, type: "TEXT" | "PRODUCT" = "TEXT", productId?: string) => {
+  const handleSendMessage = async (
+    content: string,
+    type: "TEXT" | "PRODUCT" | "SUPPLY_CHAIN" = "TEXT",
+    productId?: string,
+    supplyChainId?: string
+  ) => {
     if (!activeConversation) return;
 
     // Optimistic update
@@ -66,6 +71,7 @@ function CrmInner() {
       content,
       attachmentUrl: null,
       productId: productId ?? null,
+      supplyChainId: supplyChainId ?? null,
       status: "sent",
       createdAt: new Date(),
     };
@@ -75,7 +81,7 @@ function CrmInner() {
     await fetch("/api/crm/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId: activeConversation.id, content, type, productId }),
+      body: JSON.stringify({ conversationId: activeConversation.id, content, type, productId, supplyChainId }),
     });
   };
 

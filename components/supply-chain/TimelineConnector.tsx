@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { MilestoneStatus } from "@/types/supply-chain";
 
 export function TimelineConnector({ leftStatus }: { leftStatus: MilestoneStatus }) {
-  if (leftStatus === "Completed") {
+  if (leftStatus === "COMPLETED") {
     return (
       <div className="relative h-0.5 flex-1 min-w-8 rounded-full bg-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.5)] overflow-hidden">
         <motion.div
@@ -18,8 +18,8 @@ export function TimelineConnector({ leftStatus }: { leftStatus: MilestoneStatus 
     );
   }
 
-  if (leftStatus === "In Progress" || leftStatus === "Delayed") {
-    const color = leftStatus === "Delayed" ? "bg-red-500" : "bg-primary";
+  if (leftStatus === "IN_PROGRESS" || leftStatus === "DELAYED") {
+    const color = leftStatus === "DELAYED" ? "bg-red-500" : "bg-primary";
     return (
       <div className="relative h-0.5 flex-1 min-w-8 rounded-full bg-border overflow-hidden">
         <motion.div

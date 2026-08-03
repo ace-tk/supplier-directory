@@ -18,18 +18,18 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { MilestoneCard } from "./MilestoneCard";
 import { updateMilestoneColumnAction } from "@/services/supply-chain";
-import { BOARD_COLUMNS } from "@/types/supply-chain";
+import { BOARD_COLUMN_LABELS } from "@/lib/supply-chain-ui";
 import { cn } from "@/lib/utils";
-import type { Milestone, BoardColumn } from "@/types/supply-chain";
+import { BOARD_COLUMNS, type MilestoneRecord, type BoardColumn } from "@/types/supply-chain";
 
 const COLUMN_ACCENT: Record<BoardColumn, string> = {
-  Planning: "bg-slate-500",
-  "In Progress": "bg-primary",
-  Review: "bg-amber-500",
-  Completed: "bg-emerald-500",
+  PLANNING: "bg-slate-500",
+  IN_PROGRESS: "bg-primary",
+  REVIEW: "bg-amber-500",
+  COMPLETED: "bg-emerald-500",
 };
 
-function SortableBoardCard({ milestone, onClick }: { milestone: Milestone; onClick: () => void }) {
+function SortableBoardCard({ milestone, onClick, dimmed }: { milestone: MilestoneRecord; onClick: () => void; dimmed?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: milestone.id,
     data: { column: milestone.boardColumn },
@@ -42,6 +42,7 @@ function SortableBoardCard({ milestone, onClick }: { milestone: Milestone; onCli
       variant="board"
       cardRef={setNodeRef}
       isDragging={isDragging}
+      dimmed={dimmed}
       dragHandleProps={{ ...attributes, ...listeners }}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     />
@@ -51,11 +52,13 @@ function SortableBoardCard({ milestone, onClick }: { milestone: Milestone; onCli
 function Column({
   column,
   milestones,
+  visibleIds,
   onMilestoneClick,
 }: {
   column: BoardColumn;
-  milestones: Milestone[];
-  onMilestoneClick: (m: Milestone) => void;
+  milestones: MilestoneRecord[];
+  visibleIds?: Set<string>;
+  onMilestoneClick: (m: MilestoneRecord) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column });
 
@@ -63,7 +66,7 @@ function Column({
     <div className="flex-1 min-w-[260px]">
       <div className="flex items-center gap-2 mb-3 px-1">
         <span className={cn("w-2 h-2 rounded-full", COLUMN_ACCENT[column])} />
-        <p className="text-sm font-semibold text-foreground">{column}</p>
+        <p className="text-sm font-semibold text-foreground">{BOARD_COLUMN_LABELS[column]}</p>
         <span className="text-xs text-muted-foreground">{milestones.length}</span>
       </div>
       <SortableContext items={milestones.map((m) => m.id)} strategy={verticalListSortingStrategy}>
@@ -75,7 +78,12 @@ function Column({
           )}
         >
           {milestones.map((m) => (
-            <SortableBoardCard key={m.id} milestone={m} onClick={() => onMilestoneClick(m)} />
+            <SortableBoardCard
+              key={m.id}
+              milestone={m}
+              onClick={() => onMilestoneClick(m)}
+              dimmed={visibleIds ? !visibleIds.has(m.id) : false}
+            />
           ))}
           {milestones.length === 0 && (
             <p className="text-center text-[11px] text-muted-foreground/60 py-6">Drop here</p>
@@ -88,21 +96,25 @@ function Column({
 
 interface KanbanBoardProps {
   chainId: string;
-  milestones: Milestone[];
-  onMilestonesChange: (milestones: Milestone[]) => void;
-  onMilestoneClick: (milestone: Milestone) => void;
+  milestones: MilestoneRecord[];
+  canEdit: boolean;
+  visibleIds?: Set<string>;
+  onMilestonesChange: (milestones: MilestoneRecord[]) => void;
+  onMilestoneClick: (milestone: MilestoneRecord) => void;
 }
 
-export function KanbanBoard({ chainId, milestones, onMilestonesChange, onMilestoneClick }: KanbanBoardProps) {
+export function KanbanBoard({ chainId, milestones, canEdit, visibleIds, onMilestonesChange, onMilestoneClick }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   function handleDragStart(event: DragStartEvent) {
+    if (!canEdit) return;
     setActiveId(String(event.active.id));
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
+    if (!canEdit) return;
     const { active, over } = event;
     if (!over) return;
 
@@ -138,6 +150,7 @@ export function KanbanBoard({ chainId, milestones, onMilestonesChange, onMilesto
             key={column}
             column={column}
             milestones={milestones.filter((m) => m.boardColumn === column)}
+            visibleIds={visibleIds}
             onMilestoneClick={onMilestoneClick}
           />
         ))}

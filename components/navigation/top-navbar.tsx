@@ -1,16 +1,11 @@
 "use client";
 
-import { Bell, Search, Menu, Settings, LogOut, User, ChevronDown } from "lucide-react";
+import { Search, Menu, Settings, LogOut, User, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SearchBar } from "@/components/shared/search-bar";
-import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,15 +53,7 @@ export function TopNavbar({ user }: TopNavbarProps) {
       {/* Right actions */}
       <div className="flex items-center gap-1">
         {/* Notifications */}
-        <Tooltip>
-          <TooltipTrigger render={<Button variant="ghost" size="icon" className="relative h-9 w-9" />}>
-            <Bell className="h-4 w-4" />
-            <Badge className="absolute -top-0.5 -right-0.5 h-4 w-4 p-0 text-[9px] flex items-center justify-center bg-primary text-primary-foreground border-2 border-background">
-              3
-            </Badge>
-          </TooltipTrigger>
-          <TooltipContent>Notifications</TooltipContent>
-        </Tooltip>
+        <NotificationBell />
 
         <ThemeToggle />
 

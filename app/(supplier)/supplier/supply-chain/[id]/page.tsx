@@ -1,11 +1,15 @@
-import { notFound } from "next/navigation";
-import { getSupplyChainById } from "@/lib/supply-chain-store";
+import { notFound, redirect } from "next/navigation";
+import { getUser } from "@/lib/session";
+import { getSupplyChainWithAccess } from "@/lib/supply-chain-queries";
 import { SupplyChainWorkspace } from "@/components/supply-chain/SupplyChainWorkspace";
 
 export default async function SupplierSupplyChainWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const chain = getSupplyChainById(id);
-  if (!chain) notFound();
+  const user = await getUser();
+  if (!user) redirect(`/login?from=/supplier/supply-chain/${id}`);
 
-  return <SupplyChainWorkspace chain={chain} basePath="/supplier/supply-chain" />;
+  const result = await getSupplyChainWithAccess(id, user.id, user.role);
+  if (!result) notFound();
+
+  return <SupplyChainWorkspace chain={result.chain} access={result.access} basePath="/supplier/supply-chain" />;
 }

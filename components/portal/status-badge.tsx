@@ -36,6 +36,8 @@ const STATUS_STYLES: Record<string, string> = {
   "In Progress": "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   Delayed: "bg-red-500/10 text-red-600 dark:text-red-400",
   Upcoming: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  "Not Started": "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  Waiting: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
 };
 
 export function StatusBadge({ status }: { status: string }) {

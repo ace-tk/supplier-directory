@@ -4,18 +4,19 @@ import { motion } from "framer-motion";
 import { GripVertical, CheckCircle2 } from "lucide-react";
 import { StatusBadge } from "@/components/portal/status-badge";
 import { AvatarGroup, Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { MILESTONE_CARD_STYLES, formatShortDate, initialsFor } from "@/lib/supply-chain-ui";
+import { MILESTONE_CARD_STYLES, MILESTONE_STATUS_LABELS, formatShortDate, initialsFor, avatarColorFor } from "@/lib/supply-chain-ui";
 import { cn } from "@/lib/utils";
-import type { Milestone } from "@/types/supply-chain";
+import type { MilestoneRecord } from "@/types/supply-chain";
 
 interface MilestoneCardProps {
-  milestone: Milestone;
+  milestone: MilestoneRecord;
   onClick?: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
   isDragging?: boolean;
   variant?: "timeline" | "board";
   style?: React.CSSProperties;
   cardRef?: React.Ref<HTMLDivElement>;
+  dimmed?: boolean;
 }
 
 export function MilestoneCard({
@@ -26,9 +27,10 @@ export function MilestoneCard({
   variant = "timeline",
   style,
   cardRef,
+  dimmed,
 }: MilestoneCardProps) {
   const styles = MILESTONE_CARD_STYLES[milestone.status];
-  const isCompleted = milestone.status === "Completed";
+  const isCompleted = milestone.status === "COMPLETED";
 
   return (
     <motion.div
@@ -41,13 +43,27 @@ export function MilestoneCard({
         variant === "timeline" ? "w-[228px]" : "w-full",
         styles.ring,
         styles.glow,
-        isDragging && "opacity-50"
+        isDragging && "opacity-50",
+        dimmed && "opacity-30 saturate-50"
       )}
       onClick={onClick}
     >
+      {isCompleted && (
+        <motion.div
+          aria-hidden
+          className="absolute inset-0 rounded-2xl pointer-events-none ring-1 ring-emerald-500/30"
+          animate={{ opacity: [0.4, 0.9, 0.4] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        />
+      )}
+
       <div className="flex items-start justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-1.5 min-w-0">
-          {isCompleted && <CheckCircle2 className={cn("h-3.5 w-3.5 shrink-0", styles.text)} />}
+          {isCompleted && (
+            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400, damping: 15 }}>
+              <CheckCircle2 className={cn("h-3.5 w-3.5 shrink-0", styles.text)} />
+            </motion.span>
+          )}
           <h4 className="text-sm font-semibold text-foreground truncate">{milestone.name}</h4>
         </div>
         {dragHandleProps && (
@@ -64,7 +80,7 @@ export function MilestoneCard({
       </div>
 
       <div className="flex items-center gap-2 mb-3">
-        <StatusBadge status={milestone.status} />
+        <StatusBadge status={MILESTONE_STATUS_LABELS[milestone.status]} />
         <span className="text-[11px] text-muted-foreground">{formatShortDate(milestone.dueDate)}</span>
       </div>
 
@@ -83,8 +99,8 @@ export function MilestoneCard({
         <AvatarGroup>
           {milestone.assignees.map((a) => (
             <Avatar key={a.id} size="sm">
-              <AvatarFallback className={cn("text-white text-[9px] font-semibold", a.colorClass)}>
-                {initialsFor(a.name)}
+              <AvatarFallback className={cn("text-white text-[9px] font-semibold", avatarColorFor(a.user.id))}>
+                {initialsFor(a.user.name)}
               </AvatarFallback>
             </Avatar>
           ))}

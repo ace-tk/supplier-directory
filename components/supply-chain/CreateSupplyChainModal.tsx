@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,8 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSession } from "@/hooks/use-session";
-import { createSupplyChainAction } from "@/services/supply-chain";
+import { createSupplyChainAction, getBuyerOptions, getSupplierOptions, type DirectoryOption } from "@/services/supply-chain";
 import { createSupplyChainSchema, type CreateSupplyChainFormValues } from "@/lib/validations/supply-chain";
 
 interface CreateSupplyChainModalProps {
@@ -29,9 +28,21 @@ interface CreateSupplyChainModalProps {
   basePath: string;
 }
 
+const EMPTY_VALUES: CreateSupplyChainFormValues = {
+  name: "",
+  orderName: "",
+  orderNumber: "",
+  buyerUserId: "",
+  supplierUserId: "",
+  expectedDelivery: "",
+  priority: "MEDIUM",
+  description: "",
+};
+
 export function CreateSupplyChainModal({ open, onOpenChange, basePath }: CreateSupplyChainModalProps) {
   const router = useRouter();
-  const session = useSession();
+  const [buyers, setBuyers] = useState<DirectoryOption[]>([]);
+  const [suppliers, setSuppliers] = useState<DirectoryOption[]>([]);
 
   const {
     register,
@@ -43,34 +54,21 @@ export function CreateSupplyChainModal({ open, onOpenChange, basePath }: CreateS
   } = useForm<CreateSupplyChainFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- zodResolver type diverges from RHF Resolver generic
     resolver: zodResolver(createSupplyChainSchema) as any,
-    defaultValues: {
-      name: "",
-      orderName: "",
-      orderNumber: "",
-      buyerName: session?.role === "BUYER" ? session.name : "",
-      supplierName: session?.role === "SUPPLIER" ? session.name : "",
-      expectedDelivery: "",
-      priority: "Medium",
-      description: "",
-    },
+    defaultValues: EMPTY_VALUES,
   });
 
   useEffect(() => {
-    if (open) {
-      reset({
-        name: "",
-        orderName: "",
-        orderNumber: "",
-        buyerName: session?.role === "BUYER" ? session.name : "",
-        supplierName: session?.role === "SUPPLIER" ? session.name : "",
-        expectedDelivery: "",
-        priority: "Medium",
-        description: "",
-      });
-    }
-  }, [open, session, reset]);
+    if (!open) return;
+    reset(EMPTY_VALUES);
+    Promise.all([getBuyerOptions(), getSupplierOptions()]).then(([b, s]) => {
+      setBuyers(b);
+      setSuppliers(s);
+    });
+  }, [open, reset]);
 
   const priority = watch("priority");
+  const buyerUserId = watch("buyerUserId");
+  const supplierUserId = watch("supplierUserId");
 
   async function onSubmit(values: CreateSupplyChainFormValues) {
     const result = await createSupplyChainAction({ ...values, description: values.description ?? "" });
@@ -116,13 +114,41 @@ export function CreateSupplyChainModal({ open, onOpenChange, basePath }: CreateS
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="sc-buyer" className="text-xs">Buyer</Label>
-              <Input id="sc-buyer" placeholder="Buyer name" aria-invalid={!!errors.buyerName} {...register("buyerName")} />
-              {errors.buyerName && <p className="text-xs text-destructive">{errors.buyerName.message}</p>}
+              <Select value={buyerUserId} onValueChange={(v) => v && setValue("buyerUserId", v, { shouldValidate: true })}>
+                <SelectTrigger id="sc-buyer" className="w-full" aria-invalid={!!errors.buyerUserId}>
+                  <SelectValue placeholder="Select a buyer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {buyers.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name} {b.companyName && `— ${b.companyName}`}
+                    </SelectItem>
+                  ))}
+                  {buyers.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">No buyer accounts yet</div>
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.buyerUserId && <p className="text-xs text-destructive">{errors.buyerUserId.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sc-supplier" className="text-xs">Supplier</Label>
-              <Input id="sc-supplier" placeholder="Supplier name" aria-invalid={!!errors.supplierName} {...register("supplierName")} />
-              {errors.supplierName && <p className="text-xs text-destructive">{errors.supplierName.message}</p>}
+              <Select value={supplierUserId} onValueChange={(v) => v && setValue("supplierUserId", v, { shouldValidate: true })}>
+                <SelectTrigger id="sc-supplier" className="w-full" aria-invalid={!!errors.supplierUserId}>
+                  <SelectValue placeholder="Select a supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} {s.companyName && `— ${s.companyName}`}
+                    </SelectItem>
+                  ))}
+                  {suppliers.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">No supplier accounts yet</div>
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.supplierUserId && <p className="text-xs text-destructive">{errors.supplierUserId.message}</p>}
             </div>
           </div>
 
@@ -139,10 +165,10 @@ export function CreateSupplyChainModal({ open, onOpenChange, basePath }: CreateS
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Low">Low</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Urgent">Urgent</SelectItem>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="URGENT">Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -72,11 +72,16 @@ export async function GET(req: Request) {
     const supplierId = searchParams.get("supplierId");
 
     if (supplierId) {
+      const messagesInclude = {
+        orderBy: { createdAt: "asc" as const },
+        include: { supplyChain: { select: { id: true, name: true, orderNumber: true, status: true } } },
+      };
+
       let conv = await db.conversation.findUnique({
         where: { supplierId },
         include: {
           supplier: true,
-          messages: { orderBy: { createdAt: "asc" } },
+          messages: messagesInclude,
           notes: { orderBy: { createdAt: "desc" } },
           tasks: { orderBy: { createdAt: "desc" } },
           activities: { orderBy: { createdAt: "desc" } },
@@ -91,7 +96,7 @@ export async function GET(req: Request) {
           },
           include: {
             supplier: true,
-            messages: { orderBy: { createdAt: "asc" } },
+            messages: messagesInclude,
             notes: { orderBy: { createdAt: "desc" } },
             tasks: { orderBy: { createdAt: "desc" } },
             activities: { orderBy: { createdAt: "desc" } },
@@ -124,14 +129,15 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { conversationId, content, type = "TEXT", productId } = body;
+    const { conversationId, content, type = "TEXT", productId, supplyChainId } = body;
 
     if (!conversationId || !content) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const message = await db.message.create({
-      data: { conversationId, sender: "user", type, content, productId, status: "sent" },
+      data: { conversationId, sender: "user", type, content, productId, supplyChainId, status: "sent" },
+      include: { supplyChain: { select: { id: true, name: true, orderNumber: true, status: true } } },
     });
 
     await db.conversation.update({

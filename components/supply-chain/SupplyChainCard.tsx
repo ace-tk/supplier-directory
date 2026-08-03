@@ -5,7 +5,15 @@ import { motion } from "framer-motion";
 import { Building2, Factory, CalendarDays } from "lucide-react";
 import { StatusBadge } from "@/components/portal/status-badge";
 import { AvatarGroup, Avatar, AvatarFallback, AvatarGroupCount } from "@/components/ui/avatar";
-import { PRIORITY_STYLES, PRIORITY_DOT, formatShortDate, initialsFor } from "@/lib/supply-chain-ui";
+import {
+  PRIORITY_STYLES,
+  PRIORITY_DOT,
+  PRIORITY_LABELS,
+  SUPPLY_CHAIN_STATUS_LABELS,
+  formatShortDate,
+  initialsFor,
+  avatarColorFor,
+} from "@/lib/supply-chain-ui";
 import { cn } from "@/lib/utils";
 import type { SupplyChainRecord } from "@/types/supply-chain";
 
@@ -16,7 +24,7 @@ export function SupplyChainCard({ chain, basePath, index = 0 }: { chain: SupplyC
     : 0;
 
   const uniqueAssignees = Array.from(
-    new Map(chain.milestones.flatMap((m) => m.assignees).map((a) => [a.id, a])).values()
+    new Map(chain.milestones.flatMap((m) => m.assignees).map((a) => [a.user.id, a.user])).values()
   );
 
   return (
@@ -39,7 +47,7 @@ export function SupplyChainCard({ chain, basePath, index = 0 }: { chain: SupplyC
           </div>
           <span className={cn("shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium", PRIORITY_STYLES[chain.priority])}>
             <span className={cn("w-1.5 h-1.5 rounded-full", PRIORITY_DOT[chain.priority])} />
-            {chain.priority}
+            {PRIORITY_LABELS[chain.priority]}
           </span>
         </div>
 
@@ -69,7 +77,7 @@ export function SupplyChainCard({ chain, basePath, index = 0 }: { chain: SupplyC
 
         <div className="flex items-center justify-between pt-3 border-t border-border/60">
           <div className="flex items-center gap-2">
-            <StatusBadge status={chain.status} />
+            <StatusBadge status={SUPPLY_CHAIN_STATUS_LABELS[chain.status]} />
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <CalendarDays className="w-3 h-3" /> {formatShortDate(chain.expectedDelivery)}
             </span>
@@ -79,7 +87,7 @@ export function SupplyChainCard({ chain, basePath, index = 0 }: { chain: SupplyC
             <AvatarGroup>
               {uniqueAssignees.slice(0, 3).map((a) => (
                 <Avatar key={a.id} size="sm">
-                  <AvatarFallback className={cn("text-white text-[9px] font-semibold", a.colorClass)}>
+                  <AvatarFallback className={cn("text-white text-[9px] font-semibold", avatarColorFor(a.id))}>
                     {initialsFor(a.name)}
                   </AvatarFallback>
                 </Avatar>

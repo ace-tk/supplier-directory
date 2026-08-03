@@ -26,9 +26,9 @@ import { MilestoneCard } from "./MilestoneCard";
 import { TimelineConnector } from "./TimelineConnector";
 import { reorderMilestonesAction, addMilestoneAction } from "@/services/supply-chain";
 import { toast } from "sonner";
-import type { Milestone } from "@/types/supply-chain";
+import type { MilestoneRecord } from "@/types/supply-chain";
 
-function SortableMilestoneCard({ milestone, onClick }: { milestone: Milestone; onClick: () => void }) {
+function SortableMilestoneCard({ milestone, onClick, dimmed }: { milestone: MilestoneRecord; onClick: () => void; dimmed?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: milestone.id });
 
   return (
@@ -37,6 +37,7 @@ function SortableMilestoneCard({ milestone, onClick }: { milestone: Milestone; o
       onClick={onClick}
       cardRef={setNodeRef}
       isDragging={isDragging}
+      dimmed={dimmed}
       dragHandleProps={{ ...attributes, ...listeners }}
       style={{
         transform: CSS.Transform.toString(transform),
@@ -104,22 +105,26 @@ function AddMilestoneButton({ onAdd }: { onAdd: (name: string) => void }) {
 
 interface TimelineCanvasProps {
   chainId: string;
-  milestones: Milestone[];
-  onMilestonesChange: (milestones: Milestone[]) => void;
-  onMilestoneClick: (milestone: Milestone) => void;
+  milestones: MilestoneRecord[];
+  canEdit: boolean;
+  visibleIds?: Set<string>;
+  onMilestonesChange: (milestones: MilestoneRecord[]) => void;
+  onMilestoneClick: (milestone: MilestoneRecord) => void;
 }
 
-export function TimelineCanvas({ chainId, milestones, onMilestonesChange, onMilestoneClick }: TimelineCanvasProps) {
+export function TimelineCanvas({ chainId, milestones, canEdit, visibleIds, onMilestonesChange, onMilestoneClick }: TimelineCanvasProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const sorted = [...milestones].sort((a, b) => a.order - b.order);
 
   function handleDragStart(event: DragStartEvent) {
+    if (!canEdit) return;
     setActiveId(String(event.active.id));
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
+    if (!canEdit) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -135,12 +140,43 @@ export function TimelineCanvas({ chainId, milestones, onMilestonesChange, onMile
   }
 
   async function handleAdd(name: string, position: { afterMilestoneId?: string; beforeMilestoneId?: string }) {
+    const now = new Date().toISOString();
     const result = await addMilestoneAction(chainId, { name, ...position });
     if (!result.success) {
       toast.error(result.error);
       return;
     }
-    onMilestonesChange(result.data.milestones);
+
+    const placeholder: MilestoneRecord = {
+      id: result.data.id,
+      supplyChainId: chainId,
+      name,
+      description: null,
+      status: "NOT_STARTED",
+      boardColumn: "PLANNING",
+      priority: "MEDIUM",
+      dueDate: now,
+      progress: 0,
+      notes: null,
+      order: 0,
+      createdAt: now,
+      updatedAt: now,
+      assignees: [],
+      tags: [],
+      mediaCount: 0,
+      attachmentCount: 0,
+      commentCount: 0,
+    };
+
+    const insertAt = position.beforeMilestoneId
+      ? sorted.findIndex((m) => m.id === position.beforeMilestoneId)
+      : position.afterMilestoneId
+        ? sorted.findIndex((m) => m.id === position.afterMilestoneId) + 1
+        : sorted.length;
+
+    const next = [...sorted];
+    next.splice(insertAt === -1 ? sorted.length : insertAt, 0, placeholder);
+    onMilestonesChange(next.map((m, i) => ({ ...m, order: i })));
     toast.success(`"${name}" added to the timeline`);
   }
 
@@ -157,19 +193,25 @@ export function TimelineCanvas({ chainId, milestones, onMilestonesChange, onMile
       >
         <SortableContext items={sorted.map((m) => m.id)} strategy={horizontalListSortingStrategy}>
           <div className="flex items-center min-w-max px-2 py-2">
-            <AddMilestoneButton onAdd={(name) => handleAdd(name, { beforeMilestoneId: sorted[0]?.id })} />
+            {canEdit && <AddMilestoneButton onAdd={(name) => handleAdd(name, { beforeMilestoneId: sorted[0]?.id })} />}
 
             {sorted.map((milestone, i) => (
               <div key={milestone.id} className="flex items-center">
                 {i > 0 && <TimelineConnector leftStatus={sorted[i - 1].status} />}
                 <div className="mx-2">
-                  <SortableMilestoneCard milestone={milestone} onClick={() => onMilestoneClick(milestone)} />
+                  <SortableMilestoneCard
+                    milestone={milestone}
+                    onClick={() => onMilestoneClick(milestone)}
+                    dimmed={visibleIds ? !visibleIds.has(milestone.id) : false}
+                  />
                 </div>
                 <div className="flex items-center">
                   {i < sorted.length - 1 && <TimelineConnector leftStatus={milestone.status} />}
-                  <div className="mx-2">
-                    <AddMilestoneButton onAdd={(name) => handleAdd(name, { afterMilestoneId: milestone.id })} />
-                  </div>
+                  {canEdit && (
+                    <div className="mx-2">
+                      <AddMilestoneButton onAdd={(name) => handleAdd(name, { afterMilestoneId: milestone.id })} />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

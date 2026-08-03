@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Truck } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { MILESTONE_CARD_STYLES } from "@/lib/supply-chain-ui";
-import type { Milestone } from "@/types/supply-chain";
+import type { MilestoneRecord } from "@/types/supply-chain";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -28,9 +28,9 @@ function buildMonthGrid(monthDate: Date): Date[] {
 }
 
 interface CalendarViewProps {
-  milestones: Milestone[];
+  milestones: MilestoneRecord[];
   expectedDelivery: string;
-  onMilestoneClick: (milestone: Milestone) => void;
+  onMilestoneClick: (milestone: MilestoneRecord) => void;
 }
 
 export function CalendarView({ milestones, expectedDelivery, onMilestoneClick }: CalendarViewProps) {

@@ -2,13 +2,17 @@
 
 import { useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
-import { 
+import {
   Phone, Video, Info, Paperclip, Smile, Mic, Send,
   Menu, Sparkles, Package, Check, CheckCheck,
-  ShieldCheck, MessageCircle
+  ShieldCheck, MessageCircle, Workflow, ArrowRight
 } from "lucide-react";
+import Link from "next/link";
 import { Conversation, Message } from "@/types/crm";
 import { motion, AnimatePresence } from "framer-motion";
+import { ShareSupplyChainDialog } from "./ShareSupplyChainDialog";
+import { supplyChainPath } from "@/lib/supply-chain-ui";
+import type { SupplyChainSummary } from "@/services/supply-chain";
 
 export function ChatWindow({
   conversation,
@@ -18,13 +22,14 @@ export function ChatWindow({
   showLeftSidebar
 }: {
   conversation: Conversation | null;
-  onSendMessage: (c: string, t?: "TEXT" | "PRODUCT", pid?: string) => void;
+  onSendMessage: (c: string, t?: "TEXT" | "PRODUCT" | "SUPPLY_CHAIN", pid?: string, supplyChainId?: string) => void;
   onToggleLeftSidebar: () => void;
   onToggleRightSidebar: () => void;
   showLeftSidebar: boolean;
 }) {
   const [inputText, setInputText] = useState("");
   const [showAiMenu, setShowAiMenu] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,6 +61,11 @@ export function ChatWindow({
     if (!inputText.trim()) return;
     onSendMessage(inputText);
     setInputText("");
+  };
+
+  const handleShareSupplyChain = (chain: SupplyChainSummary) => {
+    onSendMessage(`Shared "${chain.name}" (${chain.orderNumber})`, "SUPPLY_CHAIN", undefined, chain.id);
+    setShareOpen(false);
   };
 
   const handleAiAction = (promptType: string) => {
@@ -178,10 +188,31 @@ export function ChatWindow({
                       </div>
                     )}
 
-                    <p className="text-[14.5px] leading-relaxed break-words whitespace-pre-wrap text-slate-800">
-                      {msg.content}
-                    </p>
-                    
+                    {/* Supply Chain Card */}
+                    {msg.type === 'SUPPLY_CHAIN' && msg.supplyChain && (
+                      <div className="mb-2 p-2.5 bg-white/80 rounded-xl flex items-center gap-3 border border-slate-200/50">
+                        <div className="w-12 h-12 bg-indigo-50 rounded-lg shrink-0 flex items-center justify-center">
+                          <Workflow className="w-5 h-5 text-indigo-500" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{msg.supplyChain.name}</p>
+                          <p className="text-[11px] text-slate-500">{msg.supplyChain.orderNumber}</p>
+                          <Link
+                            href={supplyChainPath("ADMIN", msg.supplyChain.id)}
+                            className="inline-flex items-center gap-1 text-xs text-indigo-600 font-medium hover:underline mt-0.5"
+                          >
+                            Open Supply Chain <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
+                    {msg.type !== 'SUPPLY_CHAIN' && (
+                      <p className="text-[14.5px] leading-relaxed break-words whitespace-pre-wrap text-slate-800">
+                        {msg.content}
+                      </p>
+                    )}
+
                     <div className={`flex items-center justify-end gap-1 mt-0.5 ${isUser ? 'text-[#8696A0]' : 'text-slate-400'}`}>
                       <span className="text-[10px] font-medium">
                         {format(new Date(msg.createdAt), 'h:mm a')}
@@ -208,6 +239,13 @@ export function ChatWindow({
         </button>
         <button className="p-2.5 text-slate-500 hover:text-slate-600 hover:bg-slate-200/60 rounded-full transition-colors shrink-0">
           <Paperclip className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => setShareOpen(true)}
+          title="Share Supply Chain"
+          className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors shrink-0"
+        >
+          <Workflow className="w-5 h-5" />
         </button>
 
         {/* Input area */}
@@ -296,6 +334,8 @@ export function ChatWindow({
           </button>
         )}
       </div>
+
+      <ShareSupplyChainDialog open={shareOpen} onClose={() => setShareOpen(false)} onSelect={handleShareSupplyChain} />
     </div>
   );
 }
