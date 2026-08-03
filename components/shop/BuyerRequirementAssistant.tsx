@@ -225,14 +225,14 @@ export function BuyerRequirementAssistant() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Describe your sourcing requirement..."
-                  rows={1}
+                  rows={3}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSend();
                     }
                   }}
-                  className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 min-h-9 max-h-20 overflow-y-auto text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
+                  className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-3 min-h-[84px] max-h-[140px] overflow-y-auto text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                 />
 
                 <Button onClick={handleSend} size="icon-lg" className="shrink-0 rounded-full" aria-label="Send Request">
