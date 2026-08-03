@@ -30,6 +30,7 @@ import {
   Factory,
   Briefcase,
   Users2,
+  Workflow,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -125,7 +126,10 @@ export const ADMIN_BOTTOM_ITEMS: NavItem[] = [
 export const BUYER_NAV_GROUPS: NavGroup[] = [
   {
     group: "Overview",
-    items: [{ label: "Dashboard", href: "/buyer", icon: LayoutDashboard }],
+    items: [
+      { label: "Dashboard", href: "/buyer", icon: LayoutDashboard },
+      { label: "Supply Chain", href: "/buyer/supply-chain", icon: Workflow, badge: "New" },
+    ],
   },
   {
     group: "Discover",
@@ -158,7 +162,10 @@ export const BUYER_BOTTOM_ITEMS: NavItem[] = [
 export const SUPPLIER_NAV_GROUPS: NavGroup[] = [
   {
     group: "Overview",
-    items: [{ label: "Dashboard", href: "/supplier", icon: LayoutDashboard }],
+    items: [
+      { label: "Dashboard", href: "/supplier", icon: LayoutDashboard },
+      { label: "Supply Chain", href: "/supplier/supply-chain", icon: Workflow, badge: "New" },
+    ],
   },
   {
     group: "Business",
