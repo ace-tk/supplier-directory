@@ -12,7 +12,7 @@ import { ProductDrawer } from "@/components/shop/ProductDrawer";
 import { ProductVideoModal } from "@/components/shop/ProductVideoModal";
 import { RequestVideoModal } from "@/components/shop/RequestVideoModal";
 import { CounterOfferModal } from "@/components/shop/CounterOfferModal";
-import { SourcingRequestBar } from "@/components/shop/SourcingRequestBar";
+import { BuyerRequirementAssistant } from "@/components/shop/BuyerRequirementAssistant";
 import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
@@ -332,7 +332,7 @@ function ShopPageContent() {
         </div>
       </div>
 
-      <SourcingRequestBar />
+      <BuyerRequirementAssistant />
 
       <ProductDrawer
         product={selectedProduct}

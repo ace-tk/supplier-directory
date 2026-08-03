@@ -76,6 +76,49 @@ export function getViewsByCountry(product: Pick<Product, "id">, totalViews: numb
   return results.sort((a, b) => b.views - a.views);
 }
 
+export interface MarketShare {
+  code: string;
+  flag: string;
+  country: string;
+  percent: number;
+}
+
+// Top N markets by share, with the remainder rolled into a single "Others"
+// row — matches how real analytics dashboards summarize a long tail.
+export function getTopMarkets(product: Pick<Product, "id">, totalViews: number, topN = 5): MarketShare[] {
+  const countries = getViewsByCountry(product, totalViews);
+  const top = countries.slice(0, topN);
+  const othersPercent = 100 - top.reduce((sum, c) => sum + c.percent, 0);
+
+  const result: MarketShare[] = top.map((c) => ({
+    code: c.code,
+    flag: c.flag,
+    country: c.country,
+    percent: c.percent,
+  }));
+
+  if (othersPercent > 0) {
+    result.push({ code: "OTHER", flag: "🌎", country: "Others", percent: othersPercent });
+  }
+
+  return result;
+}
+
+// Deterministic mock week-over-week growth, shown as a small insight.
+export function getViewsTrendPercent(product: Pick<Product, "id">): number {
+  return 4 + (hashString(`${product.id}-trend`) % 32); // 4-35%
+}
+
+// The runner-up market reads as "trending" — a plausible, stable mock signal.
+export function getTrendingMarket(product: Pick<Product, "id">, totalViews: number): string {
+  const countries = getViewsByCountry(product, totalViews);
+  return countries[1]?.country ?? countries[0]?.country ?? "—";
+}
+
+export function getUpdatedMinutesAgo(product: Pick<Product, "id">): number {
+  return 1 + (hashString(`${product.id}-updated`) % 59); // 1-59 minutes
+}
+
 const SHIPPING_TERMS = [
   "FOB (Free On Board)",
   "CIF (Cost, Insurance & Freight)",

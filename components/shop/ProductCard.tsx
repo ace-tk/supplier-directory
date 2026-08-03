@@ -24,7 +24,7 @@ import { downloadDetails, shareDetails } from "@/lib/card-actions";
 import { hasProductVideo } from "@/lib/product-engagement";
 import { useSession } from "@/hooks/use-session";
 import { ProductImageSlider } from "./ProductImageSlider";
-import { ViewsPopover } from "./ViewsPopover";
+import { BuyerInterestPill } from "./BuyerInterestPill";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -250,7 +250,7 @@ export function ProductCard({
               <MapPin className="w-3 h-3" /> {supplier.city}
             </span>
           )}
-          <ViewsPopover product={product} />
+          <BuyerInterestPill product={product} />
         </div>
 
         <div className="flex flex-wrap gap-1.5 mb-4">
