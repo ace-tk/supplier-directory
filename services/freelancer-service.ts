@@ -1,76 +1,77 @@
-// Mock freelancer service — same swap-later contract as inventory-service.ts.
+"use server";
 
-import { SUPPLIERS } from "@/data/suppliers";
-import { hashString, pick } from "@/lib/mock-data";
+// Real, DB-backed freelancer list for the Admin → Freelancers module — was a
+// mock in-memory service; now sourced from actual registered Freelancer
+// accounts (see lib/freelancer-queries.ts) so Add Task/Proposal/Assign reach
+// real Freelancer Portal users.
+
+import { db } from "@/lib/db";
+import { getUser } from "@/lib/session";
+import { getAllFreelancerProfiles, getAllProjects } from "@/lib/freelancer-queries";
 import type { FreelancerRecord, PaymentStatus, Availability } from "@/types/freelancer";
 
-function mockLatency(ms = 500): Promise<void> {
+function mockLatency(ms = 400): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const NAMES = [
-  "Arjun Mehta", "Isabella Cruz", "Kenji Watanabe", "Layla Hassan", "Ola Adeyemi",
-  "Sofia Rossi", "Ivan Petrov", "Meera Iyer", "Noah Fischer", "Chidi Okafor",
-  "Hana Kobayashi", "Diego Fernandez",
-];
-const SKILL_POOL = [
-  "Product Photography", "Copywriting", "Video Editing", "Graphic Design", "SEO",
-  "Supplier Verification", "Quality Inspection", "Translation", "Logistics Coordination",
-  "Social Media Marketing", "Data Entry", "Customer Support",
-];
-const BUYER_NAMES = ["Ananya Rao", "Marcus Lee", "Fatima Al-Sayed", "David Kim", "Priya Nair"];
-const PAYMENT_STATUSES: PaymentStatus[] = ["Paid", "Paid", "Pending", "Overdue"];
-const AVAILABILITY: Availability[] = ["Available", "Available", "Busy", "Unavailable"];
+const AVAILABILITY_MAP: Record<string, Availability> = {
+  AVAILABLE: "Available",
+  BUSY: "Busy",
+  UNAVAILABLE: "Unavailable",
+};
 
-let freelancersCache: FreelancerRecord[] | null = null;
+const PAYMENT_STATUS_MAP: Record<string, PaymentStatus> = {
+  PAID: "Paid",
+  PENDING: "Pending",
+  OVERDUE: "Overdue",
+};
 
-export function getFreelancers(): FreelancerRecord[] {
-  if (freelancersCache) return freelancersCache;
+export async function getFreelancers(): Promise<FreelancerRecord[]> {
+  const [profiles, projects] = await Promise.all([getAllFreelancerProfiles(), getAllProjects()]);
 
-  freelancersCache = NAMES.map((name, i) => {
-    const key = `freelancer-${i}-${name}`;
-    const skillCount = 2 + (hashString(`${key}-skillcount`) % 3);
-    const skills = [...SKILL_POOL]
-      .sort((a, b) => hashString(`${key}-${a}`) - hashString(`${key}-${b}`))
-      .slice(0, skillCount);
-    const clientCount = 1 + (hashString(`${key}-clients`) % 3);
-    const supplierCount = 1 + (hashString(`${key}-suppliers`) % 3);
+  return profiles.map((p) => {
+    const ownProjects = projects.filter((pr) => pr.freelancerUserId === p.userId);
+    const activeProjects = ownProjects.filter((pr) => pr.status === "ACTIVE").length;
+    const assignedClients = [...new Set(ownProjects.map((pr) => pr.clientName))];
 
     return {
-      id: `fl-${i}`,
-      name,
-      email: `${name.toLowerCase().replace(" ", ".")}@freelance.supplybase.com`,
-      skills,
-      assignedClients: Array.from({ length: clientCount }, (_, j) => pick(BUYER_NAMES, `${key}-client-${j}`)),
-      assignedSuppliers: Array.from({ length: supplierCount }, (_, j) => pick(SUPPLIERS, `${key}-supplier-${j}`).companyName),
-      activeProjects: hashString(`${key}-projects`) % 6,
-      paymentStatus: pick(PAYMENT_STATUSES, `${key}-payment`),
-      performanceScore: 55 + (hashString(`${key}-perf`) % 45),
-      availability: pick(AVAILABILITY, `${key}-avail`),
-      status: "Active",
+      id: p.userId,
+      name: p.name,
+      email: p.email,
+      skills: p.skills,
+      assignedClients,
+      assignedSuppliers: [],
+      activeProjects,
+      paymentStatus: PAYMENT_STATUS_MAP[p.paymentStatus] ?? "Pending",
+      performanceScore: p.performanceScore,
+      availability: AVAILABILITY_MAP[p.availability] ?? "Available",
+      status: p.status === "DEACTIVATED" ? "Deactivated" : "Active",
     };
   });
-
-  return freelancersCache;
 }
 
-// Mock mutations — swap for real `POST /api/freelancers/:id/...` calls later.
+// Legacy entry point kept for the original mock Assign Task dialog — no
+// longer wired to any button (superseded by the real Proposal/Add Project
+// flow in components/admin/freelancers/add-task-dialog.tsx) but left intact
+// per "don't remove existing components."
 export async function assignTask(
   freelancerId: string,
   payload: { clientOrSupplier: string; taskTitle: string }
 ): Promise<{ success: true }> {
   await mockLatency(700);
-  const freelancer = getFreelancers().find((f) => f.id === freelancerId);
-  if (freelancer) {
-    freelancer.activeProjects += 1;
-    console.info("[mock] task assigned", freelancerId, payload);
-  }
+  console.info("[mock] task assigned", freelancerId, payload);
   return { success: true };
 }
 
-export async function deactivateFreelancer(id: string): Promise<{ success: true }> {
-  await mockLatency();
-  const freelancer = getFreelancers().find((f) => f.id === id);
-  if (freelancer) freelancer.status = freelancer.status === "Active" ? "Deactivated" : "Active";
-  return { success: true };
+export async function deactivateFreelancer(userId: string): Promise<{ success: true; status: "Active" | "Deactivated" }> {
+  const admin = await getUser();
+  if (!admin || admin.role !== "ADMIN") return { success: true, status: "Active" };
+
+  const freelancer = await db.freelancer.findUnique({ where: { userId }, select: { status: true } });
+  if (!freelancer) return { success: true, status: "Active" };
+
+  const nextStatus = freelancer.status === "ACTIVE" ? "DEACTIVATED" : "ACTIVE";
+  await db.freelancer.update({ where: { userId }, data: { status: nextStatus } });
+
+  return { success: true, status: nextStatus === "ACTIVE" ? "Active" : "Deactivated" };
 }

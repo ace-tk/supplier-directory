@@ -24,6 +24,7 @@ const ROLE_COLORS: Record<string, string> = {
   ADMIN: "bg-orange-500/20 text-orange-500",
   SUPPLIER: "bg-blue-500/20 text-blue-500",
   BUYER: "bg-emerald-500/20 text-emerald-500",
+  FREELANCER: "bg-purple-500/20 text-purple-500",
 };
 
 interface TopNavbarProps {

@@ -3,6 +3,7 @@
 // signature, not its internals.
 
 import type { BuyerLeadRecord } from "@/types/buyer-lead";
+import type { ProposalChannel } from "@/lib/generated/prisma/enums";
 
 function mockLatency(ms = 400): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,6 +23,37 @@ export async function sendBuyerRequirementEmail(lead: BuyerLeadRecord): Promise<
   ].join("\n");
 
   console.info(`[mock email] To: ${ADMIN_NOTIFICATION_EMAIL}\nSubject: ${subject}\n\n${body}`);
+
+  return { success: true };
+}
+
+interface ProposalMessageInput {
+  freelancerName: string;
+  freelancerEmail: string;
+  freelancerPhone: string | null;
+  title: string;
+  clientName: string;
+  description: string | null;
+  channel: ProposalChannel;
+}
+
+export async function sendProposalMessage(input: ProposalMessageInput): Promise<{ success: true }> {
+  await mockLatency();
+
+  const body = [
+    `Project: ${input.title}`,
+    `Client: ${input.clientName}`,
+    input.description ? `Details: ${input.description}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  if (input.channel === "EMAIL" || input.channel === "BOTH") {
+    console.info(`[mock email] To: ${input.freelancerEmail}\nSubject: New Proposal — ${input.title}\n\n${body}`);
+  }
+  if (input.channel === "WHATSAPP" || input.channel === "BOTH") {
+    console.info(`[mock whatsapp] To: ${input.freelancerPhone ?? "(no phone on file)"}\n\n${body}`);
+  }
 
   return { success: true };
 }

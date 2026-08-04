@@ -38,6 +38,8 @@ const STATUS_STYLES: Record<string, string> = {
   Upcoming: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
   "Not Started": "bg-slate-500/10 text-slate-600 dark:text-slate-400",
   Waiting: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  Sent: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  Viewed: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
 };
 
 export function StatusBadge({ status }: { status: string }) {

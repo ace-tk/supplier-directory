@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Users, Briefcase, UserCheck, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatWidget } from "@/components/portal/stat-widget";
 import { ListToolbar } from "@/components/admin/list-toolbar";
 import { FreelancerCard } from "@/components/admin/freelancers/freelancer-card";
-import { AssignTaskDialog } from "@/components/admin/freelancers/assign-task-dialog";
+import { AddTaskDialog } from "@/components/admin/freelancers/add-task-dialog";
+import { CreateProjectDialog } from "@/components/admin/freelancers/create-project/create-project-dialog";
 import { FreelancerDetailDialog } from "@/components/admin/freelancers/freelancer-detail-dialog";
 import {
   AlertDialog,
@@ -24,7 +25,8 @@ import { getFreelancers, deactivateFreelancer } from "@/services/freelancer-serv
 import type { FreelancerRecord } from "@/types/freelancer";
 
 export default function FreelancersPage() {
-  const [freelancers, setFreelancers] = useState<FreelancerRecord[]>(() => getFreelancers());
+  const [freelancers, setFreelancers] = useState<FreelancerRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [detailTarget, setDetailTarget] = useState<FreelancerRecord | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -32,7 +34,21 @@ export default function FreelancersPage() {
   const [assignTarget, setAssignTarget] = useState<FreelancerRecord | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
 
+  const [createProjectTarget, setCreateProjectTarget] = useState<FreelancerRecord | null>(null);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+
   const [deactivateTarget, setDeactivateTarget] = useState<FreelancerRecord | null>(null);
+
+  function refresh() {
+    getFreelancers().then((data) => {
+      setFreelancers(data);
+      setLoading(false);
+    });
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
 
   const { search, setSearch, filterValue, setFilterValue, filtered } = useSearchFilter(
     freelancers,
@@ -54,27 +70,27 @@ export default function FreelancersPage() {
     setAssignOpen(true);
   }
 
-  function handleAssigned(freelancerId: string) {
-    setFreelancers((prev) =>
-      prev.map((f) => (f.id === freelancerId ? { ...f, activeProjects: f.activeProjects + 1 } : f))
-    );
+  function handleAssignSelected(freelancer: FreelancerRecord) {
+    setCreateProjectTarget(freelancer);
+    setCreateProjectOpen(true);
   }
 
   async function confirmDeactivate() {
     if (!deactivateTarget) return;
-    await deactivateFreelancer(deactivateTarget.id);
-    const willReactivate = deactivateTarget.status === "Deactivated";
+    const result = await deactivateFreelancer(deactivateTarget.id);
     setFreelancers((prev) =>
-      prev.map((f) => (f.id === deactivateTarget.id ? { ...f, status: willReactivate ? "Active" : "Deactivated" } : f))
+      prev.map((f) => (f.id === deactivateTarget.id ? { ...f, status: result.status } : f))
     );
-    toast.success(willReactivate ? `${deactivateTarget.name} reactivated` : `${deactivateTarget.name} deactivated`);
+    toast.success(result.status === "Deactivated" ? `${deactivateTarget.name} deactivated` : `${deactivateTarget.name} reactivated`);
     setDeactivateTarget(null);
   }
 
   const activeCount = freelancers.filter((f) => f.status === "Active").length;
   const availableCount = freelancers.filter((f) => f.availability === "Available" && f.status === "Active").length;
   const totalProjects = freelancers.reduce((sum, f) => sum + f.activeProjects, 0);
-  const avgPerformance = Math.round(freelancers.reduce((sum, f) => sum + f.performanceScore, 0) / freelancers.length);
+  const avgPerformance = freelancers.length
+    ? Math.round(freelancers.reduce((sum, f) => sum + f.performanceScore, 0) / freelancers.length)
+    : 0;
 
   return (
     <div>
@@ -113,12 +129,26 @@ export default function FreelancersPage() {
           />
         ))}
       </div>
-      {filtered.length === 0 && (
-        <p className="text-center text-sm text-muted-foreground py-10">No freelancers match your search.</p>
+      {!loading && filtered.length === 0 && (
+        <p className="text-center text-sm text-muted-foreground py-10">
+          {freelancers.length === 0 ? "No freelancers have registered yet." : "No freelancers match your search."}
+        </p>
       )}
 
       <FreelancerDetailDialog freelancer={detailTarget} open={detailOpen} onOpenChange={setDetailOpen} />
-      <AssignTaskDialog freelancer={assignTarget} open={assignOpen} onOpenChange={setAssignOpen} onAssigned={handleAssigned} />
+      <AddTaskDialog
+        freelancer={assignTarget}
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        onCreated={refresh}
+        onAssignSelected={handleAssignSelected}
+      />
+      <CreateProjectDialog
+        freelancer={createProjectTarget}
+        open={createProjectOpen}
+        onOpenChange={setCreateProjectOpen}
+        onCreated={refresh}
+      />
 
       <AlertDialog open={!!deactivateTarget} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
         <AlertDialogContent>

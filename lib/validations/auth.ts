@@ -19,7 +19,7 @@ export const signupSchema = z
     // Admin accounts are never created through public signup — only
     // BUYER/SUPPLIER are valid here, enforced server-side (not just hidden
     // in the UI), so a crafted request can't self-provision an admin.
-    role: z.enum(["SUPPLIER", "BUYER"]),
+    role: z.enum(["SUPPLIER", "BUYER", "FREELANCER"]),
     companyName: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {

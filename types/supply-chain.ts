@@ -7,6 +7,7 @@ import type {
   MediaKind,
   ShareRole,
 } from "@/lib/generated/prisma/enums";
+import type { Role } from "@/types/auth";
 
 export type { SupplyChainStatus, SupplyChainPriority, MilestoneStatus, BoardColumn, ParticipantKind, MediaKind, ShareRole };
 
@@ -28,7 +29,7 @@ export interface ParticipantUser {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "BUYER" | "SUPPLIER";
+  role: Role;
   avatar: string | null;
   companyName: string | null;
 }

@@ -31,6 +31,11 @@ import {
   Briefcase,
   Users2,
   Workflow,
+  FolderKanban,
+  ListChecks,
+  FileText,
+  Image as ImageIcon,
+  Bell,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -50,6 +55,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
   SUPPLIER: "Supplier",
   BUYER: "Buyer",
+  FREELANCER: "Freelancer",
 };
 
 /**
@@ -63,6 +69,7 @@ export function roleHome(role: string): string {
     ADMIN: "/dashboard",
     BUYER: "/buyer",
     SUPPLIER: "/supplier",
+    FREELANCER: "/freelancer/dashboard",
   };
   return map[role as Role] ?? "/login";
 }
@@ -200,16 +207,49 @@ export const SUPPLIER_BOTTOM_ITEMS: NavItem[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Freelancer Portal
+// ---------------------------------------------------------------------------
+export const FREELANCER_NAV_GROUPS: NavGroup[] = [
+  {
+    group: "Overview",
+    items: [{ label: "Dashboard", href: "/freelancer/dashboard", icon: LayoutDashboard }],
+  },
+  {
+    group: "Work",
+    items: [
+      { label: "Projects", href: "/freelancer/projects", icon: FolderKanban },
+      { label: "Tasks", href: "/freelancer/tasks", icon: ListChecks },
+      { label: "Proposals", href: "/freelancer/proposals", icon: FileText },
+    ],
+  },
+  {
+    group: "Profile",
+    items: [
+      { label: "Portfolio", href: "/freelancer/portfolio", icon: ImageIcon },
+      { label: "Messages", href: "/freelancer/messages", icon: MessageSquare },
+      { label: "Notifications", href: "/freelancer/notifications", icon: Bell },
+      { label: "Profile", href: "/freelancer/profile", icon: UserCircle },
+    ],
+  },
+];
+
+export const FREELANCER_BOTTOM_ITEMS: NavItem[] = [
+  { label: "Settings", href: "/freelancer/settings", icon: Settings },
+  { label: "Help & Support", href: "/help", icon: HelpCircle },
+];
+
+// ---------------------------------------------------------------------------
 // Portal config lookup — keyed by a plain string so layouts (Server
 // Components) can hand the Sidebar (a Client Component) just the key. The
 // nav configs themselves carry icon *component references*, which can't be
 // serialized across the server/client boundary as props — so this map is
 // only ever read from inside sidebar.tsx, never passed in.
 // ---------------------------------------------------------------------------
-export type PortalKey = "admin" | "buyer" | "supplier";
+export type PortalKey = "admin" | "buyer" | "supplier" | "freelancer";
 
 export const PORTAL_CONFIG: Record<PortalKey, { navGroups: NavGroup[]; bottomItems: NavItem[]; label?: string }> = {
   admin: { navGroups: ADMIN_NAV_GROUPS, bottomItems: ADMIN_BOTTOM_ITEMS },
   buyer: { navGroups: BUYER_NAV_GROUPS, bottomItems: BUYER_BOTTOM_ITEMS, label: "Buyer Portal" },
   supplier: { navGroups: SUPPLIER_NAV_GROUPS, bottomItems: SUPPLIER_BOTTOM_ITEMS, label: "Supplier Portal" },
+  freelancer: { navGroups: FREELANCER_NAV_GROUPS, bottomItems: FREELANCER_BOTTOM_ITEMS, label: "Freelancer Portal" },
 };

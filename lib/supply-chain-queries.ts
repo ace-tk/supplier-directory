@@ -11,6 +11,7 @@ import type {
   MilestoneDetail,
   ParticipantUser,
 } from "@/types/supply-chain";
+import type { Role } from "@/types/auth";
 
 type UserWithProfile = {
   id: string;
@@ -149,7 +150,7 @@ export async function getAccessibleSupplyChains(userId: string, role: string): P
 export async function getSupplyChainWithAccess(
   id: string,
   userId: string,
-  role: "ADMIN" | "BUYER" | "SUPPLIER"
+  role: Role
 ): Promise<{ chain: SupplyChainRecord; access: SupplyChainAccess } | null> {
   const raw = await fetchChainRaw(id);
   if (!raw) return null;
@@ -164,7 +165,7 @@ export async function getSupplyChainWithAccess(
 export async function getMilestoneDetail(
   milestoneId: string,
   userId: string,
-  role: "ADMIN" | "BUYER" | "SUPPLIER"
+  role: Role
 ): Promise<{ milestone: MilestoneDetail; access: SupplyChainAccess; isAssignee: boolean } | null> {
   const milestone = await db.milestone.findUnique({
     where: { id: milestoneId },
@@ -236,7 +237,7 @@ export async function getMilestoneDetail(
 export async function getMilestoneActivities(
   milestoneId: string,
   userId: string,
-  role: "ADMIN" | "BUYER" | "SUPPLIER"
+  role: Role
 ) {
   const milestone = await db.milestone.findUnique({ where: { id: milestoneId }, select: { supplyChainId: true } });
   if (!milestone) return null;
@@ -283,7 +284,7 @@ export async function getSupplyChainAnalyticsForUser(userId: string, role: strin
 export async function getAccessForChain(
   chainId: string,
   userId: string,
-  role: "ADMIN" | "BUYER" | "SUPPLIER"
+  role: Role
 ): Promise<{ access: SupplyChainAccess; ownerId: string } | null> {
   const chain = await db.supplyChain.findUnique({ where: { id: chainId }, select: { ownerId: true } });
   if (!chain) return null;
@@ -296,7 +297,7 @@ export async function getAccessForChain(
 export async function getAccessForMilestone(
   milestoneId: string,
   userId: string,
-  role: "ADMIN" | "BUYER" | "SUPPLIER"
+  role: Role
 ): Promise<{ access: SupplyChainAccess; chainId: string; isAssignee: boolean } | null> {
   const milestone = await db.milestone.findUnique({
     where: { id: milestoneId },

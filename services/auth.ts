@@ -91,6 +91,13 @@ export async function signupAction(
               },
             }
           : {}),
+        ...(role === "FREELANCER"
+          ? {
+              freelancer: {
+                create: {},
+              },
+            }
+          : {}),
       },
     });
 

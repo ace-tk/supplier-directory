@@ -52,6 +52,7 @@ const DEMO_USERS = [
   { name: "Demo Buyer", email: "buyer@supplybase.com", role: "BUYER" as const, companyName: "Demo Buyer Co.", password: "Demo@1234" },
   { name: "Demo Supplier", email: "supplier@supplybase.com", role: "SUPPLIER" as const, companyName: "Demo Supplier Co.", password: "Demo@1234" },
   { name: "Demo Admin", email: "admin@supplybase.com", role: "ADMIN" as const, companyName: undefined, password: "Admin@123" },
+  { name: "Demo Freelancer", email: "freelancer@supplybase.com", role: "FREELANCER" as const, companyName: undefined, password: "Freelancer@123" },
 ];
 
 // Idempotent — cheap after the first run (one indexed count query), so it's
@@ -75,6 +76,22 @@ export async function ensureDemoUsersSeeded() {
         role: u.role,
         ...(u.role === "SUPPLIER" ? { supplier: { create: { companyName: u.companyName! } } } : {}),
         ...(u.role === "BUYER" ? { buyer: { create: { companyName: u.companyName! } } } : {}),
+        ...(u.role === "FREELANCER"
+          ? {
+              freelancer: {
+                create: {
+                  bio: "Freelance product photographer and catalog specialist working with wholesale suppliers to create conversion-ready listing content.",
+                  location: "Bengaluru, India",
+                  phone: "+91 98765 43210",
+                  skills: ["Product Photography", "Catalog Design", "Adobe Photoshop", "Lightroom", "Content Writing"],
+                  linkedinUrl: "https://linkedin.com/in/demo-freelancer",
+                  githubUrl: "https://github.com/demo-freelancer",
+                  availability: "AVAILABLE",
+                  performanceScore: 82,
+                },
+              },
+            }
+          : {}),
       },
     });
   }

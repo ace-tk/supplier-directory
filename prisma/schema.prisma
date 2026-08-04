@@ -13,6 +13,7 @@ enum Role {
   ADMIN
   SUPPLIER
   BUYER
+  FREELANCER
 }
 
 model User {
@@ -25,8 +26,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  supplier Supplier?
-  buyer    Buyer?
+  supplier   Supplier?
+  buyer      Buyer?
+  freelancer Freelancer?
 
   ownedSupplyChains       SupplyChain[]          @relation("SupplyChainOwner")
   buyerSupplyChains       SupplyChain[]          @relation("SupplyChainBuyer")
@@ -39,6 +41,12 @@ model User {
   sharesReceived          SupplyChainShare[]     @relation("SharedWithUser")
   sharesGiven             SupplyChainShare[]     @relation("SharedByUser")
   notifications           Notification[]
+
+  assignedProjects  Project[]        @relation("ProjectFreelancer")
+  createdProjects   Project[]        @relation("ProjectCreatedBy")
+  receivedProposals Proposal[]       @relation("ProposalFreelancer")
+  sentProposals     Proposal[]       @relation("ProposalCreatedBy")
+  assignedTasks     FreelancerTask[] @relation("TaskFreelancer")
 
   @@index([email])
 }
@@ -106,10 +114,10 @@ model SupplierListing {
 
 // Global Product catalog for the Shop page
 model Product {
-  id             String          @id @default(cuid())
-  supplierId     String
-  supplier       SupplierListing @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  
+  id         String          @id @default(cuid())
+  supplierId String
+  supplier   SupplierListing @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
   name           String
   description    String?
   moq            String?
@@ -120,11 +128,11 @@ model Product {
   country        String?
   leadTime       String?
   images         String[]
-  savedCount     Int             @default(0)
-  
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  
+  savedCount     Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([supplierId])
   @@index([category])
   @@index([country])
@@ -137,9 +145,9 @@ model SupplierIdSequence {
 
 // Supplier self-onboarding portal
 model SupplierPortal {
-  id           String   @id @default(cuid())
-  supplierCode String?  @unique  // SB-000001
-  status       String   @default("draft") // draft | submitted | approved
+  id           String  @id @default(cuid())
+  supplierCode String? @unique // SB-000001
+  status       String  @default("draft") // draft | submitted | approved
 
   // Step 1 — Business Info
   companyName  String?
@@ -158,21 +166,21 @@ model SupplierPortal {
   phone        String?
 
   // Profile extras
-  logoUrl      String?
-  coverUrl     String?
-  description  String?
+  logoUrl     String?
+  coverUrl    String?
+  description String?
 
   // Step 2 — Categories (stored as array)
-  categories   String[]
+  categories String[]
 
   // Step 3 — Products
-  products     PortalProduct[]
+  products PortalProduct[]
 
   // Step 4 — Documents
-  documents    PortalDocument[]
+  documents PortalDocument[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([supplierCode])
@@ -198,7 +206,7 @@ model PortalDocument {
   id        String         @id @default(cuid())
   portalId  String
   portal    SupplierPortal @relation(fields: [portalId], references: [id], onDelete: Cascade)
-  docType   String         // logo | cover | license | gst | catalog | certificate
+  docType   String // logo | cover | license | gst | catalog | certificate
   fileName  String
   fileUrl   String
   fileSize  Int?
@@ -209,22 +217,22 @@ model PortalDocument {
 
 // CRM Models for WhatsApp Module
 model Conversation {
-  id              String   @id @default(cuid())
-  supplierId      String   @unique
-  supplier        SupplierListing @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  unreadCount     Int      @default(0)
-  pinned          Boolean  @default(false)
-  archived        Boolean  @default(false)
-  assigned        Boolean  @default(false)
-  highPriority    Boolean  @default(false)
-  lastMessageAt   DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String          @id @default(cuid())
+  supplierId    String          @unique
+  supplier      SupplierListing @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  unreadCount   Int             @default(0)
+  pinned        Boolean         @default(false)
+  archived      Boolean         @default(false)
+  assigned      Boolean         @default(false)
+  highPriority  Boolean         @default(false)
+  lastMessageAt DateTime        @default(now())
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  messages        Message[]
-  notes           CrmNote[]
-  tasks           Task[]
-  activities      Activity[]
+  messages   Message[]
+  notes      CrmNote[]
+  tasks      Task[]
+  activities Activity[]
 
   @@index([supplierId])
   @@index([lastMessageAt])
@@ -242,58 +250,58 @@ enum MessageType {
 }
 
 model Message {
-  id              String   @id @default(cuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender          String   // 'user' or 'supplier'
-  type            MessageType @default(TEXT)
-  content         String?
-  attachmentUrl   String?
-  productId       String?
-  supplyChainId   String?
-  supplyChain     SupplyChain? @relation(fields: [supplyChainId], references: [id], onDelete: SetNull)
-  status          String   @default("sent") // sent, delivered, seen
-  createdAt       DateTime @default(now())
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         String // 'user' or 'supplier'
+  type           MessageType  @default(TEXT)
+  content        String?
+  attachmentUrl  String?
+  productId      String?
+  supplyChainId  String?
+  supplyChain    SupplyChain? @relation(fields: [supplyChainId], references: [id], onDelete: SetNull)
+  status         String       @default("sent") // sent, delivered, seen
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId])
   @@index([supplyChainId])
 }
 
 model CrmNote {
-  id              String   @id @default(cuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  content         String
-  author          String   @default("Me")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  content        String
+  author         String       @default("Me")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([conversationId])
 }
 
 model Task {
-  id              String   @id @default(cuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  title           String
-  dueDate         DateTime?
-  priority        String   @default("Medium") // Low, Medium, High
-  assignedTo      String   @default("Me")
-  completed       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  title          String
+  dueDate        DateTime?
+  priority       String       @default("Medium") // Low, Medium, High
+  assignedTo     String       @default("Me")
+  completed      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([conversationId])
 }
 
 model Activity {
-  id              String   @id @default(cuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  title           String
-  description     String?
-  type            String   @default("System") // Message, Quote, Call, Meeting, System
-  createdAt       DateTime @default(now())
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  type           String       @default("System") // Message, Quote, Call, Meeting, System
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId])
 }
@@ -359,6 +367,9 @@ enum NotificationType {
   COMMENT_ADDED
   SUPPLY_CHAIN_SHARED
   MILESTONE_COMPLETED
+  PROPOSAL_RECEIVED
+  PROJECT_ASSIGNED
+  ADMIN_MESSAGE
 }
 
 model SupplyChain {
@@ -379,7 +390,7 @@ model SupplyChain {
   buyerName   String
 
   supplierUserId String?
-  supplierUser   User?  @relation("SupplyChainSupplier", fields: [supplierUserId], references: [id], onDelete: SetNull)
+  supplierUser   User?   @relation("SupplyChainSupplier", fields: [supplierUserId], references: [id], onDelete: SetNull)
   supplierName   String
 
   createdAt DateTime @default(now())
@@ -388,6 +399,10 @@ model SupplyChain {
   milestones Milestone[]
   shares     SupplyChainShare[]
   messages   Message[]
+
+  // Optional link from a Freelancer Portal Project (see Project.supplyChainId
+  // below) — purely additive, does not affect any existing Supply Chain query.
+  linkedProjects Project[]
 
   @@index([ownerId])
   @@index([buyerUserId])
@@ -523,4 +538,296 @@ model Notification {
   createdAt DateTime         @default(now())
 
   @@index([userId, read])
+}
+
+// ─── Freelancer Portal ──────────────────────────────────────────────────
+
+enum FreelancerAvailability {
+  AVAILABLE
+  BUSY
+  UNAVAILABLE
+}
+
+enum FreelancerStatus {
+  ACTIVE
+  DEACTIVATED
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  OVERDUE
+}
+
+enum ProposalStatus {
+  SENT
+  VIEWED
+  ACCEPTED
+  DECLINED
+}
+
+enum ProposalChannel {
+  EMAIL
+  WHATSAPP
+  BOTH
+}
+
+enum ProjectStatus {
+  UPCOMING
+  ACTIVE
+  COMPLETED
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Freelancer {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  location String?
+  phone    String?
+  bio      String?
+  skills   String[] @default([])
+
+  linkedinUrl  String?
+  instagramUrl String?
+  behanceUrl   String?
+  dribbbleUrl  String?
+  githubUrl    String?
+
+  resumeFileName String?
+  resumeDataUrl  String? @db.Text
+
+  availability     FreelancerAvailability @default(AVAILABLE)
+  status           FreelancerStatus       @default(ACTIVE)
+  paymentStatus    PaymentStatus          @default(PENDING)
+  performanceScore Int                    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  portfolioItems FreelancerPortfolioItem[]
+  experience     FreelancerExperience[]
+
+  @@index([userId])
+}
+
+model FreelancerPortfolioItem {
+  id           String     @id @default(cuid())
+  freelancerId String
+  freelancer   Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  caption      String?
+  dataUrl      String     @db.Text
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@index([freelancerId])
+}
+
+model FreelancerExperience {
+  id           String     @id @default(cuid())
+  freelancerId String
+  freelancer   Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  role         String
+  company      String
+  startDate    DateTime
+  endDate      DateTime?
+  description  String?
+  order        Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@index([freelancerId])
+}
+
+model Proposal {
+  id String @id @default(cuid())
+
+  freelancerUserId String
+  freelancer       User   @relation("ProposalFreelancer", fields: [freelancerUserId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("ProposalCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  title       String
+  clientName  String
+  description String?
+  channel     ProposalChannel
+  status      ProposalStatus  @default(SENT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([freelancerUserId])
+}
+
+model Project {
+  id String @id @default(cuid())
+
+  name            String
+  clientName      String
+  startDate       DateTime
+  expectedEndDate DateTime
+  priority        ProjectPriority @default(MEDIUM)
+  description     String?
+  status          ProjectStatus   @default(UPCOMING)
+  isDraft         Boolean         @default(false)
+
+  // Section 1 — Project Details
+  city           String?
+  pointOfContact String?
+  whatsapp       String?
+  email          String?
+  linkedinUrl    String?
+  notes          String? @db.Text
+
+  // Section 6 — optional link to an existing Supply Chain. SetNull so
+  // deleting a chain never cascades into (or is blocked by) a Project.
+  supplyChainId String?
+  supplyChain   SupplyChain? @relation(fields: [supplyChainId], references: [id], onDelete: SetNull)
+
+  freelancerUserId String
+  freelancer       User   @relation("ProjectFreelancer", fields: [freelancerUserId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks           FreelancerTask[]
+  timeline        ProjectTimelineEntry[]
+  referenceLinks  ProjectReferenceLink[]
+  referenceImages ProjectReferenceImage[]
+  documents       ProjectDocument[]
+  items           ProjectItem[]
+
+  @@index([freelancerUserId])
+  @@index([supplyChainId])
+}
+
+enum ProjectTimelineStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+}
+
+model ProjectTimelineEntry {
+  id          String                @id @default(cuid())
+  projectId   String
+  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  date        DateTime
+  status      ProjectTimelineStatus @default(NOT_STARTED)
+  order       Int                   @default(0)
+  createdAt   DateTime              @default(now())
+
+  @@index([projectId])
+}
+
+enum ReferenceLinkPlatform {
+  WEBSITE
+  INSTAGRAM
+  LINKEDIN
+  BEHANCE
+  DRIBBBLE
+  GOOGLE_DRIVE
+  FIGMA
+}
+
+model ProjectReferenceLink {
+  id        String                @id @default(cuid())
+  projectId String
+  project   Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  platform  ReferenceLinkPlatform @default(WEBSITE)
+  url       String
+  order     Int                   @default(0)
+  createdAt DateTime              @default(now())
+
+  @@index([projectId])
+}
+
+model ProjectReferenceImage {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  caption   String?
+  dataUrl   String   @db.Text
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model ProjectDocument {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  dataUrl   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model ProjectItem {
+  id String @id @default(cuid())
+
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category       String
+  name           String
+  quantity       Int      @default(1)
+  sizes          String[] @default([])
+  priceBeforeGst Float    @default(0)
+  priceAfterGst  Float    @default(0)
+  shippingCost   Float    @default(0)
+  miscCost       Float    @default(0)
+  leadTime       String?
+  order          Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model FreelancerTask {
+  id String @id @default(cuid())
+
+  title    String
+  dueDate  DateTime
+  priority TaskPriority @default(MEDIUM)
+  status   TaskStatus   @default(NOT_STARTED)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  freelancerUserId String
+  freelancer       User   @relation("TaskFreelancer", fields: [freelancerUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([freelancerUserId])
 }

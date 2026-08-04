@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, ArrowRight, Building2, ShoppingCart, Video } from "lucide-react";
+import { Eye, EyeOff, Loader2, ArrowRight, Building2, ShoppingCart, Video, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 
 import { signupSchema, type SignupFormValues } from "@/lib/validations/auth";
@@ -31,6 +31,12 @@ const ROLES = [
     description: "List and sell your products",
     icon: Building2,
   },
+  {
+    value: "FREELANCER" as const,
+    label: "Freelancer",
+    description: "Offer your services on projects",
+    icon: Briefcase,
+  },
 ];
 
 function SignupContent() {
@@ -49,7 +55,7 @@ function SignupContent() {
   })();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<"BUYER" | "SUPPLIER">("BUYER");
+  const [selectedRole, setSelectedRole] = useState<"BUYER" | "SUPPLIER" | "FREELANCER">("BUYER");
 
   const {
     register,
@@ -65,7 +71,7 @@ function SignupContent() {
 
   const watchedRole = watch("role");
 
-  function selectRole(role: "BUYER" | "SUPPLIER") {
+  function selectRole(role: "BUYER" | "SUPPLIER" | "FREELANCER") {
     setSelectedRole(role);
     setValue("role", role, { shouldValidate: true });
   }
@@ -120,7 +126,7 @@ function SignupContent() {
           {/* Role selector */}
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">I am a</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {ROLES.map((role) => {
                 const isSelected = watchedRole === role.value;
                 return (

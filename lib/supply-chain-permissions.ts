@@ -3,6 +3,7 @@
 // place: Owner > Admin > Shared Team Member > Shared Buyer > Shared Supplier.
 
 import type { ShareRole } from "@/lib/generated/prisma/enums";
+import type { Role } from "@/types/auth";
 
 export type MilestoneEditScope = "ALL" | "ASSIGNED" | "NONE";
 
@@ -26,7 +27,7 @@ const NO_ACCESS: SupplyChainAccess = {
 
 export function resolveSupplyChainAccess(input: {
   userId: string;
-  userRole: "ADMIN" | "BUYER" | "SUPPLIER";
+  userRole: Role;
   chain: { ownerId: string };
   shareRole: ShareRole | null;
 }): SupplyChainAccess {
