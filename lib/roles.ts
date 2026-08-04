@@ -36,6 +36,9 @@ import {
   FileText,
   Image as ImageIcon,
   Bell,
+  NotebookText,
+  Table2,
+  Receipt,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -117,6 +120,14 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [{ label: "Freelancers", href: "/freelancers", icon: Briefcase }],
   },
   {
+    group: "Workspace",
+    items: [
+      { label: "Content Management", href: "/content", icon: NotebookText },
+      { label: "Catalog Management", href: "/catalog", icon: Table2 },
+      { label: "Invoice Management", href: "/invoices", icon: Receipt },
+    ],
+  },
+  {
     group: "Analytics",
     items: [{ label: "Reports", href: "/reports", icon: BarChart3 }],
   },
@@ -154,6 +165,14 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
       { label: "Messages", href: "/buyer/messages", icon: MessageSquare },
       { label: "Orders", href: "/buyer/orders", icon: ClipboardList },
       { label: "Downloads", href: "/buyer/downloads", icon: Download },
+    ],
+  },
+  {
+    group: "Workspace",
+    items: [
+      { label: "Content Management", href: "/buyer/content", icon: NotebookText },
+      { label: "Catalog Management", href: "/buyer/catalog", icon: Table2 },
+      { label: "Invoice Management", href: "/buyer/invoices", icon: Receipt },
     ],
   },
 ];
@@ -199,6 +218,14 @@ export const SUPPLIER_NAV_GROUPS: NavGroup[] = [
       { label: "Team Members", href: "/supplier/team", icon: Users },
     ],
   },
+  {
+    group: "Workspace",
+    items: [
+      { label: "Content Management", href: "/supplier/content", icon: NotebookText },
+      { label: "Catalog Management", href: "/supplier/catalog", icon: Table2 },
+      { label: "Invoice Management", href: "/supplier/invoices", icon: Receipt },
+    ],
+  },
 ];
 
 export const SUPPLIER_BOTTOM_ITEMS: NavItem[] = [
@@ -229,6 +256,14 @@ export const FREELANCER_NAV_GROUPS: NavGroup[] = [
       { label: "Messages", href: "/freelancer/messages", icon: MessageSquare },
       { label: "Notifications", href: "/freelancer/notifications", icon: Bell },
       { label: "Profile", href: "/freelancer/profile", icon: UserCircle },
+    ],
+  },
+  {
+    group: "Workspace",
+    items: [
+      { label: "Content Management", href: "/freelancer/content", icon: NotebookText },
+      { label: "Catalog Management", href: "/freelancer/catalog", icon: Table2 },
+      { label: "Invoice Management", href: "/freelancer/invoices", icon: Receipt },
     ],
   },
 ];

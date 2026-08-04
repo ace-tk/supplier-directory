@@ -48,6 +48,11 @@ model User {
   sentProposals     Proposal[]       @relation("ProposalCreatedBy")
   assignedTasks     FreelancerTask[] @relation("TaskFreelancer")
 
+  contentItems     ContentItem[]
+  catalogs         Catalog[]
+  purchaseInvoices PurchaseInvoice[]
+  salesInvoices    SalesInvoice[]
+
   @@index([email])
 }
 
@@ -830,4 +835,203 @@ model FreelancerTask {
   updatedAt DateTime @updatedAt
 
   @@index([freelancerUserId])
+}
+
+// ─── Module 1: Content Management ──────────────────────────────────────────
+// Owned per-user across all four portals — real, DB-backed, no mock data.
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model ContentItem {
+  id               String        @id @default(cuid())
+  title            String
+  category         String?
+  tags             String[]      @default([])
+  featuredImageUrl String?       @db.Text
+  bodyHtml         String        @db.Text
+  status           ContentStatus @default(DRAFT)
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  attachments ContentAttachment[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model ContentAttachment {
+  id        String      @id @default(cuid())
+  contentId String
+  content   ContentItem @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  dataUrl   String      @db.Text
+  createdAt DateTime    @default(now())
+
+  @@index([contentId])
+}
+
+// ─── Module 2: Catalog Management ──────────────────────────────────────────
+// One catalog per user (auto-created on first visit), Notion/Airtable-style
+// editable rows.
+
+model Catalog {
+  id          String  @id @default(cuid())
+  name        String  @default("My Catalog")
+  description String?
+
+  ownerId String @unique
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  rows CatalogRow[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CatalogRowStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+model CatalogRow {
+  id String @id @default(cuid())
+
+  catalogId String
+  catalog   Catalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+
+  category       String?
+  productName    String
+  sku            String?
+  description    String?
+  quantity       Int              @default(0)
+  sizes          String[]         @default([])
+  color          String?
+  moq            Int?
+  priceBeforeGst Float            @default(0)
+  priceAfterGst  Float            @default(0)
+  currency       String           @default("INR")
+  shippingCost   Float            @default(0)
+  miscCost       Float            @default(0)
+  leadTime       String?
+  status         CatalogRowStatus @default(ACTIVE)
+  notes          String?
+  order          Int              @default(0)
+
+  images      CatalogRowImage[]
+  attachments CatalogRowAttachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([catalogId])
+}
+
+model CatalogRowImage {
+  id      String     @id @default(cuid())
+  rowId   String
+  row     CatalogRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  dataUrl String     @db.Text
+  order   Int        @default(0)
+
+  @@index([rowId])
+}
+
+model CatalogRowAttachment {
+  id        String     @id @default(cuid())
+  rowId     String
+  row       CatalogRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  dataUrl   String     @db.Text
+  createdAt DateTime   @default(now())
+
+  @@index([rowId])
+}
+
+// ─── Module 3: Invoice Management ──────────────────────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PENDING
+  OVERDUE
+}
+
+model PurchaseInvoice {
+  id            String        @id @default(cuid())
+  vendor        String
+  poNumber      String?
+  invoiceNumber String
+  invoiceDate   DateTime
+  dueDate       DateTime
+  gst           Float         @default(0)
+  shipping      Float         @default(0)
+  totalAmount   Float         @default(0)
+  status        InvoiceStatus @default(DRAFT)
+  notes         String?
+
+  attachmentFileName String?
+  attachmentDataUrl  String? @db.Text
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model SalesInvoice {
+  id            String        @id @default(cuid())
+  customer      String
+  invoiceNumber String
+  invoiceDate   DateTime
+  dueDate       DateTime
+  gst           Float         @default(0)
+  shipping      Float         @default(0)
+  grandTotal    Float         @default(0)
+  paymentStatus InvoiceStatus @default(DRAFT)
+  notes         String?
+
+  attachmentFileName String?
+  attachmentDataUrl  String? @db.Text
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  items SalesInvoiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([paymentStatus])
+}
+
+model SalesInvoiceItem {
+  id          String       @id @default(cuid())
+  invoiceId   String
+  invoice     SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productName String
+  quantity    Int          @default(1)
+  unitPrice   Float        @default(0)
+  order       Int          @default(0)
+
+  @@index([invoiceId])
 }

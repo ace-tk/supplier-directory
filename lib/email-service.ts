@@ -57,3 +57,26 @@ export async function sendProposalMessage(input: ProposalMessageInput): Promise<
 
   return { success: true };
 }
+
+interface InvoiceEmailInput {
+  recipientLabel: string;
+  invoiceNumber: string;
+  amount: number;
+  currency?: string;
+  dueDate: string;
+}
+
+export async function sendInvoiceEmail(input: InvoiceEmailInput): Promise<{ success: true }> {
+  await mockLatency();
+
+  const subject = `Invoice ${input.invoiceNumber}`;
+  const body = [
+    `To: ${input.recipientLabel}`,
+    `Amount: ${input.currency ?? "INR"} ${input.amount.toLocaleString("en-IN")}`,
+    `Due: ${new Date(input.dueDate).toLocaleDateString("en-IN", { dateStyle: "medium" })}`,
+  ].join("\n");
+
+  console.info(`[mock email] ${subject}\n${body}`);
+
+  return { success: true };
+}
