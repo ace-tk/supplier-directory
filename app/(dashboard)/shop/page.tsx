@@ -3,11 +3,10 @@
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PackageSearch, Loader2 } from "lucide-react";
-import { ShopHero } from "@/components/shop/ShopHero";
+import { FeaturedSlider } from "@/components/shop/FeaturedSlider";
 import { ShopCategories } from "@/components/shop/ShopCategories";
 import { FilterBar, type ShopFilters, DEFAULT_FILTERS } from "@/components/shop/FilterBar";
 import { MasonryGrid } from "@/components/shop/MasonryGrid";
-import { CollectionRow } from "@/components/shop/CollectionRow";
 import { ProductDrawer } from "@/components/shop/ProductDrawer";
 import { ProductVideoModal } from "@/components/shop/ProductVideoModal";
 import { RequestVideoModal } from "@/components/shop/RequestVideoModal";
@@ -16,7 +15,6 @@ import { BuyerRequirementAssistant } from "@/components/shop/BuyerRequirementAss
 import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
-import { FASHION_CATEGORIES, COLLECTIONS } from "@/lib/shop-data";
 import { getMoqNumber, getPriceMin, isReadyStock } from "@/lib/product-tags";
 
 const PAGE_SIZE = 24;
@@ -26,7 +24,6 @@ function ShopPageContent() {
   const searchParams = useSearchParams();
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [discoveryPool, setDiscoveryPool] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const pageRef = useRef(1);
@@ -104,14 +101,6 @@ function ShopPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey]);
 
-  // Curation pool for category-agnostic homepage collections — fetched once.
-  useEffect(() => {
-    fetch(`/api/products?limit=150&sort=trending`)
-      .then((res) => res.json())
-      .then((data: Product[]) => setDiscoveryPool(data))
-      .catch((err) => console.error("Failed to load discovery pool:", err));
-  }, []);
-
   // Resume the Request Video flow after a signup/login redirect.
   useEffect(() => {
     const openId = searchParams.get("openRequestVideo");
@@ -180,33 +169,6 @@ function ShopPageContent() {
     });
   }, [products, filters.readyStockOnly, filters.moqBucket, filters.priceBucket, filters.productionTypes]);
 
-  const collections = useMemo(
-    () =>
-      COLLECTIONS.map((c) => ({ ...c, items: discoveryPool.filter(c.filter).slice(0, 10) })).filter(
-        (c) => c.items.length > 0
-      ),
-    [discoveryPool]
-  );
-
-  function isChipActive(chip: string) {
-    if (FASHION_CATEGORIES.includes(chip)) return activeCategory === chip;
-    if (chip === "Export Quality") return filters.exportOnly;
-    if (chip === "Ready Stock") return filters.readyStockOnly;
-    if (chip === "MOQ <100") return filters.moqBucket === "Under 100";
-    return false;
-  }
-
-  function onChipToggle(chip: string) {
-    if (FASHION_CATEGORIES.includes(chip)) {
-      setActiveCategory((prev) => (prev === chip ? "All Categories" : chip));
-      return;
-    }
-    if (chip === "Export Quality") setFilters((f) => ({ ...f, exportOnly: !f.exportOnly }));
-    else if (chip === "Ready Stock") setFilters((f) => ({ ...f, readyStockOnly: !f.readyStockOnly }));
-    else if (chip === "MOQ <100")
-      setFilters((f) => ({ ...f, moqBucket: f.moqBucket === "Under 100" ? "Any" : "Under 100" }));
-  }
-
   function onCategorySelect(category: string) {
     setActiveCategory(category === "All Categories" ? "All Categories" : category);
     gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -244,33 +206,13 @@ function ShopPageContent() {
 
   return (
     <div className="max-w-[1600px] mx-auto w-full">
-      <ShopHero
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        onChipToggle={onChipToggle}
-        onCategorySelect={onCategorySelect}
-        isChipActive={isChipActive}
-      />
+      <div className="pt-4">
+        <FeaturedSlider onSlideClick={onCategorySelect} />
+      </div>
 
-      <ShopCategories onSelect={onCategorySelect} />
-
-      {collections.length > 0 && (
-        <div className="py-10 space-y-10">
-          {collections.map((c) => (
-            <CollectionRow
-              key={c.title}
-              title={c.title}
-              emoji={c.emoji}
-              products={c.items}
-              onProductClick={openProduct}
-              onViewSupplier={openSupplier}
-              onWatchVideo={openVideoModal}
-              onRequestVideo={openRequestVideoModal}
-              onCounterOffer={openCounterOfferModal}
-            />
-          ))}
-        </div>
-      )}
+      <div className="pt-8">
+        <ShopCategories onSelect={onCategorySelect} />
+      </div>
 
       <div ref={gridRef} className="pt-4 scroll-mt-4">
         <FilterBar
