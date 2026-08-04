@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { FolderKanban, Calendar, Building2 } from "lucide-react";
 import { getUser } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
@@ -55,7 +56,8 @@ function ProjectGrid({ projects, emptyLabel }: { projects: ProjectRecord[]; empt
 
 export default async function FreelancerProjectsPage() {
   const user = await getUser();
-  const projects = await getProjectsForFreelancer(user!.id);
+  if (!user) redirect("/login?from=/freelancer/projects");
+  const projects = await getProjectsForFreelancer(user.id);
 
   const active = projects.filter((p) => p.status === "ACTIVE");
   const completed = projects.filter((p) => p.status === "COMPLETED");

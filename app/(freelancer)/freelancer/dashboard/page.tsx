@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { FolderKanban, FileText, ListChecks, CheckCircle2, Bell, ArrowRight } from "lucide-react";
 import { getUser } from "@/lib/session";
 import { PageHeader, SectionHeader } from "@/components/layout/page-header";
@@ -21,7 +22,8 @@ function timeAgo(iso: string): string {
 
 export default async function FreelancerDashboardPage() {
   const user = await getUser();
-  const userId = user!.id;
+  if (!user) redirect("/login?from=/freelancer/dashboard");
+  const userId = user.id;
 
   const [stats, projects, tasks, { notifications }] = await Promise.all([
     getFreelancerDashboardStats(userId),
@@ -37,7 +39,7 @@ export default async function FreelancerDashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Welcome back, ${user!.name.split(" ")[0]}`}
+        title={`Welcome back, ${user.name.split(" ")[0]}`}
         description="Here's what's happening across your projects and proposals."
       />
 

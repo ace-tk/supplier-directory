@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getUser } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/portal/status-badge";
@@ -16,7 +17,8 @@ const columns: RecordColumn<FreelancerTaskRecord>[] = [
 
 export default async function FreelancerTasksPage() {
   const user = await getUser();
-  const tasks = await getTasksForFreelancer(user!.id);
+  if (!user) redirect("/login?from=/freelancer/tasks");
+  const tasks = await getTasksForFreelancer(user.id);
 
   return (
     <div className="space-y-6">

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getUser } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { getFreelancerProfile } from "@/lib/freelancer-queries";
@@ -5,7 +6,8 @@ import { PortfolioEditor } from "@/components/freelancer/portfolio-editor";
 
 export default async function FreelancerPortfolioPage() {
   const user = await getUser();
-  const profile = await getFreelancerProfile(user!.id);
+  if (!user) redirect("/login?from=/freelancer/portfolio");
+  const profile = await getFreelancerProfile(user.id);
 
   if (!profile) {
     return (

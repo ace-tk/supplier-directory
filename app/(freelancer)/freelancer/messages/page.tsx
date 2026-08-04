@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { getUser } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
@@ -16,8 +17,9 @@ function timeAgo(iso: string): string {
 
 export default async function FreelancerMessagesPage() {
   const user = await getUser();
+  if (!user) redirect("/login?from=/freelancer/messages");
   const messages = await db.notification.findMany({
-    where: { userId: user!.id, type: "ADMIN_MESSAGE" },
+    where: { userId: user.id, type: "ADMIN_MESSAGE" },
     orderBy: { createdAt: "desc" },
   });
 

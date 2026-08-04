@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Mail, Phone, MapPin, FileText, Download, ArrowRight } from "lucide-react";
 import { getUser } from "@/lib/session";
 import { PageHeader, SectionHeader } from "@/components/layout/page-header";
@@ -11,7 +12,8 @@ import { AvatarUploader } from "@/components/freelancer/avatar-uploader";
 
 export default async function FreelancerProfilePage() {
   const user = await getUser();
-  const profile = await getFreelancerProfile(user!.id);
+  if (!user) redirect("/login?from=/freelancer/profile");
+  const profile = await getFreelancerProfile(user.id);
 
   if (!profile) {
     return (

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getUser } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/portal/status-badge";
@@ -16,7 +17,8 @@ const columns: RecordColumn<ProposalRecord>[] = [
 
 export default async function FreelancerProposalsPage() {
   const user = await getUser();
-  const proposals = await getProposalsForFreelancer(user!.id);
+  if (!user) redirect("/login?from=/freelancer/proposals");
+  const proposals = await getProposalsForFreelancer(user.id);
 
   return (
     <div className="space-y-6">
