@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe2, TrendingUp, Flame, Clock } from "lucide-react";
+import { BarChart3, Globe2, Users, TrendingUp, Flame, Clock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Product } from "@/types/product";
 import {
@@ -10,6 +10,8 @@ import {
   getViewsTrendPercent,
   getTrendingMarket,
   getUpdatedMinutesAgo,
+  getCountriesReachedCount,
+  getActiveBuyerRequests,
 } from "@/lib/product-engagement";
 
 export function BuyerInterestPill({ product }: { product: Product }) {
@@ -18,6 +20,8 @@ export function BuyerInterestPill({ product }: { product: Product }) {
   const trendPercent = getViewsTrendPercent(product);
   const trendingMarket = getTrendingMarket(product, totalViews);
   const updatedMinutesAgo = getUpdatedMinutesAgo(product);
+  const countriesReached = getCountriesReachedCount(product);
+  const activeBuyerRequests = getActiveBuyerRequests(product);
 
   return (
     <Popover>
@@ -31,9 +35,9 @@ export function BuyerInterestPill({ product }: { product: Product }) {
           />
         }
       >
-        <Globe2 className="w-3 h-3 text-sky-500" />
+        <BarChart3 className="w-3 h-3 text-sky-500" />
         <span className="font-medium">{formatViews(totalViews)}</span>
-        <span className="hidden sm:inline">Global Buyer Interest</span>
+        <span className="hidden sm:inline">Global Buyers</span>
       </PopoverTrigger>
 
       <PopoverContent
@@ -43,18 +47,35 @@ export function BuyerInterestPill({ product }: { product: Product }) {
       >
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-sky-500/10 shrink-0">
-            <Globe2 className="w-4 h-4 text-sky-500" />
+            <BarChart3 className="w-4 h-4 text-sky-500" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-foreground">Global Buyer Interest</p>
+            <p className="text-xs font-semibold text-foreground">Global Buyers</p>
             <p className="text-[11px] text-muted-foreground">Total Views</p>
           </div>
         </div>
 
         <p className="text-2xl font-bold text-foreground tabular-nums">{totalViews.toLocaleString()}</p>
 
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-muted/50 px-2.5 py-2">
+            <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+              <Globe2 className="w-3 h-3" />
+              <span className="text-[10px] font-medium uppercase tracking-wide">Countries</span>
+            </div>
+            <p className="text-sm font-semibold text-foreground tabular-nums">{countriesReached}</p>
+          </div>
+          <div className="rounded-xl bg-muted/50 px-2.5 py-2">
+            <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+              <Users className="w-3 h-3" />
+              <span className="text-[10px] font-medium uppercase tracking-wide">Buyer Requests</span>
+            </div>
+            <p className="text-sm font-semibold text-foreground tabular-nums">{activeBuyerRequests}</p>
+          </div>
+        </div>
+
         <div>
-          <p className="text-[11px] font-medium text-muted-foreground mb-2">Top Buyer Markets</p>
+          <p className="text-[11px] font-medium text-muted-foreground mb-2">Top Countries</p>
           <div className="space-y-2">
             {markets.map((m) => (
               <div key={m.code}>
@@ -77,7 +98,7 @@ export function BuyerInterestPill({ product }: { product: Product }) {
 
         <div className="flex flex-wrap gap-x-3 gap-y-1 pt-2.5 border-t border-border/60 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1 text-emerald-500 font-medium">
-            <TrendingUp className="w-3 h-3" /> +{trendPercent}% this week
+            <TrendingUp className="w-3 h-3" /> Buyer Growth +{trendPercent}% this month
           </span>
           <span className="flex items-center gap-1">
             <Flame className="w-3 h-3 text-orange-500" /> Trending in {trendingMarket}

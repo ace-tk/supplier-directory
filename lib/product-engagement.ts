@@ -46,10 +46,9 @@ export interface CountryViews {
 const COUNTRY_WEIGHTS = [
   { code: "IN", flag: "🇮🇳", country: "India", weight: 50 },
   { code: "US", flag: "🇺🇸", country: "USA", weight: 17 },
-  { code: "GB", flag: "🇬🇧", country: "UK", weight: 8 },
-  { code: "AE", flag: "🇦🇪", country: "UAE", weight: 7 },
-  { code: "CA", flag: "🇨🇦", country: "Canada", weight: 5 },
-  { code: "AU", flag: "🇦🇺", country: "Australia", weight: 4 },
+  { code: "AE", flag: "🇦🇪", country: "UAE", weight: 8 },
+  { code: "GB", flag: "🇬🇧", country: "UK", weight: 7 },
+  { code: "DE", flag: "🇩🇪", country: "Germany", weight: 5 },
 ];
 
 export function getViewsByCountry(product: Pick<Product, "id">, totalViews: number): CountryViews[] {
@@ -117,6 +116,16 @@ export function getTrendingMarket(product: Pick<Product, "id">, totalViews: numb
 
 export function getUpdatedMinutesAgo(product: Pick<Product, "id">): number {
   return 1 + (hashString(`${product.id}-updated`) % 59); // 1-59 minutes
+}
+
+// Deterministic mock — swap for a real "distinct buyer countries" query later.
+export function getCountriesReachedCount(product: Pick<Product, "id">): number {
+  return 12 + (hashString(`${product.id}-countries`) % 19); // 12-30 countries
+}
+
+// Deterministic mock — swap for a real "open buyer requests" query later.
+export function getActiveBuyerRequests(product: Pick<Product, "id">): number {
+  return 40 + (hashString(`${product.id}-requests`) % 461); // 40-500
 }
 
 const SHIPPING_TERMS = [
