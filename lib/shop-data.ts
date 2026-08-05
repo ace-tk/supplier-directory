@@ -2,6 +2,30 @@ import { Product } from "@/types/product";
 import { isExportQuality } from "@/lib/product-tags";
 import { fashionImageUrl } from "@/lib/fashion-images";
 
+export interface ShopFilters {
+  city: string;
+  verifiedOnly: boolean;
+  material: string;
+  country: string;
+  exportOnly: boolean;
+  readyStockOnly: boolean;
+  moqBucket: "Any" | "Under 100" | "100-300" | "300+";
+  priceBucket: "Any" | "Under ₹300" | "₹300–₹700" | "₹700–₹1500" | "Above ₹1500";
+  productionTypes: string[];
+}
+
+export const DEFAULT_FILTERS: ShopFilters = {
+  city: "All Cities",
+  verifiedOnly: false,
+  material: "All Materials",
+  country: "All Countries",
+  exportOnly: false,
+  readyStockOnly: false,
+  moqBucket: "Any",
+  priceBucket: "Any",
+  productionTypes: [],
+};
+
 export const SHOP_CATEGORY_CHIPS = [
   "Women",
   "Men",
