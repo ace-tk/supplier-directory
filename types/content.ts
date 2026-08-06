@@ -1,6 +1,12 @@
-import type { ContentStatus } from "@/lib/generated/prisma/enums";
+import type {
+  ContentStatus,
+  ContentType,
+  ContentLanguage,
+  ContentTone,
+  ContentAudience,
+} from "@/lib/generated/prisma/enums";
 
-export type { ContentStatus };
+export type { ContentStatus, ContentType, ContentLanguage, ContentTone, ContentAudience };
 
 export interface ContentAttachmentEntry {
   id: string;
@@ -19,6 +25,12 @@ export interface ContentItemRecord {
   featuredImageUrl: string | null;
   bodyHtml: string;
   status: ContentStatus;
+  prompt: string | null;
+  contentType: ContentType | null;
+  language: ContentLanguage | null;
+  tone: ContentTone | null;
+  audience: ContentAudience | null;
+  isTemplate: boolean;
   ownerId: string;
   ownerName: string;
   attachments: ContentAttachmentEntry[];
@@ -34,6 +46,8 @@ export interface ContentItemSummary {
   tags: string[];
   featuredImageUrl: string | null;
   status: ContentStatus;
+  contentType: ContentType | null;
+  isTemplate: boolean;
   attachmentCount: number;
   createdAt: string;
   updatedAt: string;

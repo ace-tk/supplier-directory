@@ -846,6 +846,44 @@ enum ContentStatus {
   ARCHIVED
 }
 
+// AI Content Studio — Phase 1. All optional/nullable since plain content
+// items (created before this migration, or without going through the AI
+// flow) never populate them.
+enum ContentType {
+  PRODUCT_DESCRIPTION
+  COMPANY_PROFILE
+  EMAIL
+  NEWSLETTER
+  LINKEDIN_POST
+  INSTAGRAM_CAPTION
+  WEBSITE_CONTENT
+  BLOG
+  CATALOG_DESCRIPTION
+  OTHER
+}
+
+enum ContentLanguage {
+  ENGLISH
+  FRENCH
+  GERMAN
+}
+
+enum ContentTone {
+  PROFESSIONAL
+  FRIENDLY
+  LUXURY
+  TECHNICAL
+  MARKETING
+}
+
+enum ContentAudience {
+  BUYERS
+  SUPPLIERS
+  EXPORTERS
+  RETAILERS
+  MANUFACTURERS
+}
+
 model ContentItem {
   id               String        @id @default(cuid())
   title            String
@@ -854,6 +892,15 @@ model ContentItem {
   featuredImageUrl String?       @db.Text
   bodyHtml         String        @db.Text
   status           ContentStatus @default(DRAFT)
+
+  // AI Content Studio — the prompt/config used to generate this content, and
+  // whether the user has explicitly saved it as a reusable template.
+  prompt      String?          @db.Text
+  contentType ContentType?
+  language    ContentLanguage?
+  tone        ContentTone?
+  audience    ContentAudience?
+  isTemplate  Boolean          @default(false)
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -866,6 +913,7 @@ model ContentItem {
 
   @@index([ownerId])
   @@index([status])
+  @@index([isTemplate])
 }
 
 model ContentAttachment {

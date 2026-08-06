@@ -4,9 +4,9 @@ import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateImage, validateDocument } from "@/lib/file-validation";
 import { saveContentSchema } from "@/lib/validations/content";
-import { getContentItemForOwner, getContentListForOwner } from "@/lib/content-queries";
+import { getContentItemForOwner, getContentListForOwner, getTemplatesForOwner } from "@/lib/content-queries";
 import type { ContentItemRecord, ContentItemSummary } from "@/types/content";
-import type { ContentStatus } from "@/lib/generated/prisma/enums";
+import type { ContentStatus, ContentType, ContentLanguage, ContentTone, ContentAudience } from "@/lib/generated/prisma/enums";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
 
@@ -19,6 +19,12 @@ export async function getContentListAction(): Promise<ActionResult<ContentItemSu
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
   return { success: true, data: await getContentListForOwner(user.id) };
+}
+
+export async function getTemplatesAction(): Promise<ActionResult<ContentItemSummary[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+  return { success: true, data: await getTemplatesForOwner(user.id) };
 }
 
 export async function getContentItemAction(id: string): Promise<ActionResult<ContentItemRecord>> {
@@ -39,6 +45,12 @@ export interface SaveContentPayload {
   bodyHtml: string;
   attachments: { fileName: string; mimeType: string; sizeBytes: number; dataUrl: string }[];
   status: ContentStatus;
+  prompt?: string;
+  contentType?: ContentType;
+  language?: ContentLanguage;
+  tone?: ContentTone;
+  audience?: ContentAudience;
+  isTemplate?: boolean;
 }
 
 export async function saveContentAction(input: SaveContentPayload): Promise<ActionResult<{ id: string }>> {
@@ -77,6 +89,12 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
         bodyHtml: data.bodyHtml,
         status: input.status,
         publishedAt: input.status === "PUBLISHED" ? new Date() : undefined,
+        prompt: data.prompt,
+        contentType: data.contentType,
+        language: data.language,
+        tone: data.tone,
+        audience: data.audience,
+        isTemplate: data.isTemplate,
         attachments: {
           deleteMany: {},
           create: data.attachments.map((a) => ({
@@ -101,6 +119,12 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
       bodyHtml: data.bodyHtml,
       status: input.status,
       publishedAt: input.status === "PUBLISHED" ? new Date() : null,
+      prompt: data.prompt,
+      contentType: data.contentType,
+      language: data.language,
+      tone: data.tone,
+      audience: data.audience,
+      isTemplate: data.isTemplate ?? false,
       ownerId: user.id,
       attachments: {
         create: data.attachments.map((a) => ({
@@ -115,6 +139,18 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
   });
 
   return { success: true, data: { id: created.id } };
+}
+
+export async function renameContentAction(id: string, title: string): Promise<ActionResult<void>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+  if (!title.trim() || title.trim().length < 2) return { success: false, error: "Title is required." };
+
+  const existing = await db.contentItem.findUnique({ where: { id }, select: { ownerId: true } });
+  if (!existing || existing.ownerId !== user.id) return { success: false, error: "Content not found." };
+
+  await db.contentItem.update({ where: { id }, data: { title: title.trim() } });
+  return { success: true, data: undefined };
 }
 
 export async function setContentStatusAction(id: string, status: ContentStatus): Promise<ActionResult<void>> {

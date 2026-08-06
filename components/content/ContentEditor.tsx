@@ -14,6 +14,7 @@ import {
   FileText,
   Eye,
   ArrowLeft,
+  BookMarked,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -22,12 +23,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/content/RichTextEditor";
+import { ContentGenerationForm } from "@/components/content/ContentGenerationForm";
 import { fileToDataUrl } from "@/lib/file-to-data-url";
 import { validateImage, validateDocument } from "@/lib/file-validation";
 import { formatFileSize } from "@/lib/content-ui";
 import { saveContentAction, type SaveContentPayload } from "@/services/content";
 import { CONTENT_CATEGORIES } from "@/lib/content-ui";
-import type { ContentItemRecord } from "@/types/content";
+import type { ContentItemRecord, ContentType, ContentLanguage, ContentTone, ContentAudience } from "@/types/content";
 
 interface DraftAttachment {
   fileName: string;
@@ -53,8 +55,15 @@ export function ContentEditor({
   const [featuredImage, setFeaturedImage] = useState<string | null>(initialItem?.featuredImageUrl ?? null);
   const [bodyHtml, setBodyHtml] = useState(initialItem?.bodyHtml ?? "");
   const [attachments, setAttachments] = useState<DraftAttachment[]>(initialItem?.attachments ?? []);
-  const [saving, setSaving] = useState<"draft" | "publish" | "archive" | null>(null);
+  const [saving, setSaving] = useState<"draft" | "publish" | "archive" | "template" | null>(null);
   const [preview, setPreview] = useState(startInPreview);
+  const [mode, setMode] = useState<"generate" | "edit">(initialItem ? "edit" : "generate");
+
+  const [contentType, setContentType] = useState<ContentType | undefined>(initialItem?.contentType ?? undefined);
+  const [language, setLanguage] = useState<ContentLanguage | undefined>(initialItem?.language ?? undefined);
+  const [tone, setTone] = useState<ContentTone | undefined>(initialItem?.tone ?? undefined);
+  const [audience, setAudience] = useState<ContentAudience | undefined>(initialItem?.audience ?? undefined);
+  const [prompt, setPrompt] = useState(initialItem?.prompt ?? "");
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -89,12 +98,12 @@ export function ContentEditor({
     }
   }
 
-  async function handleSave(status: "DRAFT" | "PUBLISHED" | "ARCHIVED") {
+  async function handleSave(status: "DRAFT" | "PUBLISHED" | "ARCHIVED", opts?: { asTemplate?: boolean }) {
     if (!title.trim()) {
       toast.error("Title is required.");
       return;
     }
-    setSaving(status === "DRAFT" ? "draft" : status === "PUBLISHED" ? "publish" : "archive");
+    setSaving(opts?.asTemplate ? "template" : status === "DRAFT" ? "draft" : status === "PUBLISHED" ? "publish" : "archive");
 
     const payload: SaveContentPayload = {
       id: initialItem?.id,
@@ -105,15 +114,47 @@ export function ContentEditor({
       bodyHtml,
       attachments,
       status,
+      prompt: prompt || undefined,
+      contentType,
+      language,
+      tone,
+      audience,
+      isTemplate: opts?.asTemplate ? true : initialItem?.isTemplate,
     };
 
     const result = await saveContentAction(payload);
     setSaving(null);
     if (!result.success) return toast.error(result.error);
 
-    toast.success(status === "PUBLISHED" ? "Content published" : status === "ARCHIVED" ? "Content archived" : "Draft saved");
+    toast.success(
+      opts?.asTemplate
+        ? "Saved as template"
+        : status === "PUBLISHED"
+          ? "Content published"
+          : status === "ARCHIVED"
+            ? "Content archived"
+            : "Draft saved"
+    );
     router.push(basePath);
     router.refresh();
+  }
+
+  function handleGenerated(
+    html: string,
+    meta: { title: string; contentType: ContentType; language: ContentLanguage; tone: ContentTone; audience: ContentAudience; prompt: string }
+  ) {
+    setTitle(meta.title);
+    setBodyHtml(html);
+    setContentType(meta.contentType);
+    setLanguage(meta.language);
+    setTone(meta.tone);
+    setAudience(meta.audience);
+    setPrompt(meta.prompt);
+    setMode("edit");
+  }
+
+  if (mode === "generate") {
+    return <ContentGenerationForm basePath={basePath} onGenerated={handleGenerated} onSkip={() => setMode("edit")} />;
   }
 
   return (
@@ -284,6 +325,14 @@ export function ContentEditor({
             {saving === "archive" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />} Archive
           </Button>
         )}
+        <Button
+          variant="outline"
+          className="gap-1.5 ml-auto"
+          disabled={!!saving}
+          onClick={() => handleSave(initialItem?.status ?? "DRAFT", { asTemplate: true })}
+        >
+          {saving === "template" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookMarked className="h-3.5 w-3.5" />} Save Template
+        </Button>
       </div>
     </div>
   );

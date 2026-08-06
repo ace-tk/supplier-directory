@@ -14,6 +14,8 @@ import {
   Send,
   RotateCcw,
   Paperclip,
+  BookMarked,
+  PenLine,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Input } from "@/components/ui/input";
@@ -33,25 +35,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getContentListAction, setContentStatusAction, deleteContentAction } from "@/services/content";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  getContentListAction,
+  getTemplatesAction,
+  setContentStatusAction,
+  deleteContentAction,
+  renameContentAction,
+} from "@/services/content";
 import { CONTENT_STATUS_LABELS, CONTENT_CATEGORIES, formatShortDate } from "@/lib/content-ui";
 import type { ContentItemSummary, ContentStatus } from "@/types/content";
 import { cn } from "@/lib/utils";
 
-type TabValue = "ALL" | ContentStatus;
+type TabValue = "ALL" | ContentStatus | "TEMPLATES";
 
 export function ContentDashboard({ basePath }: { basePath: string }) {
   const [items, setItems] = useState<ContentItemSummary[]>([]);
+  const [templates, setTemplates] = useState<ContentItemSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabValue>("ALL");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
   const [deleteTarget, setDeleteTarget] = useState<ContentItemSummary | null>(null);
+  const [renameTarget, setRenameTarget] = useState<ContentItemSummary | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   function refresh() {
-    getContentListAction().then((result) => {
-      if (result.success) setItems(result.data);
-      else toast.error(result.error);
+    Promise.all([getContentListAction(), getTemplatesAction()]).then(([itemsResult, templatesResult]) => {
+      if (itemsResult.success) setItems(itemsResult.data);
+      else toast.error(itemsResult.error);
+      if (templatesResult.success) setTemplates(templatesResult.data);
+      else toast.error(templatesResult.error);
       setLoading(false);
     });
   }
@@ -66,18 +81,20 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
       DRAFT: items.filter((i) => i.status === "DRAFT").length,
       PUBLISHED: items.filter((i) => i.status === "PUBLISHED").length,
       ARCHIVED: items.filter((i) => i.status === "ARCHIVED").length,
+      TEMPLATES: templates.length,
     }),
-    [items]
+    [items, templates]
   );
 
   const filtered = useMemo(() => {
-    return items.filter((i) => {
-      if (tab !== "ALL" && i.status !== tab) return false;
+    const source = tab === "TEMPLATES" ? templates : items;
+    return source.filter((i) => {
+      if (tab !== "ALL" && tab !== "TEMPLATES" && i.status !== tab) return false;
       if (category !== "All Categories" && i.category !== category) return false;
       if (search && !i.title.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
-  }, [items, tab, category, search]);
+  }, [items, templates, tab, category, search]);
 
   async function handleStatusChange(id: string, status: ContentStatus) {
     const result = await setContentStatusAction(id, status);
@@ -92,6 +109,23 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
     if (!result.success) return toast.error(result.error);
     toast.success("Content deleted");
     setDeleteTarget(null);
+    refresh();
+  }
+
+  function openRename(item: ContentItemSummary) {
+    setRenameTarget(item);
+    setRenameValue(item.title);
+  }
+
+  async function confirmRename() {
+    if (!renameTarget) return;
+    if (!renameValue.trim() || renameValue.trim().length < 2) return toast.error("Title is required.");
+    setRenaming(true);
+    const result = await renameContentAction(renameTarget.id, renameValue.trim());
+    setRenaming(false);
+    if (!result.success) return toast.error(result.error);
+    toast.success("Renamed");
+    setRenameTarget(null);
     refresh();
   }
 
@@ -116,6 +150,7 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
             <TabsTrigger value="DRAFT">Drafts ({counts.DRAFT})</TabsTrigger>
             <TabsTrigger value="PUBLISHED">Published ({counts.PUBLISHED})</TabsTrigger>
             <TabsTrigger value="ARCHIVED">Archived ({counts.ARCHIVED})</TabsTrigger>
+            <TabsTrigger value="TEMPLATES">Templates ({counts.TEMPLATES})</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -153,10 +188,28 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={FileText}
-          title={items.length === 0 ? "No content yet" : "No content matches your filters"}
-          description={items.length === 0 ? "Create your first piece of content to get started." : "Try adjusting your search or filters."}
-          action={items.length === 0 ? { label: "Create Content", onClick: () => (window.location.href = `${basePath}/new`) } : undefined}
+          icon={tab === "TEMPLATES" ? BookMarked : FileText}
+          title={
+            tab === "TEMPLATES"
+              ? templates.length === 0
+                ? "No templates yet"
+                : "No templates match your filters"
+              : items.length === 0
+                ? "No content yet"
+                : "No content matches your filters"
+          }
+          description={
+            tab === "TEMPLATES"
+              ? "Generate content with AI, edit it, then save it as a reusable template."
+              : items.length === 0
+                ? "Create your first piece of content to get started."
+                : "Try adjusting your search or filters."
+          }
+          action={
+            tab !== "TEMPLATES" && items.length === 0
+              ? { label: "Create Content", onClick: () => (window.location.href = `${basePath}/new`) }
+              : undefined
+          }
         />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -174,7 +227,13 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
               <div className="p-4 flex-1 flex flex-col gap-2">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold text-foreground line-clamp-2">{item.title}</p>
-                  <StatusBadge status={CONTENT_STATUS_LABELS[item.status]} />
+                  {item.isTemplate ? (
+                    <Badge variant="secondary" className="gap-1 shrink-0 font-normal">
+                      <BookMarked className="h-3 w-3" /> Template
+                    </Badge>
+                  ) : (
+                    <StatusBadge status={CONTENT_STATUS_LABELS[item.status]} />
+                  )}
                 </div>
                 {item.category && <p className="text-xs text-muted-foreground">{item.category}</p>}
                 {item.tags.length > 0 && (
@@ -198,7 +257,7 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
               <div className="flex items-center gap-1 border-t border-border/60 px-2 py-1.5">
                 <Link href={`${basePath}/${item.id}`} className="flex-1">
                   <Button variant="ghost" size="sm" className="w-full gap-1.5">
-                    <Pencil className="h-3.5 w-3.5" /> Edit
+                    <Pencil className="h-3.5 w-3.5" /> {item.isTemplate ? "Open" : "Edit"}
                   </Button>
                 </Link>
                 <Link href={`${basePath}/${item.id}?preview=1`}>
@@ -206,19 +265,27 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
                     <Eye className="h-3.5 w-3.5" />
                   </Button>
                 </Link>
-                {item.status !== "PUBLISHED" && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Publish" onClick={() => handleStatusChange(item.id, "PUBLISHED")}>
-                    <Send className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                {item.status !== "ARCHIVED" ? (
-                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Archive" onClick={() => handleStatusChange(item.id, "ARCHIVED")}>
-                    <Archive className="h-3.5 w-3.5" />
+                {item.isTemplate ? (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Rename" onClick={() => openRename(item)}>
+                    <PenLine className="h-3.5 w-3.5" />
                   </Button>
                 ) : (
-                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Restore to draft" onClick={() => handleStatusChange(item.id, "DRAFT")}>
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </Button>
+                  <>
+                    {item.status !== "PUBLISHED" && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Publish" onClick={() => handleStatusChange(item.id, "PUBLISHED")}>
+                        <Send className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {item.status !== "ARCHIVED" ? (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Archive" onClick={() => handleStatusChange(item.id, "ARCHIVED")}>
+                        <Archive className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Restore to draft" onClick={() => handleStatusChange(item.id, "DRAFT")}>
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </>
                 )}
                 <Button
                   variant="ghost"
@@ -249,6 +316,33 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!renameTarget} onOpenChange={(open) => !open && setRenameTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename template</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            placeholder="Template name"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                confirmRename();
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTarget(null)} disabled={renaming}>
+              Cancel
+            </Button>
+            <Button onClick={confirmRename} disabled={renaming}>
+              {renaming ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
