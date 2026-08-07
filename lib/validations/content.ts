@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AI_EDIT_ACTIONS } from "@/lib/ai/content-edit-actions";
 
 export const contentAttachmentSchema = z.object({
   fileName: z.string().min(1),
@@ -58,3 +59,15 @@ export const generateContentSchema = z.object({
 });
 
 export type GenerateContentInput = z.infer<typeof generateContentSchema>;
+
+// Input to the AI editing endpoint (rewrite/tone/translate/etc. actions run
+// against content already open in the editor). `html` is capped well above
+// any realistic editor payload so a single request can't be used to run up
+// an unbounded OpenAI bill.
+export const aiEditContentSchema = z.object({
+  action: z.enum(AI_EDIT_ACTIONS),
+  html: z.string().min(1, "There's no content to edit yet.").max(60000, "This content is too long for AI editing — try shortening it first."),
+  targetLanguage: contentLanguageEnum.optional(),
+});
+
+export type AIEditContentInput = z.infer<typeof aiEditContentSchema>;

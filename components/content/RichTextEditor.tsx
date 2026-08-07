@@ -320,10 +320,13 @@ export function RichTextEditor({
   value,
   onChange,
   placeholder = "Start writing...",
+  editable = true,
 }: {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** Set to false to lock the editor (e.g. while an AI action is in flight) without unmounting it. */
+  editable?: boolean;
 }) {
   const [fullScreen, setFullScreen] = useState(false);
   const onChangeRef = useRef(onChange);
@@ -333,6 +336,7 @@ export function RichTextEditor({
 
   const editor = useEditor({
     immediatelyRender: false,
+    editable,
     extensions: [
       StarterKit.configure({ link: false }),
       Underline,
@@ -357,6 +361,22 @@ export function RichTextEditor({
     },
     onUpdate: ({ editor }) => onChangeRef.current(editor.getHTML()),
   });
+
+  useEffect(() => {
+    if (editor && editor.isEditable !== editable) editor.setEditable(editable);
+  }, [editor, editable]);
+
+  // `content: value` above only seeds the editor at creation — Tiptap doesn't
+  // watch the prop afterward. Without this, external replacements (AI
+  // Assistant's "Replace Content", template load, etc.) update React state
+  // but never reach the actual document. Guarded by an equality check so it
+  // doesn't fight the editor's own onUpdate → onChange → value round-trip
+  // while the user is typing.
+  useEffect(() => {
+    if (editor && value !== editor.getHTML()) {
+      editor.commands.setContent(value, { emitUpdate: false });
+    }
+  }, [editor, value]);
 
   const escHandler = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") setFullScreen(false);

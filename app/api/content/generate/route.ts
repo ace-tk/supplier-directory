@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { getUser } from "@/lib/session";
+import { runChatCompletion, AIConfigError, OpenAI } from "@/lib/ai/openai-client";
+import { sanitizeEditorHtml } from "@/lib/ai/sanitize-html";
 import { generateContentSchema } from "@/lib/validations/content";
 import { CONTENT_TYPE_LABELS, CONTENT_LANGUAGE_LABELS, CONTENT_TONE_LABELS, CONTENT_AUDIENCE_LABELS } from "@/lib/content-ui";
 
@@ -26,14 +27,6 @@ export async function POST(req: Request) {
   }
   const { title, contentType, language, tone, audience, prompt } = parsed.data;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "AI generation isn't configured yet. Add OPENAI_API_KEY to the server environment." },
-      { status: 500 }
-    );
-  }
-
   const systemPrompt = [
     "You are an expert B2B wholesale marketplace copywriter working for SupplyBase, a supplier/buyer trading platform.",
     "Write copy that is specific, credible, and free of generic filler — no vague superscript claims, no placeholder brackets.",
@@ -50,25 +43,13 @@ export async function POST(req: Request) {
   const userPrompt = `Title: ${title}\n\nInstructions: ${prompt}`;
 
   try {
-    const client = new OpenAI({ apiKey });
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.7,
-      max_tokens: 1200,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    });
-
-    const html = completion.choices[0]?.message?.content?.trim();
-    if (!html) {
-      return NextResponse.json({ error: "The AI didn't return any content. Please try again." }, { status: 502 });
-    }
-
-    return NextResponse.json({ html });
+    const html = await runChatCompletion({ system: systemPrompt, user: userPrompt });
+    return NextResponse.json({ html: sanitizeEditorHtml(html) });
   } catch (err) {
     console.error("[content/generate] OpenAI request failed:", err);
+    if (err instanceof AIConfigError) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
     const message =
       err instanceof OpenAI.APIError
         ? `AI generation failed: ${err.message}`

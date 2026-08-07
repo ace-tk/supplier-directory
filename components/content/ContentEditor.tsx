@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/content/RichTextEditor";
 import { ContentGenerationForm } from "@/components/content/ContentGenerationForm";
+import { AIAssistantToolbar } from "@/components/content/AIAssistantToolbar";
 import { fileToDataUrl } from "@/lib/file-to-data-url";
 import { validateImage, validateDocument } from "@/lib/file-validation";
 import { formatFileSize } from "@/lib/content-ui";
@@ -58,6 +59,7 @@ export function ContentEditor({
   const [saving, setSaving] = useState<"draft" | "publish" | "archive" | "template" | null>(null);
   const [preview, setPreview] = useState(startInPreview);
   const [mode, setMode] = useState<"generate" | "edit">(initialItem ? "edit" : "generate");
+  const [aiProcessing, setAiProcessing] = useState(false);
 
   const [contentType, setContentType] = useState<ContentType | undefined>(initialItem?.contentType ?? undefined);
   const [language, setLanguage] = useState<ContentLanguage | undefined>(initialItem?.language ?? undefined);
@@ -272,9 +274,15 @@ export function ContentEditor({
             </div>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-3">
             <Label className="text-xs font-medium">Content</Label>
-            <RichTextEditor value={bodyHtml} onChange={setBodyHtml} />
+            <AIAssistantToolbar
+              html={bodyHtml}
+              onReplace={setBodyHtml}
+              onProcessingChange={setAiProcessing}
+              disabled={!bodyHtml.trim()}
+            />
+            <RichTextEditor value={bodyHtml} onChange={setBodyHtml} editable={!aiProcessing} />
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-6 space-y-3">
