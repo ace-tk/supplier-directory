@@ -6,5 +6,5 @@ export default async function FreelancerCatalogPage() {
   const user = await getUser();
   if (!user) redirect("/login?from=/freelancer/catalog");
 
-  return <CatalogTable />;
+  return <CatalogTable basePath="/freelancer/catalog" />;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -19,6 +20,7 @@ import {
   Copy,
   GripVertical,
   Maximize2,
+  Pencil,
   Upload,
   Download,
   Loader2,
@@ -47,6 +49,7 @@ import {
   importRowsAction,
 } from "@/services/catalog";
 import { exportRowsToFile, parseFileToRows } from "@/lib/catalog-io";
+import { GST_RATE_OPTIONS, computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
 import type { CatalogRecord, CatalogRowRecord, CatalogRowStatus } from "@/types/catalog";
 import type { CatalogRowInput } from "@/lib/validations/catalog";
 import { cn } from "@/lib/utils";
@@ -89,12 +92,14 @@ function NumberCell({ value, onSave }: { value: number; onSave: (v: number) => v
 
 function SortableRow({
   row,
+  basePath,
   onFieldChange,
   onDelete,
   onDuplicate,
   onExpand,
 }: {
   row: CatalogRowRecord;
+  basePath: string;
   onFieldChange: (field: keyof CatalogRowInput, value: unknown) => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -110,15 +115,27 @@ function SortableRow({
           <GripVertical className="h-3.5 w-3.5" />
         </button>
       </td>
-      <td className="min-w-[140px]"><TextCell value={row.category ?? ""} placeholder="Category" onSave={(v) => onFieldChange("category", v)} /></td>
+      <td className="min-w-[140px]"><TextCell value={row.category ?? ""} placeholder="Product Category" onSave={(v) => onFieldChange("category", v)} /></td>
       <td className="min-w-[180px]"><TextCell value={row.productName} placeholder="Product name" onSave={(v) => onFieldChange("productName", v)} className="font-medium" /></td>
+      <td className="min-w-[130px]"><TextCell value={row.brandName ?? ""} placeholder="Brand" onSave={(v) => onFieldChange("brandName", v)} /></td>
       <td className="min-w-[110px]"><TextCell value={row.sku ?? ""} placeholder="SKU" onSave={(v) => onFieldChange("sku", v)} /></td>
+      <td className="min-w-[110px]"><TextCell value={row.hsnCode ?? ""} placeholder="HSN Code" onSave={(v) => onFieldChange("hsnCode", v)} /></td>
       <td className="min-w-[90px]"><NumberCell value={row.quantity} onSave={(v) => onFieldChange("quantity", v)} /></td>
       <td className="min-w-[130px]"><TextCell value={row.sizes.join(", ")} placeholder="S, M, L" onSave={(v) => onFieldChange("sizes", v.split(",").map((s) => s.trim()).filter(Boolean))} /></td>
       <td className="min-w-[100px]"><TextCell value={row.color ?? ""} placeholder="Color" onSave={(v) => onFieldChange("color", v)} /></td>
       <td className="min-w-[80px]"><NumberCell value={row.moq ?? 0} onSave={(v) => onFieldChange("moq", v)} /></td>
       <td className="min-w-[110px]"><NumberCell value={row.priceBeforeGst} onSave={(v) => onFieldChange("priceBeforeGst", v)} /></td>
-      <td className="min-w-[110px]"><NumberCell value={row.priceAfterGst} onSave={(v) => onFieldChange("priceAfterGst", v)} /></td>
+      <td className="min-w-[90px]">
+        <Select value={String(row.gstPercent)} onValueChange={(v) => v && onFieldChange("gstPercent", Number(v))}>
+          <SelectTrigger className="w-full h-8 border-none bg-transparent shadow-none"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {GST_RATE_OPTIONS.map((r) => <SelectItem key={r} value={String(r)}>{r}%</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </td>
+      <td className="min-w-[110px] px-2 py-1.5 text-sm tabular-nums text-muted-foreground" title="Derived from Price Before GST + GST %">
+        {row.priceAfterGst.toFixed(2)}
+      </td>
       <td className="min-w-[90px]">
         <Select value={row.currency} onValueChange={(v) => v && onFieldChange("currency", v)}>
           <SelectTrigger className="w-full h-8 border-none bg-transparent shadow-none"><SelectValue /></SelectTrigger>
@@ -142,8 +159,18 @@ function SortableRow({
           </SelectContent>
         </Select>
       </td>
-      <td className="w-32 px-1">
+      <td className="w-40 px-1">
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label="Edit product"
+            render={<Link href={`${basePath}/${row.id}/edit`} />}
+            nativeButton={false}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Expand row" onClick={onExpand}>
             <Maximize2 className="h-3.5 w-3.5" />
           </Button>
@@ -160,11 +187,11 @@ function SortableRow({
 }
 
 const COLUMN_HEADERS = [
-  "", "Category", "Product Name", "SKU", "Qty", "Sizes", "Color", "MOQ",
-  "Price (Before GST)", "Price (After GST)", "Currency", "Shipping", "Misc.", "Lead Time", "Status", "",
+  "", "Product Category", "Product Name", "Brand", "SKU", "HSN Code", "Qty", "Sizes", "Color", "MOQ",
+  "Price Before GST", "GST %", "Price", "Currency", "Shipping", "Misc.", "Lead Time", "Status", "",
 ];
 
-export function CatalogTable() {
+export function CatalogTable({ basePath }: { basePath: string }) {
   const [catalog, setCatalog] = useState<CatalogRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -215,7 +242,18 @@ export function CatalogTable() {
   }
 
   async function handleFieldChange(rowId: string, field: keyof CatalogRowInput, value: unknown) {
-    updateLocalRow(rowId, { [field]: value } as Partial<CatalogRowRecord>);
+    const patch: Partial<CatalogRowRecord> = { [field]: value } as Partial<CatalogRowRecord>;
+    // priceAfterGst is server-derived — mirror that locally so the display
+    // column updates instantly instead of waiting for a refetch.
+    if (field === "priceBeforeGst" || field === "gstPercent") {
+      const row = catalog?.rows.find((r) => r.id === rowId);
+      if (row) {
+        const priceBeforeGst = field === "priceBeforeGst" ? (value as number) : row.priceBeforeGst;
+        const gstPercent = field === "gstPercent" ? (value as number) : row.gstPercent;
+        patch.priceAfterGst = computeCatalogPriceAfterGst(priceBeforeGst, gstPercent);
+      }
+    }
+    updateLocalRow(rowId, patch);
     const result = await updateRowFieldAction(rowId, field, value);
     if (!result.success) toast.error(result.error);
   }
@@ -286,7 +324,10 @@ export function CatalogTable() {
 
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <Button onClick={handleAddRow} className="gap-1.5">
+          <Button className="gap-1.5" render={<Link href={`${basePath}/new`} />} nativeButton={false}>
+            <Plus className="h-4 w-4" /> Add Product
+          </Button>
+          <Button variant="outline" onClick={handleAddRow} className="gap-1.5">
             <Plus className="h-4 w-4" /> Add Row
           </Button>
           <div className="relative">
@@ -357,6 +398,7 @@ export function CatalogTable() {
                     <SortableRow
                       key={row.id}
                       row={row}
+                      basePath={basePath}
                       onFieldChange={(field, value) => handleFieldChange(row.id, field, value)}
                       onDelete={() => handleDelete(row.id)}
                       onDuplicate={() => handleDuplicate(row.id)}

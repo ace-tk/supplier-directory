@@ -1,6 +1,7 @@
-import type { InvoiceStatus } from "@/lib/generated/prisma/enums";
-
-export type { InvoiceStatus };
+// NOTE: this file is orphaned Phase-1 legacy — kept only so lib/invoice-pdf.ts
+// (unused until Phase 2 wires up PDF export against the new Invoice model)
+// keeps compiling. The live status enum now lives in types/invoicing.ts.
+export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "PENDING" | "OVERDUE";
 
 export interface PurchaseInvoiceRecord {
   id: string;

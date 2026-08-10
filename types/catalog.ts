@@ -19,16 +19,19 @@ export interface CatalogRowAttachmentEntry {
 export interface CatalogRowRecord {
   id: string;
   catalogId: string;
-  category: string | null;
+  category: string | null; // "Product Category" in the UI
   productName: string;
+  brandName: string | null;
   sku: string | null;
   description: string | null;
   quantity: number;
   sizes: string[];
   color: string | null;
   moq: number | null;
+  hsnCode: string | null;
+  gstPercent: number;
   priceBeforeGst: number;
-  priceAfterGst: number;
+  priceAfterGst: number; // server-derived from priceBeforeGst * (1 + gstPercent/100)
   currency: string;
   shippingCost: number;
   miscCost: number;
@@ -52,16 +55,19 @@ export interface CatalogRecord {
 }
 
 export const CATALOG_COLUMN_LABELS: Record<string, string> = {
-  category: "Category",
+  category: "Product Category",
   productName: "Product Name",
+  brandName: "Brand Name",
   sku: "SKU",
   description: "Description",
   quantity: "Quantity",
   sizes: "Sizes",
   color: "Color",
   moq: "MOQ",
+  hsnCode: "HSN Code",
+  gstPercent: "GST / Tax %",
   priceBeforeGst: "Price Before GST",
-  priceAfterGst: "Price After GST",
+  priceAfterGst: "Price",
   currency: "Currency",
   shippingCost: "Shipping Cost",
   miscCost: "Misc. Cost",
@@ -73,12 +79,15 @@ export const CATALOG_COLUMN_LABELS: Record<string, string> = {
 export const CATALOG_EXPORT_COLUMNS: (keyof CatalogRowRecord)[] = [
   "category",
   "productName",
+  "brandName",
   "sku",
   "description",
   "quantity",
   "sizes",
   "color",
   "moq",
+  "hsnCode",
+  "gstPercent",
   "priceBeforeGst",
   "priceAfterGst",
   "currency",

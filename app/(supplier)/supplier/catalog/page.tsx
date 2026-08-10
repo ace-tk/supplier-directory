@@ -6,5 +6,5 @@ export default async function SupplierCatalogPage() {
   const user = await getUser();
   if (!user) redirect("/login?from=/supplier/catalog");
 
-  return <CatalogTable />;
+  return <CatalogTable basePath="/supplier/catalog" />;
 }

@@ -21,18 +21,21 @@ function fetchCatalogRaw(ownerId: string) {
   return db.catalog.findUnique({ where: { ownerId }, include: catalogInclude });
 }
 
-function mapRow(r: CatalogWithRows["rows"][number]): CatalogRowRecord {
+export function mapRow(r: CatalogWithRows["rows"][number]): CatalogRowRecord {
   return {
     id: r.id,
     catalogId: r.catalogId,
     category: r.category,
     productName: r.productName,
+    brandName: r.brandName,
     sku: r.sku,
     description: r.description,
     quantity: r.quantity,
     sizes: r.sizes,
     color: r.color,
     moq: r.moq,
+    hsnCode: r.hsnCode,
+    gstPercent: r.gstPercent,
     priceBeforeGst: r.priceBeforeGst,
     priceAfterGst: r.priceAfterGst,
     currency: r.currency,

@@ -28,7 +28,7 @@ const LABEL_TO_FIELD: Record<string, keyof CatalogRowInput> = Object.fromEntries
   Object.entries(CATALOG_COLUMN_LABELS).map(([field, label]) => [label.toLowerCase(), field as keyof CatalogRowInput])
 );
 
-const NUMERIC_FIELDS = new Set(["quantity", "moq", "priceBeforeGst", "priceAfterGst", "shippingCost", "miscCost"]);
+const NUMERIC_FIELDS = new Set(["quantity", "moq", "gstPercent", "priceBeforeGst", "priceAfterGst", "shippingCost", "miscCost"]);
 
 function normalizeHeader(header: string): keyof CatalogRowInput | null {
   const key = header.trim().toLowerCase();

@@ -48,10 +48,15 @@ model User {
   sentProposals     Proposal[]       @relation("ProposalCreatedBy")
   assignedTasks     FreelancerTask[] @relation("TaskFreelancer")
 
-  contentItems     ContentItem[]
-  catalogs         Catalog[]
-  purchaseInvoices PurchaseInvoice[]
-  salesInvoices    SalesInvoice[]
+  contentItems ContentItem[]
+  catalogs     Catalog[]
+
+  ownedInvoices        Invoice[]        @relation("InvoiceOwner")
+  counterpartyInvoices Invoice[]        @relation("InvoiceCounterparty")
+  invoiceCounters      InvoiceCounter[]
+
+  ownedExpenses Expense[] @relation("ExpenseOwner")
+  expenseParty  Expense[] @relation("ExpenseParty")
 
   @@index([email])
 }
@@ -959,14 +964,20 @@ model CatalogRow {
   catalogId String
   catalog   Catalog @relation(fields: [catalogId], references: [id], onDelete: Cascade)
 
-  category       String?
+  category       String? // "Product Category" in the UI
   productName    String
+  brandName      String?
   sku            String?
   description    String?
   quantity       Int              @default(0)
   sizes          String[]         @default([])
   color          String?
   moq            Int?
+  hsnCode        String?
+  // GST/tax rate, constrained to 0/5/12/18 at the UI+Zod layer (see
+  // lib/catalog-ui.ts GST_RATE_OPTIONS). priceAfterGst is server-derived
+  // from priceBeforeGst * (1 + gstPercent/100) — never hand-edited.
+  gstPercent     Float            @default(0)
   priceBeforeGst Float            @default(0)
   priceAfterGst  Float            @default(0)
   currency       String           @default("INR")
@@ -979,6 +990,7 @@ model CatalogRow {
 
   images      CatalogRowImage[]
   attachments CatalogRowAttachment[]
+  invoiceItems InvoiceItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1010,76 +1022,255 @@ model CatalogRowAttachment {
 }
 
 // ─── Module 3: Invoice Management ──────────────────────────────────────────
+// Normalized Sales/Purchase invoice engine shared across all 4 portals.
+// Party/company details are snapshotted onto the Invoice at creation time
+// and never re-read live from User/Buyer/Supplier afterward (see
+// lib/invoicing/). All money fields are Decimal — see lib/invoicing/calc.ts
+// for the shared client+server calculation engine.
+
+// SALES/PURCHASE remain the underlying symbol names for the original two
+// document types (avoids a large cosmetic rename across every call site
+// that branches on `type === "SALES"`) — their user-facing label is "Tax
+// Invoice"/"Purchase Invoice" (see lib/invoicing/ui.ts INVOICE_TYPE_LABELS).
+// QUOTATION/CREDIT_NOTE/SALES_RETURN belong to the "sales family" (party is
+// a Buyer); DEBIT_NOTE belongs to the "purchase family" (party is a
+// Supplier) — see lib/invoicing/family.ts.
+enum InvoiceType {
+  SALES
+  PURCHASE
+  QUOTATION
+  CREDIT_NOTE
+  SALES_RETURN
+  DEBIT_NOTE
+}
 
 enum InvoiceStatus {
   DRAFT
   SENT
-  PAID
   PENDING
+  PARTIALLY_PAID
+  PAID
   OVERDUE
+  CANCELLED
 }
 
-model PurchaseInvoice {
-  id            String        @id @default(cuid())
-  vendor        String
-  poNumber      String?
+// Only relevant for CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE documents.
+enum InvoiceReason {
+  DAMAGED_GOODS
+  PRICE_ADJUSTMENT
+  PRODUCT_RETURN
+  BILLING_ERROR
+  DISCOUNT_ADJUSTMENT
+  OTHER
+}
+
+enum InvoiceTaxMode {
+  EXCLUSIVE
+  INCLUSIVE
+}
+
+enum InvoiceTaxBreakup {
+  SINGLE
+  CGST_SGST
+  IGST
+}
+
+// Per-owner, per-type, per-year atomic sequence powering INV-2026-0001 /
+// PUR-2026-0001 numbering (see lib/invoicing/numbering.ts).
+model InvoiceCounter {
+  id         String      @id @default(cuid())
+  ownerId    String
+  owner      User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  type       InvoiceType
+  year       Int
+  lastNumber Int         @default(0)
+
+  @@unique([ownerId, type, year])
+}
+
+model Invoice {
+  id   String      @id @default(cuid())
+  type InvoiceType
+
+  // Owner = creator/controller of the invoice (seller on SALES, biller on
+  // PURCHASE). Sole scoping key for lists/dashboard/KPIs.
+  ownerId String
+  owner   User   @relation("InvoiceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Counterparty = the other side of the deal, a registered platform User
+  // with role BUYER (SALES) or SUPPLIER (PURCHASE). Nullable — Phase 1
+  // also allows a fully manual party with no matching platform account.
+  counterpartyUserId String?
+  counterpartyUser   User?   @relation("InvoiceCounterparty", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+
   invoiceNumber String
-  invoiceDate   DateTime
-  dueDate       DateTime
-  gst           Float         @default(0)
-  shipping      Float         @default(0)
-  totalAmount   Float         @default(0)
   status        InvoiceStatus @default(DRAFT)
-  notes         String?
 
-  attachmentFileName String?
-  attachmentDataUrl  String? @db.Text
+  invoiceDate     DateTime
+  dueDate         DateTime
+  currency        String    @default("INR")
+  paymentTerms    String?
+  referenceNumber String?
 
-  ownerId String
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  // ── Seller/company snapshot — captured at creation, editable per
+  // invoice, never re-read live from the org profile afterward. ──
+  sellerName    String
+  sellerAddress String? @db.Text
+  sellerTaxId   String?
+  sellerPhone   String?
+  sellerEmail   String?
+  sellerLogoUrl String?
+
+  // ── Party (Buyer on SALES / Supplier on PURCHASE) snapshot. ──
+  partyName            String
+  partyContactPerson   String?
+  partyEmail           String?
+  partyPhone           String?
+  partyBillingAddress  String? @db.Text
+  partyShippingAddress String? @db.Text
+  partyTaxId           String?
+
+  // Explicit tax configuration — never auto-guessed (see spec ¶11).
+  taxMode    InvoiceTaxMode    @default(EXCLUSIVE)
+  taxBreakup InvoiceTaxBreakup @default(SINGLE)
+
+  // ── Totals — always server-recalculated & persisted, never trusted
+  // from the client. ──
+  subtotal           Decimal @db.Decimal(14, 2) @default(0)
+  itemDiscountTotal  Decimal @db.Decimal(14, 2) @default(0)
+  taxableAmount      Decimal @db.Decimal(14, 2) @default(0)
+  cgstTotal          Decimal @db.Decimal(14, 2) @default(0)
+  sgstTotal          Decimal @db.Decimal(14, 2) @default(0)
+  igstTotal          Decimal @db.Decimal(14, 2) @default(0)
+  taxTotal           Decimal @db.Decimal(14, 2) @default(0)
+  shippingCharge     Decimal @db.Decimal(14, 2) @default(0)
+  miscCharge         Decimal @db.Decimal(14, 2) @default(0)
+  miscChargeLabel    String?
+  additionalDiscount Decimal @db.Decimal(14, 2) @default(0)
+  roundOff           Decimal @db.Decimal(6, 2)  @default(0)
+  grandTotal         Decimal @db.Decimal(14, 2) @default(0)
+
+  customerNotes      String? @db.Text
+  termsAndConditions String? @db.Text
+
+  // Only set on CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE documents.
+  reason InvoiceReason?
+
+  // Generic "derived from" lineage — powers Quotation→Tax Invoice
+  // conversion, Credit Note / Sales Return (source = the original Sales
+  // invoice), and Debit Note (source = the original Purchase invoice).
+  // SetNull so archiving/editing a source document never blocks or
+  // corrupts a document derived from it.
+  sourceInvoiceId  String?
+  sourceInvoice    Invoice?  @relation("InvoiceSource", fields: [sourceInvoiceId], references: [id], onDelete: SetNull)
+  derivedDocuments Invoice[] @relation("InvoiceSource")
+
+  // Soft-hide from default lists — distinct from the CANCELLED business
+  // status, which stays visible.
+  archivedAt DateTime?
+
+  items    InvoiceItem[]
+  expenses Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([ownerId, type, invoiceNumber])
   @@index([ownerId])
+  @@index([counterpartyUserId])
   @@index([status])
+  @@index([type])
+  @@index([invoiceDate])
+  @@index([sourceInvoiceId])
 }
 
-model SalesInvoice {
-  id            String        @id @default(cuid())
-  customer      String
-  invoiceNumber String
-  invoiceDate   DateTime
-  dueDate       DateTime
-  gst           Float         @default(0)
-  shipping      Float         @default(0)
-  grandTotal    Float         @default(0)
-  paymentStatus InvoiceStatus @default(DRAFT)
-  notes         String?
+model InvoiceItem {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
-  attachmentFileName String?
-  attachmentDataUrl  String? @db.Text
+  // Optional link back to the seller's own CatalogRow this line was
+  // prefilled from (Sales invoices only). SetNull so editing/deleting a
+  // CatalogRow later never blocks or corrupts historical invoice items.
+  catalogRowId String?
+  catalogRow   CatalogRow? @relation(fields: [catalogRowId], references: [id], onDelete: SetNull)
 
-  ownerId String
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  productName     String
+  description     String? @db.Text
+  hsnSac          String?
+  quantity        Decimal @db.Decimal(12, 3) @default(1)
+  unit            String  @default("pcs")
+  rate            Decimal @db.Decimal(14, 4) @default(0)
+  discountPercent Decimal @db.Decimal(6, 3)  @default(0)
+  discountAmount  Decimal @db.Decimal(14, 2) @default(0)
+  taxPercent      Decimal @db.Decimal(6, 3)  @default(0)
+  taxAmount       Decimal @db.Decimal(14, 2) @default(0)
+  lineTotal       Decimal @db.Decimal(14, 2) @default(0)
 
-  items SalesInvoiceItem[]
+  order Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([ownerId])
-  @@index([paymentStatus])
-}
-
-model SalesInvoiceItem {
-  id          String       @id @default(cuid())
-  invoiceId   String
-  invoice     SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  productName String
-  quantity    Int          @default(1)
-  unitPrice   Float        @default(0)
-  order       Int          @default(0)
 
   @@index([invoiceId])
+  @@index([catalogRowId])
+}
+
+// ─── Expenses ───────────────────────────────────────────────────────────
+// Deliberately separate from InvoiceItem — expenses are operational costs
+// (shipping, travel, samples, ...), not sales/purchase line items, and are
+// never mixed into an Invoice's item table.
+
+enum ExpenseCategory {
+  SHIPPING
+  TRAVEL
+  PACKAGING
+  TRANSPORTATION
+  SAMPLES
+  MARKETING
+  FREELANCER
+  OFFICE
+  MISCELLANEOUS
+  OTHER
+}
+
+model Expense {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("ExpenseOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Combined date+time — split into two inputs client-side, stored as one.
+  occurredAt          DateTime
+  location            String?
+  category            ExpenseCategory @default(MISCELLANEOUS)
+  customCategoryLabel String? // used when category == OTHER
+  amount              Decimal         @db.Decimal(14, 2)
+  currency            String          @default("INR")
+  notes               String?         @db.Text
+
+  // Optional Buyer/Supplier this expense relates to — reuses the existing
+  // platform-account directory, same as an Invoice's party.
+  partyUserId String?
+  partyUser   User?   @relation("ExpenseParty", fields: [partyUserId], references: [id], onDelete: SetNull)
+
+  // Optional related Sales/Purchase document.
+  relatedInvoiceId String?
+  relatedInvoice   Invoice? @relation(fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
+
+  // File reference, not a base64 blob — reuses the existing filesystem
+  // upload endpoint (app/api/supplier-portal/upload) which returns a
+  // /uploads/portal/<file> URL. Deliberately different from the
+  // dataUrl-in-DB pattern used elsewhere (Catalog/Content/SupplyChain
+  // attachments), per explicit instruction to avoid storing large blobs
+  // in Postgres for Expense attachments.
+  attachmentFileName String?
+  attachmentUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([category])
+  @@index([occurredAt])
+  @@index([relatedInvoiceId])
 }

@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateImage, validateDocument } from "@/lib/file-validation";
 import { catalogRowInputSchema, type CatalogRowInput } from "@/lib/validations/catalog";
-import { getOrCreateCatalogForOwner } from "@/lib/catalog-queries";
+import { getOrCreateCatalogForOwner, mapRow } from "@/lib/catalog-queries";
+import { computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
 import type { CatalogRecord, CatalogRowRecord } from "@/types/catalog";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
@@ -36,38 +37,16 @@ export async function addRowAction(input?: Partial<CatalogRowInput>): Promise<Ac
 
   const maxOrder = await db.catalogRow.aggregate({ where: { catalogId: catalog.id }, _max: { order: true } });
   const row = await db.catalogRow.create({
-    data: { ...parsed.data, catalogId: catalog.id, order: (maxOrder._max.order ?? -1) + 1 },
+    data: {
+      ...parsed.data,
+      priceAfterGst: computeCatalogPriceAfterGst(parsed.data.priceBeforeGst, parsed.data.gstPercent),
+      catalogId: catalog.id,
+      order: (maxOrder._max.order ?? -1) + 1,
+    },
     include: { images: true, attachments: true },
   });
 
-  return {
-    success: true,
-    data: {
-      id: row.id,
-      catalogId: row.catalogId,
-      category: row.category,
-      productName: row.productName,
-      sku: row.sku,
-      description: row.description,
-      quantity: row.quantity,
-      sizes: row.sizes,
-      color: row.color,
-      moq: row.moq,
-      priceBeforeGst: row.priceBeforeGst,
-      priceAfterGst: row.priceAfterGst,
-      currency: row.currency,
-      shippingCost: row.shippingCost,
-      miscCost: row.miscCost,
-      leadTime: row.leadTime,
-      status: row.status,
-      notes: row.notes,
-      order: row.order,
-      images: [],
-      attachments: [],
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    },
-  };
+  return { success: true, data: mapRow(row) };
 }
 
 export async function updateRowFieldAction(
@@ -85,8 +64,48 @@ export async function updateRowFieldAction(
   const parsed = partialSchema.safeParse({ [field]: value });
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
-  await db.catalogRow.update({ where: { id: rowId }, data: parsed.data });
+  // priceAfterGst is always server-derived — never trust a directly
+  // submitted value; recompute whenever either of its inputs changes.
+  const data: Record<string, unknown> = { ...parsed.data };
+  delete data.priceAfterGst;
+  if (field === "priceBeforeGst" || field === "gstPercent") {
+    const priceBeforeGst = field === "priceBeforeGst" ? (parsed.data.priceBeforeGst as number) : row.priceBeforeGst;
+    const gstPercent = field === "gstPercent" ? (parsed.data.gstPercent as number) : row.gstPercent;
+    data.priceAfterGst = computeCatalogPriceAfterGst(priceBeforeGst, gstPercent);
+  }
+
+  await db.catalogRow.update({ where: { id: rowId }, data });
   return { success: true, data: undefined };
+}
+
+/** Bulk multi-field update, used by the page-based Add/Edit form (vs. updateRowFieldAction's single-cell autosave used by the inline table). */
+export async function updateRowAction(
+  rowId: string,
+  input: Partial<CatalogRowInput>
+): Promise<ActionResult<CatalogRowRecord>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const row = await requireOwnedRow(rowId, user.id);
+  if (!row) return { success: false, error: "Row not found." };
+
+  const parsed = catalogRowInputSchema.partial().safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+
+  const data: Record<string, unknown> = { ...parsed.data };
+  delete data.priceAfterGst;
+  if (parsed.data.priceBeforeGst !== undefined || parsed.data.gstPercent !== undefined) {
+    const priceBeforeGst = parsed.data.priceBeforeGst ?? row.priceBeforeGst;
+    const gstPercent = parsed.data.gstPercent ?? row.gstPercent;
+    data.priceAfterGst = computeCatalogPriceAfterGst(priceBeforeGst, gstPercent);
+  }
+
+  const updated = await db.catalogRow.update({
+    where: { id: rowId },
+    data,
+    include: { images: true, attachments: true },
+  });
+  return { success: true, data: mapRow(updated) };
 }
 
 export async function deleteRowAction(rowId: string): Promise<ActionResult<void>> {
@@ -113,12 +132,15 @@ export async function duplicateRowAction(rowId: string): Promise<ActionResult<Ca
       catalogId: row.catalogId,
       category: row.category,
       productName: `${row.productName} (Copy)`,
+      brandName: row.brandName,
       sku: row.sku,
       description: row.description,
       quantity: row.quantity,
       sizes: row.sizes,
       color: row.color,
       moq: row.moq,
+      hsnCode: row.hsnCode,
+      gstPercent: row.gstPercent,
       priceBeforeGst: row.priceBeforeGst,
       priceAfterGst: row.priceAfterGst,
       currency: row.currency,
@@ -129,36 +151,10 @@ export async function duplicateRowAction(rowId: string): Promise<ActionResult<Ca
       notes: row.notes,
       order: (maxOrder._max.order ?? -1) + 1,
     },
+    include: { images: true, attachments: true },
   });
 
-  return {
-    success: true,
-    data: {
-      id: copy.id,
-      catalogId: copy.catalogId,
-      category: copy.category,
-      productName: copy.productName,
-      sku: copy.sku,
-      description: copy.description,
-      quantity: copy.quantity,
-      sizes: copy.sizes,
-      color: copy.color,
-      moq: copy.moq,
-      priceBeforeGst: copy.priceBeforeGst,
-      priceAfterGst: copy.priceAfterGst,
-      currency: copy.currency,
-      shippingCost: copy.shippingCost,
-      miscCost: copy.miscCost,
-      leadTime: copy.leadTime,
-      status: copy.status,
-      notes: copy.notes,
-      order: copy.order,
-      images: [],
-      attachments: [],
-      createdAt: copy.createdAt.toISOString(),
-      updatedAt: copy.updatedAt.toISOString(),
-    },
-  };
+  return { success: true, data: mapRow(copy) };
 }
 
 export async function reorderRowsAction(rowIds: string[]): Promise<ActionResult<void>> {

@@ -1,0 +1,357 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Loader2, Paperclip, X, Check, ChevronsUpDown, Search } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ExpenseNotesField } from "./ExpenseNotesField";
+import {
+  createExpenseAction,
+  updateExpenseAction,
+  getExpensePartyOptionsAction,
+  getExpenseInvoiceOptionsAction,
+} from "@/services/expenses";
+import { EXPENSE_CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from "@/lib/expenses/ui";
+import { cn } from "@/lib/utils";
+import type { ExpenseRecord, ExpenseCategory, InvoiceOption } from "@/types/expense";
+import type { DirectoryOption } from "@/types/invoicing";
+
+interface FormState {
+  date: string;
+  time: string;
+  location: string;
+  category: ExpenseCategory;
+  customCategoryLabel: string;
+  amount: string;
+  currency: string;
+  notes: string;
+  partyUserId: string | null;
+  partyLabel: string;
+  relatedInvoiceId: string | null;
+  relatedInvoiceLabel: string;
+  attachmentFileName: string;
+  attachmentUrl: string;
+}
+
+function formFromExpense(expense: ExpenseRecord | null): FormState {
+  const occurred = expense ? new Date(expense.occurredAt) : new Date();
+  return {
+    date: occurred.toISOString().slice(0, 10),
+    time: expense ? occurred.toISOString().slice(11, 16) : "",
+    location: expense?.location ?? "",
+    category: expense?.category ?? "MISCELLANEOUS",
+    customCategoryLabel: expense?.customCategoryLabel ?? "",
+    amount: expense?.amount ?? "0",
+    currency: expense?.currency ?? "INR",
+    notes: expense?.notes ?? "",
+    partyUserId: expense?.partyUserId ?? null,
+    partyLabel: expense?.partyName ?? "",
+    relatedInvoiceId: expense?.relatedInvoiceId ?? null,
+    relatedInvoiceLabel: expense?.relatedInvoiceNumber ?? "",
+    attachmentFileName: expense?.attachmentFileName ?? "",
+    attachmentUrl: expense?.attachmentUrl ?? "",
+  };
+}
+
+function ExpenseForm({
+  expense,
+  onCancel,
+  onSaved,
+}: {
+  expense: ExpenseRecord | null;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState<FormState>(() => formFromExpense(expense));
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [partyOptions, setPartyOptions] = useState<DirectoryOption[]>([]);
+  const [partyOpen, setPartyOpen] = useState(false);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [invoiceOptions, setInvoiceOptions] = useState<InvoiceOption[]>([]);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+
+  function patch(p: Partial<FormState>) {
+    setForm((f) => ({ ...f, ...p }));
+  }
+
+  useEffect(() => {
+    getExpensePartyOptionsAction().then((r) => {
+      if (r.success) setPartyOptions(r.data);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!invoiceOpen) return;
+    const handle = setTimeout(() => {
+      getExpenseInvoiceOptionsAction(invoiceSearch).then((r) => {
+        if (r.success) setInvoiceOptions(r.data);
+      });
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [invoiceSearch, invoiceOpen]);
+
+  async function handleAttachment(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/supplier-portal/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) return toast.error(data.error ?? "Upload failed");
+      patch({ attachmentFileName: data.name, attachmentUrl: data.url });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!form.date) {
+      toast.error("Date is required.");
+      return;
+    }
+    setSaving(true);
+    const payload = {
+      occurredAt: new Date(`${form.date}T${form.time || "00:00"}`).toISOString(),
+      location: form.location,
+      category: form.category,
+      customCategoryLabel: form.customCategoryLabel,
+      amount: form.amount,
+      currency: form.currency,
+      notes: form.notes,
+      partyUserId: form.partyUserId,
+      relatedInvoiceId: form.relatedInvoiceId,
+      attachmentFileName: form.attachmentFileName,
+      attachmentUrl: form.attachmentUrl,
+    };
+    const result = expense ? await updateExpenseAction(expense.id, payload) : await createExpenseAction(payload);
+    setSaving(false);
+    if (!result.success) return toast.error(result.error);
+    toast.success(expense ? "Expense updated" : "Expense added");
+    onSaved();
+  }
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{expense ? "Edit Expense" : "Add Expense"}</DialogTitle>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Date</Label>
+            <Input type="date" value={form.date} onChange={(e) => patch({ date: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Time</Label>
+            <Input type="time" value={form.time} onChange={(e) => patch({ time: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Category</Label>
+            <Select value={form.category} onValueChange={(v) => v && patch({ category: v as ExpenseCategory })}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EXPENSE_CATEGORY_OPTIONS.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {EXPENSE_CATEGORY_LABELS[c]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Location</Label>
+            <Input value={form.location} onChange={(e) => patch({ location: e.target.value })} placeholder="Optional" />
+          </div>
+        </div>
+
+        {form.category === "OTHER" && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Custom Category Label</Label>
+            <Input value={form.customCategoryLabel} onChange={(e) => patch({ customCategoryLabel: e.target.value })} />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Amount</Label>
+            <Input type="number" min={0} value={form.amount} onChange={(e) => patch({ amount: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Currency</Label>
+            <Input value={form.currency} onChange={(e) => patch({ currency: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Buyer / Supplier</Label>
+          <Popover open={partyOpen} onOpenChange={setPartyOpen}>
+            <PopoverTrigger render={<Button variant="outline" className="w-full justify-between font-normal" />}>
+              <span className="truncate">{form.partyLabel || "Optional — select a buyer or supplier"}</span>
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </PopoverTrigger>
+            <PopoverContent className="w-[--anchor-width] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search buyers and suppliers..." />
+                <CommandList>
+                  <CommandEmpty>No matches found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="none"
+                      onSelect={() => {
+                        patch({ partyUserId: null, partyLabel: "" });
+                        setPartyOpen(false);
+                      }}
+                    >
+                      <Check className={cn("h-3.5 w-3.5", !form.partyUserId ? "opacity-100" : "opacity-0")} />
+                      None
+                    </CommandItem>
+                    {partyOptions.map((opt) => (
+                      <CommandItem
+                        key={opt.id}
+                        value={`${opt.companyName} ${opt.name}`}
+                        onSelect={() => {
+                          patch({ partyUserId: opt.id, partyLabel: opt.companyName || opt.name });
+                          setPartyOpen(false);
+                        }}
+                      >
+                        <Check className={cn("h-3.5 w-3.5", form.partyUserId === opt.id ? "opacity-100" : "opacity-0")} />
+                        {opt.companyName || opt.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Related Sales / Purchase Invoice</Label>
+          <Popover open={invoiceOpen} onOpenChange={setInvoiceOpen}>
+            <PopoverTrigger render={<Button variant="outline" className="w-full justify-between font-normal" />}>
+              <span className="flex items-center gap-2 truncate">
+                <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                {form.relatedInvoiceLabel || "Optional — search by invoice number"}
+              </span>
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </PopoverTrigger>
+            <PopoverContent className="w-[--anchor-width] p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput placeholder="Type an invoice number..." value={invoiceSearch} onValueChange={setInvoiceSearch} />
+                <CommandList>
+                  <CommandEmpty>{invoiceSearch ? "No invoices found." : "Start typing to search."}</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="none"
+                      onSelect={() => {
+                        patch({ relatedInvoiceId: null, relatedInvoiceLabel: "" });
+                        setInvoiceOpen(false);
+                      }}
+                    >
+                      <Check className={cn("h-3.5 w-3.5", !form.relatedInvoiceId ? "opacity-100" : "opacity-0")} />
+                      None
+                    </CommandItem>
+                    {invoiceOptions.map((opt) => (
+                      <CommandItem
+                        key={opt.id}
+                        value={opt.invoiceNumber}
+                        onSelect={() => {
+                          patch({ relatedInvoiceId: opt.id, relatedInvoiceLabel: opt.invoiceNumber });
+                          setInvoiceOpen(false);
+                        }}
+                      >
+                        <Check className={cn("h-3.5 w-3.5", form.relatedInvoiceId === opt.id ? "opacity-100" : "opacity-0")} />
+                        <span className="font-mono text-xs">{opt.invoiceNumber}</span>
+                        <span className="text-muted-foreground ml-1.5">{opt.partyName}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <ExpenseNotesField value={form.notes} onChange={(v) => patch({ notes: v })} />
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Attachment</Label>
+          {form.attachmentFileName ? (
+            <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+              <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-foreground truncate flex-1">{form.attachmentFileName}</span>
+              <button
+                type="button"
+                onClick={() => patch({ attachmentFileName: "", attachmentUrl: "" })}
+                aria-label="Remove attachment"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer">
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+              {uploading ? "Uploading..." : "Attach a file"}
+              <input type="file" className="hidden" onChange={handleAttachment} disabled={uploading} />
+            </label>
+          )}
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {expense ? "Save Changes" : "Add Expense"}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+export function ExpenseFormDialog({
+  expense,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  expense: ExpenseRecord | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        {open && (
+          <ExpenseForm
+            key={expense?.id ?? "new"}
+            expense={expense}
+            onCancel={() => onOpenChange(false)}
+            onSaved={() => {
+              onSaved();
+              onOpenChange(false);
+            }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

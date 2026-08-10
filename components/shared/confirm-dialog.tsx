@@ -15,7 +15,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ConfirmDialogProps {
-  trigger: React.ReactNode;
+  /** A single element (e.g. a <Button>) — merged onto the trigger via Base UI's `render` prop, since AlertDialogTrigger renders its own <button> and can't wrap another one as a child. */
+  trigger: React.ReactElement;
   title?: string;
   description?: string;
   confirmLabel?: string;
@@ -35,7 +36,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <AlertDialog>
-      <AlertDialogTrigger>{trigger}</AlertDialogTrigger>
+      <AlertDialogTrigger render={trigger} />
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
