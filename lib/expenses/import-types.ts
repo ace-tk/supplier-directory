@@ -22,6 +22,7 @@ export interface ExpenseImportResolvedRow {
   occurredAt: string | null;
   location: string;
   category: ExpenseCategory | null;
+  customCategoryId: string | null;
   amount: string | null;
   currency: string | null;
   notes: string;

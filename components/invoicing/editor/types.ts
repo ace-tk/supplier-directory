@@ -1,4 +1,4 @@
-import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason } from "@/types/invoicing";
+import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, ChargeType } from "@/types/invoicing";
 
 export interface EditorItemState {
   key: string;
@@ -11,6 +11,13 @@ export interface EditorItemState {
   rate: string;
   discountPercent: string;
   taxPercent: string;
+}
+
+export interface EditorChargeState {
+  key: string;
+  name: string;
+  type: ChargeType;
+  value: string;
 }
 
 export interface EditorFormState {
@@ -45,13 +52,21 @@ export interface EditorFormState {
 
   items: EditorItemState[];
 
-  shippingCharge: string;
-  miscCharge: string;
-  miscChargeLabel: string;
+  shippingType: ChargeType;
+  shippingValue: string;
+  additionalCharges: EditorChargeState[];
   additionalDiscount: string;
 
   customerNotes: string;
   termsAndConditions: string;
+
+  bankAccountHolder: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankIfscCode: string;
+  bankBranch: string;
+  bankUpiId: string;
+  bankPaymentInstructions: string;
 
   // Only relevant for CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE.
   reason: InvoiceReason | "";
@@ -76,6 +91,10 @@ export function emptyItem(): EditorItemState {
     discountPercent: "0",
     taxPercent: "0",
   };
+}
+
+export function emptyCharge(): EditorChargeState {
+  return { key: newItemKey(), name: "", type: "FIXED", value: "0" };
 }
 
 export function todayISODate(): string {

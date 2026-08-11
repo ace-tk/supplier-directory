@@ -25,6 +25,7 @@ const STATUS_VALUES = [
 ] as const;
 const TAX_MODE_VALUES = ["EXCLUSIVE", "INCLUSIVE"] as const;
 const TAX_BREAKUP_VALUES = ["SINGLE", "CGST_SGST", "IGST"] as const;
+const CHARGE_TYPE_VALUES = ["FIXED", "PERCENT"] as const;
 
 /** Decimal-ish string: numeric, may be blank/omitted (defaults handled by calc engine). */
 const moneyString = z
@@ -32,6 +33,15 @@ const moneyString = z
   .trim()
   .refine((v) => v === "" || !Number.isNaN(Number(v)), "Must be a number")
   .optional();
+
+export const additionalChargeInputSchema = z.object({
+  name: z.string().min(1, "Charge name is required"),
+  type: z.enum(CHARGE_TYPE_VALUES).default("FIXED"),
+  value: z
+    .string()
+    .trim()
+    .refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, "Must be 0 or more"),
+});
 
 export const invoiceItemInputSchema = z.object({
   catalogRowId: z.string().nullish(),
@@ -85,13 +95,23 @@ export const invoiceFormSchema = z
 
     items: z.array(invoiceItemInputSchema).min(1, "Add at least one item"),
 
-    shippingCharge: moneyString,
-    miscCharge: moneyString,
-    miscChargeLabel: z.string().optional(),
+    shippingType: z.enum(CHARGE_TYPE_VALUES).default("FIXED"),
+    shippingValue: moneyString,
+    additionalCharges: z.array(additionalChargeInputSchema).default([]),
     additionalDiscount: moneyString,
 
     customerNotes: z.string().optional(),
     termsAndConditions: z.string().optional(),
+
+    // Banking details — every field optional; the section is simply not
+    // shown/persisted when nothing was entered (see buildInvoiceData).
+    bankAccountHolder: z.string().optional(),
+    bankName: z.string().optional(),
+    bankAccountNumber: z.string().optional(),
+    bankIfscCode: z.string().optional(),
+    bankBranch: z.string().optional(),
+    bankUpiId: z.string().optional(),
+    bankPaymentInstructions: z.string().optional(),
 
     reason: z.enum(REASON_VALUES).optional(),
     sourceInvoiceId: z.string().nullish(),

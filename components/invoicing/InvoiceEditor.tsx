@@ -12,12 +12,14 @@ import { SellerInfoFields } from "./editor/SellerInfoFields";
 import { PartyPicker } from "./editor/PartyPicker";
 import { ItemTable } from "./editor/ItemTable";
 import { ChargesAndNotesFields } from "./editor/ChargesAndNotesFields";
+import { BankingDetailsFields } from "./editor/BankingDetailsFields";
 import { ReasonField } from "./editor/ReasonField";
 import { TotalsSummary } from "./editor/TotalsSummary";
 import { InvoicePreview } from "./preview/InvoicePreview";
 import { calculateInvoiceTotals } from "@/lib/invoicing/calc";
 import { invoiceFamily, DEPENDENT_TYPES } from "@/lib/invoicing/family";
 import { nonDraftInitialStatus } from "@/lib/invoicing/status";
+import { resolveLegacyShipping, resolveLegacyAdditionalCharges } from "@/lib/invoicing/charges";
 import { INVOICE_TYPE_LABELS } from "@/lib/invoicing/ui";
 import {
   createInvoiceAction,
@@ -55,12 +57,19 @@ function defaultForm(type: InvoiceType): EditorFormState {
     taxMode: "EXCLUSIVE",
     taxBreakup: "SINGLE",
     items: [emptyItem()],
-    shippingCharge: "0",
-    miscCharge: "0",
-    miscChargeLabel: "",
+    shippingType: "FIXED",
+    shippingValue: "0",
+    additionalCharges: [],
     additionalDiscount: "0",
     customerNotes: "",
     termsAndConditions: "",
+    bankAccountHolder: "",
+    bankName: "",
+    bankAccountNumber: "",
+    bankIfscCode: "",
+    bankBranch: "",
+    bankUpiId: "",
+    bankPaymentInstructions: "",
     reason: "",
   };
 }
@@ -106,12 +115,23 @@ function formFromRecord(record: InvoiceRecord): EditorFormState {
             taxPercent: it.taxPercent,
           }))
         : [emptyItem()],
-    shippingCharge: record.shippingCharge,
-    miscCharge: record.miscCharge,
-    miscChargeLabel: record.miscChargeLabel ?? "",
+    ...resolveLegacyShipping(record),
+    additionalCharges: resolveLegacyAdditionalCharges(record).map((c) => ({
+      key: c.id,
+      name: c.name,
+      type: c.type,
+      value: c.value,
+    })),
     additionalDiscount: record.additionalDiscount,
     customerNotes: record.customerNotes ?? "",
     termsAndConditions: record.termsAndConditions ?? "",
+    bankAccountHolder: record.bankAccountHolder ?? "",
+    bankName: record.bankName ?? "",
+    bankAccountNumber: record.bankAccountNumber ?? "",
+    bankIfscCode: record.bankIfscCode ?? "",
+    bankBranch: record.bankBranch ?? "",
+    bankUpiId: record.bankUpiId ?? "",
+    bankPaymentInstructions: record.bankPaymentInstructions ?? "",
     reason: record.reason ?? "",
   };
 }
@@ -161,12 +181,19 @@ function formFromSource(source: InvoiceRecord, targetType: InvoiceType): EditorF
             taxPercent: it.taxPercent,
           }))
         : [emptyItem()],
-    shippingCharge: "0",
-    miscCharge: "0",
-    miscChargeLabel: "",
+    shippingType: "FIXED",
+    shippingValue: "0",
+    additionalCharges: [],
     additionalDiscount: "0",
     customerNotes: "",
     termsAndConditions: source.termsAndConditions ?? "",
+    bankAccountHolder: "",
+    bankName: "",
+    bankAccountNumber: "",
+    bankIfscCode: "",
+    bankBranch: "",
+    bankUpiId: "",
+    bankPaymentInstructions: "",
     reason: "",
   };
 }
@@ -238,11 +265,24 @@ export function InvoiceEditor({
           discountPercent: it.discountPercent,
           taxPercent: it.taxPercent,
         })),
-        shippingCharge: form.shippingCharge,
-        miscCharge: form.miscCharge,
+        shippingType: form.shippingType,
+        shippingValue: form.shippingValue,
+        additionalCharges: form.additionalCharges.map((c) => ({
+          name: c.name,
+          type: c.type,
+          value: c.value,
+        })),
         additionalDiscount: form.additionalDiscount,
       }),
-    [form.taxMode, form.taxBreakup, form.items, form.shippingCharge, form.miscCharge, form.additionalDiscount]
+    [
+      form.taxMode,
+      form.taxBreakup,
+      form.items,
+      form.shippingType,
+      form.shippingValue,
+      form.additionalCharges,
+      form.additionalDiscount,
+    ]
   );
 
   // "Save Draft" only makes sense while the invoice hasn't left draft state yet.
@@ -282,6 +322,13 @@ export function InvoiceEditor({
           discountPercent: it.discountPercent,
           taxPercent: it.taxPercent,
           order: i,
+        })),
+      additionalCharges: form.additionalCharges
+        .filter((c) => c.name.trim())
+        .map((c) => ({
+          name: c.name,
+          type: c.type,
+          value: c.value,
         })),
     };
 
@@ -333,9 +380,16 @@ export function InvoiceEditor({
       lineTotal: calc.items[i]?.lineTotal ?? "0",
     })),
     totals: calc,
-    miscChargeLabel: form.miscChargeLabel,
+    additionalCharges: calc.additionalCharges,
     customerNotes: form.customerNotes,
     termsAndConditions: form.termsAndConditions,
+    bankAccountHolder: form.bankAccountHolder,
+    bankName: form.bankName,
+    bankAccountNumber: form.bankAccountNumber,
+    bankIfscCode: form.bankIfscCode,
+    bankBranch: form.bankBranch,
+    bankUpiId: form.bankUpiId,
+    bankPaymentInstructions: form.bankPaymentInstructions,
   };
 
   const editForm = (
@@ -346,7 +400,14 @@ export function InvoiceEditor({
         <PartyPicker form={form} onChange={patch} />
       </div>
       <ItemTable type={form.type} items={form.items} calc={calc} onChange={(items) => patch({ items })} locked={locked} />
-      {locked ? <ReasonField form={form} onChange={patch} /> : <ChargesAndNotesFields form={form} onChange={patch} />}
+      {locked ? (
+        <ReasonField form={form} onChange={patch} />
+      ) : (
+        <>
+          <ChargesAndNotesFields form={form} onChange={patch} />
+          <BankingDetailsFields form={form} onChange={patch} />
+        </>
+      )}
       <TotalsSummary calc={calc} currency={form.currency} />
     </div>
   );

@@ -12,6 +12,7 @@ import Decimal from "decimal.js";
 
 export type CalcTaxMode = "EXCLUSIVE" | "INCLUSIVE";
 export type CalcTaxBreakup = "SINGLE" | "CGST_SGST" | "IGST";
+export type CalcChargeType = "FIXED" | "PERCENT";
 
 export interface CalcLineItemInput {
   quantity: number | string;
@@ -31,12 +32,28 @@ export interface CalcLineItemResult {
   lineTotal: string;
 }
 
+export interface CalcAdditionalChargeInput {
+  name: string;
+  type: CalcChargeType;
+  value: number | string;
+}
+
+export interface CalcAdditionalChargeResult {
+  name: string;
+  type: CalcChargeType;
+  value: string;
+  amount: string;
+}
+
 export interface CalcInvoiceInput {
   taxMode: CalcTaxMode;
   taxBreakup: CalcTaxBreakup;
   items: CalcLineItemInput[];
-  shippingCharge?: number | string;
-  miscCharge?: number | string;
+  /** Shipping — a flat amount, or a % of the taxable base. Defaults to FIXED/0. */
+  shippingType?: CalcChargeType;
+  shippingValue?: number | string;
+  /** Any number of independent named charges (Packaging, Handling, Insurance, ...), each Fixed or Percent. */
+  additionalCharges?: CalcAdditionalChargeInput[];
   additionalDiscount?: number | string;
   /** Round grandTotal to the nearest whole currency unit. Defaults to true. */
   applyRoundOff?: boolean;
@@ -51,7 +68,12 @@ export interface CalcInvoiceResult {
   sgstTotal: string;
   igstTotal: string;
   taxTotal: string;
+  shippingType: CalcChargeType;
+  shippingValue: string;
   shippingCharge: string;
+  additionalCharges: CalcAdditionalChargeResult[];
+  additionalChargesTotal: string;
+  /** Deprecated — always "0.00" for anything computed by this function going forward. Kept only so legacy callers reading `.miscCharge` off a fresh calc result don't break; historical persisted rows keep their real stored value untouched. */
   miscCharge: string;
   additionalDiscount: string;
   roundOff: string;
@@ -124,6 +146,18 @@ function calculateLineItem(
   };
 }
 
+/** A Fixed amount is used as-is; a Percent is computed against `base` (the taxable amount). */
+function calculateCharge(
+  type: CalcChargeType | undefined,
+  value: number | string | undefined,
+  base: Decimal
+): { type: CalcChargeType; value: string; amount: Decimal } {
+  const resolvedType = type ?? "FIXED";
+  const resolvedValue = d(value);
+  const amount = resolvedType === "PERCENT" ? money(base.mul(resolvedValue).div(100)) : money(resolvedValue);
+  return { type: resolvedType, value: resolvedValue.toString(), amount };
+}
+
 export function calculateInvoiceTotals(input: CalcInvoiceInput): CalcInvoiceResult {
   const items = input.items.map((item) =>
     calculateLineItem(item, input.taxMode, input.taxBreakup)
@@ -140,15 +174,24 @@ export function calculateInvoiceTotals(input: CalcInvoiceInput): CalcInvoiceResu
   const igstTotal = sum(items.map((i) => i.igstAmount));
   const taxTotal = sum(items.map((i) => i.taxAmount));
 
-  const shippingCharge = money(d(input.shippingCharge));
-  const miscCharge = money(d(input.miscCharge));
+  // Percent-based Shipping/Additional Charges are computed against the
+  // taxable amount (post item-discount, pre-tax base) — the same base GST
+  // itself is computed on.
+  const shipping = calculateCharge(input.shippingType, input.shippingValue, taxableAmount);
+
+  const additionalCharges = (input.additionalCharges ?? []).map((c) => {
+    const computed = calculateCharge(c.type, c.value, taxableAmount);
+    return { name: c.name, type: computed.type, value: computed.value, amount: moneyStr(computed.amount) };
+  });
+  const additionalChargesTotal = additionalCharges.reduce((acc, c) => acc.plus(d(c.amount)), ZERO);
+
   const additionalDiscount = money(d(input.additionalDiscount));
 
   const grandTotalPreRound = money(
     taxableAmount
       .plus(taxTotal)
-      .plus(shippingCharge)
-      .plus(miscCharge)
+      .plus(shipping.amount)
+      .plus(additionalChargesTotal)
       .minus(additionalDiscount)
   );
 
@@ -168,8 +211,12 @@ export function calculateInvoiceTotals(input: CalcInvoiceInput): CalcInvoiceResu
     sgstTotal: moneyStr(sgstTotal),
     igstTotal: moneyStr(igstTotal),
     taxTotal: moneyStr(taxTotal),
-    shippingCharge: moneyStr(shippingCharge),
-    miscCharge: moneyStr(miscCharge),
+    shippingType: shipping.type,
+    shippingValue: shipping.value,
+    shippingCharge: moneyStr(shipping.amount),
+    additionalCharges,
+    additionalChargesTotal: moneyStr(additionalChargesTotal),
+    miscCharge: "0.00",
     additionalDiscount: moneyStr(additionalDiscount),
     roundOff: moneyStr(roundOff),
     grandTotal: moneyStr(grandTotal),

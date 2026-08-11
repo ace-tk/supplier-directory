@@ -16,8 +16,11 @@ const CATEGORY_VALUES = [
 export const expenseFormSchema = z.object({
   occurredAt: z.string().min(1, "Date is required"),
   location: z.string().optional(),
+  locationLat: z.number().nullish(),
+  locationLng: z.number().nullish(),
   category: z.enum(CATEGORY_VALUES).default("MISCELLANEOUS"),
   customCategoryLabel: z.string().optional(),
+  customCategoryId: z.string().nullish(),
   amount: z
     .string()
     .trim()

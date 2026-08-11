@@ -13,13 +13,23 @@ import type { ExpenseCategory } from "@/types/expense";
 // of truth rather than inventing a new list just for import.
 const SUPPORTED_CURRENCIES = ["INR", "USD", "EUR", "GBP"];
 
-function resolveCategory(text: string): ExpenseCategory | "INVALID" {
-  if (!text.trim()) return "MISCELLANEOUS";
+/**
+ * Resolves against system categories first, then the owner's existing
+ * custom categories — an unmatched name is always flagged for review, never
+ * silently turned into a new custom category during import.
+ */
+function resolveCategory(
+  text: string,
+  customCategories: { id: string; name: string }[]
+): { category: ExpenseCategory; customCategoryId: string | null } | "INVALID" {
+  if (!text.trim()) return { category: "MISCELLANEOUS", customCategoryId: null };
   const needle = text.trim().toLowerCase();
   const byKey = EXPENSE_CATEGORY_OPTIONS.find((c) => c.toLowerCase() === needle || c.toLowerCase() === needle.replace(/\s+/g, "_"));
-  if (byKey) return byKey;
+  if (byKey) return { category: byKey, customCategoryId: null };
   const byLabel = EXPENSE_CATEGORY_OPTIONS.find((c) => EXPENSE_CATEGORY_LABELS[c].toLowerCase() === needle);
-  if (byLabel) return byLabel;
+  if (byLabel) return { category: byLabel, customCategoryId: null };
+  const customMatch = customCategories.find((c) => c.name.toLowerCase() === needle);
+  if (customMatch) return { category: "OTHER", customCategoryId: customMatch.id };
   return "INVALID";
 }
 
@@ -58,14 +68,19 @@ export async function validateExpenseImportRows(ownerId: string, rawRows: Expens
   );
   const invoiceIndex = new Map(invoiceLookups);
 
+  const customCategories = await db.expenseCustomCategory.findMany({
+    where: { ownerId },
+    select: { id: true, name: true },
+  });
+
   return rawRows.map((row): ExpenseImportRowResult => {
     const errors: string[] = [];
 
     const occurredAt = resolveDate(row.date, row.time);
     if (!occurredAt) errors.push("Invalid or missing date.");
 
-    const category = resolveCategory(row.category);
-    if (category === "INVALID") errors.push(`Invalid category "${row.category}".`);
+    const category = resolveCategory(row.category, customCategories);
+    if (category === "INVALID") errors.push(`Unknown category "${row.category}" — create it in Expenses first, then re-import.`);
 
     const amountNum = Number(row.amount);
     const amountValid = row.amount.trim() !== "" && Number.isFinite(amountNum) && amountNum >= 0;
@@ -110,7 +125,8 @@ export async function validateExpenseImportRows(ownerId: string, rawRows: Expens
       resolved: {
         occurredAt,
         location: row.location.trim(),
-        category: category === "INVALID" ? null : category,
+        category: category === "INVALID" ? null : category.category,
+        customCategoryId: category === "INVALID" ? null : category.customCategoryId,
         amount: amountValid ? amountNum.toFixed(2) : null,
         currency: currencyValid ? currency : null,
         notes: row.notes.trim(),

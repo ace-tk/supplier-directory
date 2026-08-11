@@ -151,8 +151,14 @@ export function buildInvoicePdf(props: InvoicePreviewProps): jsPDF {
   } else {
     totalsRows.push(["Tax (GST)", money(props.totals.taxTotal)]);
   }
-  if (Number(props.totals.shippingCharge) > 0) totalsRows.push(["Shipping", money(props.totals.shippingCharge)]);
-  if (Number(props.totals.miscCharge) > 0) totalsRows.push([props.miscChargeLabel || "Misc. Charges", money(props.totals.miscCharge)]);
+  if (Number(props.totals.shippingCharge) > 0) {
+    const shippingLabel = props.totals.shippingType === "PERCENT" ? `Shipping (${props.totals.shippingValue}%)` : "Shipping";
+    totalsRows.push([shippingLabel, money(props.totals.shippingCharge)]);
+  }
+  for (const c of props.additionalCharges) {
+    const label = c.type === "PERCENT" ? `${c.name} (${c.value}%)` : c.name;
+    totalsRows.push([label, money(c.amount)]);
+  }
   if (Number(props.totals.additionalDiscount) > 0)
     totalsRows.push(["Additional Discount", `- ${money(props.totals.additionalDiscount)}`]);
   if (Number(props.totals.roundOff) !== 0) totalsRows.push(["Round Off", money(props.totals.roundOff)]);
@@ -197,6 +203,33 @@ export function buildInvoicePdf(props: InvoicePreviewProps): jsPDF {
     finalY += 5;
     const lines = doc.splitTextToSize(props.termsAndConditions, 180);
     doc.text(lines, marginX, finalY);
+    finalY += lines.length * 4.5;
+  }
+
+  const bankRows: [string, string][] = [
+    ["Account Holder", props.bankAccountHolder],
+    ["Bank Name", props.bankName],
+    ["Account Number", props.bankAccountNumber],
+    ["IFSC Code", props.bankIfscCode],
+    ["Branch", props.bankBranch],
+    ["UPI ID", props.bankUpiId],
+  ].filter((r): r is [string, string] => Boolean(r[1]));
+
+  if (bankRows.length > 0 || props.bankPaymentInstructions) {
+    finalY += 8;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("Banking Details", marginX, finalY);
+    doc.setFont("helvetica", "normal");
+    finalY += 5;
+    for (const [label, value] of bankRows) {
+      doc.text(`${label}: ${value}`, marginX, finalY);
+      finalY += 4.5;
+    }
+    if (props.bankPaymentInstructions) {
+      const lines = doc.splitTextToSize(props.bankPaymentInstructions, 180);
+      doc.text(lines, marginX, finalY);
+    }
   }
 
   return doc;

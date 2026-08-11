@@ -52,8 +52,9 @@ function buildCalcInput(d: InvoiceFormValues) {
       discountPercent: it.discountPercent,
       taxPercent: it.taxPercent,
     })),
-    shippingCharge: d.shippingCharge,
-    miscCharge: d.miscCharge,
+    shippingType: d.shippingType,
+    shippingValue: d.shippingValue,
+    additionalCharges: d.additionalCharges,
     additionalDiscount: d.additionalDiscount,
   };
 }
@@ -94,9 +95,9 @@ function buildInvoiceData(d: InvoiceFormValues, calc: ReturnType<typeof calculat
     sgstTotal: calc.sgstTotal,
     igstTotal: calc.igstTotal,
     taxTotal: calc.taxTotal,
+    shippingType: calc.shippingType,
+    shippingValue: calc.shippingValue,
     shippingCharge: calc.shippingCharge,
-    miscCharge: calc.miscCharge,
-    miscChargeLabel: d.miscChargeLabel?.trim() || null,
     additionalDiscount: calc.additionalDiscount,
     roundOff: calc.roundOff,
     grandTotal: calc.grandTotal,
@@ -104,8 +105,26 @@ function buildInvoiceData(d: InvoiceFormValues, calc: ReturnType<typeof calculat
     customerNotes: d.customerNotes?.trim() || null,
     termsAndConditions: d.termsAndConditions?.trim() || null,
 
+    bankAccountHolder: d.bankAccountHolder?.trim() || null,
+    bankName: d.bankName?.trim() || null,
+    bankAccountNumber: d.bankAccountNumber?.trim() || null,
+    bankIfscCode: d.bankIfscCode?.trim() || null,
+    bankBranch: d.bankBranch?.trim() || null,
+    bankUpiId: d.bankUpiId?.trim() || null,
+    bankPaymentInstructions: d.bankPaymentInstructions?.trim() || null,
+
     reason: d.reason ?? null,
   };
+}
+
+function buildAdditionalChargesData(charges: InvoiceFormValues["additionalCharges"], calc: ReturnType<typeof calculateInvoiceTotals>) {
+  return charges.map((c, i) => ({
+    name: c.name.trim(),
+    type: c.type,
+    value: calc.additionalCharges[i]?.value ?? c.value,
+    amount: calc.additionalCharges[i]?.amount ?? "0",
+    order: i,
+  }));
 }
 
 function buildItemsData(items: InvoiceItemInputValues[], calc: ReturnType<typeof calculateInvoiceTotals>) {
@@ -376,6 +395,7 @@ export async function createInvoiceAction(input: InvoiceFormValues): Promise<Inv
           ownerId: user.id,
           sourceInvoiceId: d.sourceInvoiceId || null,
           items: { create: buildItemsData(d.items, calc) },
+          additionalCharges: { create: buildAdditionalChargesData(d.additionalCharges, calc) },
         },
         select: { id: true },
       });
@@ -437,6 +457,7 @@ export async function updateInvoiceAction(
           ...buildInvoiceData(d, calc),
           invoiceNumber: d.invoiceNumber.trim(),
           items: { deleteMany: {}, create: buildItemsData(d.items, calc) },
+          additionalCharges: { deleteMany: {}, create: buildAdditionalChargesData(d.additionalCharges, calc) },
         },
       });
       await logInvoiceActivity(id, "UPDATED", "Invoice details updated.", user.id, tx);
@@ -452,7 +473,10 @@ export async function duplicateInvoiceAction(id: string): Promise<InvoiceActionR
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
 
-  const existing = await db.invoice.findUnique({ where: { id }, include: { items: { orderBy: { order: "asc" } } } });
+  const existing = await db.invoice.findUnique({
+    where: { id },
+    include: { items: { orderBy: { order: "asc" } }, additionalCharges: { orderBy: { order: "asc" } } },
+  });
   if (!existing) return { success: false, error: "Invoice not found." };
   const access = resolveInvoiceAccess({ userId: user.id, invoice: existing });
   if (!access.canDuplicate) return { success: false, error: "Invoice not found." };
@@ -498,6 +522,8 @@ export async function duplicateInvoiceAction(id: string): Promise<InvoiceActionR
       sgstTotal: existing.sgstTotal,
       igstTotal: existing.igstTotal,
       taxTotal: existing.taxTotal,
+      shippingType: existing.shippingType,
+      shippingValue: existing.shippingValue,
       shippingCharge: existing.shippingCharge,
       miscCharge: existing.miscCharge,
       miscChargeLabel: existing.miscChargeLabel,
@@ -507,6 +533,24 @@ export async function duplicateInvoiceAction(id: string): Promise<InvoiceActionR
 
       customerNotes: existing.customerNotes,
       termsAndConditions: existing.termsAndConditions,
+
+      bankAccountHolder: existing.bankAccountHolder,
+      bankName: existing.bankName,
+      bankAccountNumber: existing.bankAccountNumber,
+      bankIfscCode: existing.bankIfscCode,
+      bankBranch: existing.bankBranch,
+      bankUpiId: existing.bankUpiId,
+      bankPaymentInstructions: existing.bankPaymentInstructions,
+
+      additionalCharges: {
+        create: existing.additionalCharges.map((c) => ({
+          name: c.name,
+          type: c.type,
+          value: c.value,
+          amount: c.amount,
+          order: c.order,
+        })),
+      },
 
       items: {
         create: existing.items.map((it) => ({

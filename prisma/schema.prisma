@@ -57,8 +57,9 @@ model User {
   invoiceActivity      InvoiceActivity[]
   invoiceCounters      InvoiceCounter[]
 
-  ownedExpenses Expense[] @relation("ExpenseOwner")
-  expenseParty  Expense[] @relation("ExpenseParty")
+  ownedExpenses           Expense[]                @relation("ExpenseOwner")
+  expenseParty            Expense[]                @relation("ExpenseParty")
+  expenseCustomCategories ExpenseCustomCategory[]   @relation("ExpenseCustomCategoryOwner")
 
   @@index([email])
 }
@@ -1098,6 +1099,12 @@ enum InvoiceTaxBreakup {
   IGST
 }
 
+/** Shared by Shipping and each Additional Charge row — either a flat amount or a % of the taxable base. */
+enum ChargeType {
+  FIXED
+  PERCENT
+}
+
 // Per-owner, per-type, per-year atomic sequence powering INV-2026-0001 /
 // PUR-2026-0001 numbering (see lib/invoicing/numbering.ts).
 model InvoiceCounter {
@@ -1166,15 +1173,42 @@ model Invoice {
   sgstTotal          Decimal @db.Decimal(14, 2) @default(0)
   igstTotal          Decimal @db.Decimal(14, 2) @default(0)
   taxTotal           Decimal @db.Decimal(14, 2) @default(0)
-  shippingCharge     Decimal @db.Decimal(14, 2) @default(0)
-  miscCharge         Decimal @db.Decimal(14, 2) @default(0)
-  miscChargeLabel    String?
+
+  // Shipping — either a flat amount or a % of the taxable base.
+  // shippingCharge is always the server-recalculated *computed* amount
+  // (existing field, unchanged); shippingType/shippingValue record how it
+  // was entered so the editor/preview can round-trip "5%" rather than just
+  // a flat number. Rows saved before this feature default to
+  // FIXED/0 — see lib/invoicing/calc.ts's legacy fallback.
+  shippingType   ChargeType @default(FIXED)
+  shippingValue  Decimal    @db.Decimal(10, 2) @default(0)
+  shippingCharge Decimal    @db.Decimal(14, 2) @default(0)
+
+  // Deprecated single-row "misc charge" — kept for historical rows only.
+  // New saves use the additionalCharges relation instead; never written by
+  // current code, but never dropped so old invoices keep rendering as-is.
+  miscCharge      Decimal @db.Decimal(14, 2) @default(0)
+  miscChargeLabel String?
+
+  additionalCharges InvoiceAdditionalCharge[]
+
   additionalDiscount Decimal @db.Decimal(14, 2) @default(0)
   roundOff           Decimal @db.Decimal(6, 2)  @default(0)
   grandTotal         Decimal @db.Decimal(14, 2) @default(0)
 
   customerNotes      String? @db.Text
   termsAndConditions String? @db.Text
+
+  // ── Banking details — optional, shown only when at least one field is
+  // set. No organization-level banking profile exists yet, so these are
+  // captured per-invoice, same pattern as the seller snapshot fields above. ──
+  bankAccountHolder       String?
+  bankName                String?
+  bankAccountNumber       String?
+  bankIfscCode            String?
+  bankBranch              String?
+  bankUpiId               String?
+  bankPaymentInstructions String? @db.Text
 
   // Only set on CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE documents.
   reason InvoiceReason?
@@ -1271,6 +1305,24 @@ model InvoiceItem {
   @@index([catalogRowId])
 }
 
+/** One row per "Additional Charge" (Packaging, Handling, Insurance, ...) —
+ * unlike the single legacy miscCharge field, an invoice can have any
+ * number of these, each independently Fixed or Percent. */
+model InvoiceAdditionalCharge {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  name   String
+  type   ChargeType
+  value  Decimal    @db.Decimal(10, 2) @default(0) // as entered — a flat amount or a percent
+  amount Decimal    @db.Decimal(14, 2) @default(0) // server-recalculated computed amount
+
+  order Int @default(0)
+
+  @@index([invoiceId])
+}
+
 // ─── Expenses ───────────────────────────────────────────────────────────
 // Deliberately separate from InvoiceItem — expenses are operational costs
 // (shipping, travel, samples, ...), not sales/purchase line items, and are
@@ -1289,19 +1341,51 @@ enum ExpenseCategory {
   OTHER
 }
 
+/** User-created categories beyond the fixed system set — deliberately a
+ * table, not an enum edit, so adding one never needs a schema change.
+ * An Expense using a custom category still stores category=OTHER (so any
+ * code only aware of the enum keeps working) plus a link here for the
+ * real name/identity. */
+model ExpenseCustomCategory {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("ExpenseCustomCategoryOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String
+
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+
+  @@unique([ownerId, name])
+  @@index([ownerId])
+}
+
 model Expense {
   id      String @id @default(cuid())
   ownerId String
   owner   User   @relation("ExpenseOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   // Combined date+time — split into two inputs client-side, stored as one.
-  occurredAt          DateTime
-  location            String?
+  occurredAt DateTime
+  location   String?
+  // Set only when "Pin My Location" resolved real GPS coordinates — the
+  // editable `location` label above is always the source of truth for
+  // display; these are additional, optional precision data.
+  locationLat         Float?
+  locationLng         Float?
   category            ExpenseCategory @default(MISCELLANEOUS)
   customCategoryLabel String? // used when category == OTHER
-  amount              Decimal         @db.Decimal(14, 2)
-  currency            String          @default("INR")
-  notes               String?         @db.Text
+
+  // Set only when the user picked a saved custom category (see
+  // ExpenseCustomCategory above) rather than typing a one-off OTHER label.
+  // customCategoryLabel is still populated in that case too (kept in sync
+  // at save time) so existing display code needs no changes.
+  customCategoryId String?
+  customCategory   ExpenseCustomCategory? @relation(fields: [customCategoryId], references: [id], onDelete: SetNull)
+
+  amount   Decimal @db.Decimal(14, 2)
+  currency String  @default("INR")
+  notes    String? @db.Text
 
   // Optional Buyer/Supplier this expense relates to — reuses the existing
   // platform-account directory, same as an Invoice's party.

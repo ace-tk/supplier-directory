@@ -42,10 +42,15 @@ const paymentsInclude = {
   // array for every other document type.
   derivedDocuments: { where: { type: "SALES" as const }, select: { id: true, invoiceNumber: true }, take: 1 },
 } as const;
-const itemsInclude = { items: { orderBy: { order: "asc" as const } }, ...paymentsInclude };
+const itemsInclude = {
+  items: { orderBy: { order: "asc" as const } },
+  additionalCharges: { orderBy: { order: "asc" as const } },
+  ...paymentsInclude,
+};
 
 type InvoiceRow = NonNullable<Awaited<ReturnType<typeof fetchInvoiceRaw>>>;
 type InvoiceItemRow = InvoiceRow["items"][number];
+type InvoiceAdditionalChargeRow = InvoiceRow["additionalCharges"][number];
 type InvoiceSummaryRow = Awaited<ReturnType<typeof fetchSummaryRowsRaw>>[number];
 
 function fetchInvoiceRaw(id: string) {
@@ -72,6 +77,17 @@ function mapItem(item: InvoiceItemRow): InvoiceItemRecord {
     taxAmount: dec(item.taxAmount),
     lineTotal: dec(item.lineTotal),
     order: item.order,
+  };
+}
+
+function mapAdditionalCharge(charge: InvoiceAdditionalChargeRow) {
+  return {
+    id: charge.id,
+    name: charge.name,
+    type: charge.type,
+    value: dec(charge.value),
+    amount: dec(charge.amount),
+    order: charge.order,
   };
 }
 
@@ -139,7 +155,11 @@ function mapSummary(inv: InvoiceSummaryRow): InvoiceSummary {
     sgstTotal: dec(inv.sgstTotal),
     igstTotal: dec(inv.igstTotal),
     taxTotal: dec(inv.taxTotal),
+
+    shippingType: inv.shippingType,
+    shippingValue: dec(inv.shippingValue),
     shippingCharge: dec(inv.shippingCharge),
+
     miscCharge: dec(inv.miscCharge),
     miscChargeLabel: inv.miscChargeLabel,
     additionalDiscount: dec(inv.additionalDiscount),
@@ -148,6 +168,14 @@ function mapSummary(inv: InvoiceSummaryRow): InvoiceSummary {
 
     customerNotes: inv.customerNotes,
     termsAndConditions: inv.termsAndConditions,
+
+    bankAccountHolder: inv.bankAccountHolder,
+    bankName: inv.bankName,
+    bankAccountNumber: inv.bankAccountNumber,
+    bankIfscCode: inv.bankIfscCode,
+    bankBranch: inv.bankBranch,
+    bankUpiId: inv.bankUpiId,
+    bankPaymentInstructions: inv.bankPaymentInstructions,
 
     reason: inv.reason,
     sourceInvoiceId: inv.sourceInvoiceId,
@@ -166,7 +194,7 @@ function mapSummary(inv: InvoiceSummaryRow): InvoiceSummary {
 }
 
 function mapInvoice(inv: InvoiceRow): InvoiceRecord {
-  return { ...mapSummary(inv), items: inv.items.map(mapItem) };
+  return { ...mapSummary(inv), items: inv.items.map(mapItem), additionalCharges: inv.additionalCharges.map(mapAdditionalCharge) };
 }
 
 export async function getInvoiceById(id: string): Promise<InvoiceRecord | null> {

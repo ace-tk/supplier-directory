@@ -12,6 +12,7 @@ function dec(value: { toString(): string } | null | undefined): string {
 const expenseInclude = {
   partyUser: { select: { name: true, buyer: { select: { companyName: true } }, supplier: { select: { companyName: true } } } },
   relatedInvoice: { select: { invoiceNumber: true } },
+  customCategory: { select: { id: true, name: true } },
 };
 
 type ExpenseRow = Awaited<ReturnType<typeof db.expense.findMany<{ where: { ownerId: string }; include: typeof expenseInclude }>>>[number];
@@ -23,8 +24,11 @@ function mapExpense(e: ExpenseRow): ExpenseRecord {
 
     occurredAt: e.occurredAt.toISOString(),
     location: e.location,
+    locationLat: e.locationLat,
+    locationLng: e.locationLng,
     category: e.category,
-    customCategoryLabel: e.customCategoryLabel,
+    customCategoryLabel: e.customCategory?.name ?? e.customCategoryLabel,
+    customCategoryId: e.customCategoryId,
     amount: dec(e.amount),
     currency: e.currency,
     notes: e.notes,

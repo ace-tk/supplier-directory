@@ -10,6 +10,10 @@ interface SpeechRecognitionEventLike extends Event {
   results: ArrayLike<SpeechRecognitionResultLike>;
 }
 
+interface SpeechRecognitionErrorEventLike extends Event {
+  error: string;
+}
+
 interface SpeechRecognitionInstance extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
@@ -18,7 +22,7 @@ interface SpeechRecognitionInstance extends EventTarget {
   stop: () => void;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
 }
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
@@ -36,6 +40,7 @@ interface UseSpeechRecognitionOptions {
 
 export function useSpeechRecognition({ onResult }: UseSpeechRecognitionOptions) {
   const [isListening, setIsListening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isSupported] = useState(() => {
     if (typeof window === "undefined") return false;
     return !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
@@ -63,7 +68,10 @@ export function useSpeechRecognition({ onResult }: UseSpeechRecognitionOptions) 
       onResultRef.current(transcript);
     };
     recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
+    recognition.onerror = (event) => {
+      setIsListening(false);
+      setError(event.error || "Voice input failed");
+    };
     recognitionRef.current = recognition;
 
     return () => {
@@ -73,6 +81,7 @@ export function useSpeechRecognition({ onResult }: UseSpeechRecognitionOptions) 
 
   const start = useCallback(() => {
     if (!recognitionRef.current) return;
+    setError(null);
     try {
       recognitionRef.current.start();
       setIsListening(true);
@@ -86,5 +95,5 @@ export function useSpeechRecognition({ onResult }: UseSpeechRecognitionOptions) 
     setIsListening(false);
   }, []);
 
-  return { isListening, isSupported, start, stop };
+  return { isListening, isSupported, error, start, stop };
 }

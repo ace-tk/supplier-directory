@@ -24,6 +24,7 @@ import {
 import { listExpensesAction, deleteExpenseAction } from "@/services/expenses";
 import { EXPENSE_CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from "@/lib/expenses/ui";
 import { formatMoney, formatShortDate } from "@/lib/invoicing/ui";
+import { CategoryBadge } from "./CategoryBadge";
 import type { ExpenseRecord, ExpenseCategory } from "@/types/expense";
 
 export function ExpensesList({ basePath }: { basePath: string }) {
@@ -48,9 +49,25 @@ export function ExpensesList({ basePath }: { basePath: string }) {
     refresh();
   }, []);
 
+  const customCategoryOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const e of expenses) {
+      if (e.customCategoryId && e.customCategoryLabel) seen.set(e.customCategoryId, e.customCategoryLabel);
+    }
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [expenses]);
+
   const filtered = useMemo(() => {
     return expenses.filter((e) => {
-      if (categoryFilter !== "All" && e.category !== categoryFilter) return false;
+      if (categoryFilter !== "All") {
+        if (categoryFilter.startsWith("custom:")) {
+          if (e.customCategoryId !== categoryFilter.slice(7)) return false;
+        } else if (categoryFilter === "OTHER") {
+          if (e.category !== "OTHER" || e.customCategoryId) return false;
+        } else if (e.category !== categoryFilter) {
+          return false;
+        }
+      }
       if (dateFrom && e.occurredAt < dateFrom) return false;
       if (dateTo && e.occurredAt.slice(0, 10) > dateTo) return false;
       if (search) {
@@ -81,7 +98,13 @@ export function ExpensesList({ basePath }: { basePath: string }) {
 
   const columns: RecordColumn<ExpenseRecord>[] = [
     { key: "date", label: "Date", render: (e) => formatShortDate(e.occurredAt) },
-    { key: "category", label: "Category", render: (e) => (e.category === "OTHER" && e.customCategoryLabel ? e.customCategoryLabel : EXPENSE_CATEGORY_LABELS[e.category]) },
+    {
+      key: "category",
+      label: "Category",
+      render: (e) => (
+        <CategoryBadge category={e.category} customCategoryId={e.customCategoryId} customCategoryLabel={e.customCategoryLabel} />
+      ),
+    },
     { key: "location", label: "Location", render: (e) => e.location || "—" },
     { key: "party", label: "Party", render: (e) => e.partyName || "—" },
     {
@@ -181,6 +204,11 @@ export function ExpensesList({ basePath }: { basePath: string }) {
               {EXPENSE_CATEGORY_OPTIONS.map((c: ExpenseCategory) => (
                 <SelectItem key={c} value={c}>
                   {EXPENSE_CATEGORY_LABELS[c]}
+                </SelectItem>
+              ))}
+              {customCategoryOptions.map(([id, name]) => (
+                <SelectItem key={id} value={`custom:${id}`}>
+                  {name}
                 </SelectItem>
               ))}
             </SelectContent>

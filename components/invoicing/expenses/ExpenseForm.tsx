@@ -3,22 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Paperclip, X, Check, ChevronsUpDown, Search, Save } from "lucide-react";
+import { ArrowLeft, Loader2, Paperclip, Camera, X, Check, ChevronsUpDown, Search, Save } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList, CommandInput } from "@/components/ui/command";
 import { ExpenseNotesField } from "./ExpenseNotesField";
+import { CategoryPicker } from "./CategoryPicker";
+import { LocationField } from "./LocationField";
 import {
   createExpenseAction,
   updateExpenseAction,
   getExpensePartyOptionsAction,
   getExpenseInvoiceOptionsAction,
 } from "@/services/expenses";
-import { EXPENSE_CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from "@/lib/expenses/ui";
 import { cn } from "@/lib/utils";
 import type { ExpenseRecord, ExpenseCategory, InvoiceOption } from "@/types/expense";
 import type { DirectoryOption } from "@/types/invoicing";
@@ -27,7 +27,10 @@ interface FormState {
   date: string;
   time: string;
   location: string;
+  locationLat: number | null;
+  locationLng: number | null;
   category: ExpenseCategory;
+  customCategoryId: string | null;
   customCategoryLabel: string;
   amount: string;
   currency: string;
@@ -46,7 +49,10 @@ function formFromExpense(expense: ExpenseRecord | null): FormState {
     date: occurred.toISOString().slice(0, 10),
     time: expense ? occurred.toISOString().slice(11, 16) : "",
     location: expense?.location ?? "",
+    locationLat: expense?.locationLat ?? null,
+    locationLng: expense?.locationLng ?? null,
     category: expense?.category ?? "MISCELLANEOUS",
+    customCategoryId: expense?.customCategoryId ?? null,
     customCategoryLabel: expense?.customCategoryLabel ?? "",
     amount: expense?.amount ?? "0",
     currency: expense?.currency ?? "INR",
@@ -122,7 +128,10 @@ export function ExpenseForm({ basePath, expense }: { basePath: string; expense: 
     const payload = {
       occurredAt: new Date(`${form.date}T${form.time || "00:00"}`).toISOString(),
       location: form.location,
+      locationLat: form.locationLat,
+      locationLng: form.locationLng,
       category: form.category,
+      customCategoryId: form.customCategoryId,
       customCategoryLabel: form.customCategoryLabel,
       amount: form.amount,
       currency: form.currency,
@@ -178,25 +187,17 @@ export function ExpenseForm({ basePath, expense }: { basePath: string; expense: 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Category</Label>
-            <Select value={form.category} onValueChange={(v) => v && patch({ category: v as ExpenseCategory })}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EXPENSE_CATEGORY_OPTIONS.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {EXPENSE_CATEGORY_LABELS[c]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CategoryPicker
+              value={{ category: form.category, customCategoryId: form.customCategoryId, customCategoryLabel: form.customCategoryLabel }}
+              onChange={(v) => patch({ category: v.category, customCategoryId: v.customCategoryId, customCategoryLabel: v.customCategoryLabel })}
+            />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Location</Label>
-            <Input value={form.location} onChange={(e) => patch({ location: e.target.value })} placeholder="Optional" />
-          </div>
+          <LocationField
+            value={{ location: form.location, locationLat: form.locationLat, locationLng: form.locationLng }}
+            onChange={(v) => patch(v)}
+          />
         </div>
-        {form.category === "OTHER" && (
+        {form.category === "OTHER" && !form.customCategoryId && (
           <div className="space-y-1.5">
             <Label className="text-xs">Custom Category Label</Label>
             <Input value={form.customCategoryLabel} onChange={(e) => patch({ customCategoryLabel: e.target.value })} />
@@ -327,11 +328,25 @@ export function ExpenseForm({ basePath, expense }: { basePath: string; expense: 
             </button>
           </div>
         ) : (
-          <label className="flex items-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer w-fit">
-            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-            {uploading ? "Uploading..." : "Attach a file"}
-            <input type="file" className="hidden" onChange={handleAttachment} disabled={uploading} />
-          </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="flex items-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer w-fit">
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+              {uploading ? "Uploading..." : "Attach File"}
+              <input type="file" className="hidden" onChange={handleAttachment} disabled={uploading} />
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer w-fit">
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+              {uploading ? "Uploading..." : "Scan"}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleAttachment}
+                disabled={uploading}
+              />
+            </label>
+          </div>
         )}
       </div>
 

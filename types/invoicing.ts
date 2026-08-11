@@ -5,9 +5,19 @@ import type {
   InvoiceTaxBreakup,
   InvoiceReason,
   PaymentMethod,
+  ChargeType,
 } from "@/lib/generated/prisma/enums";
 
-export type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, PaymentMethod };
+export type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, PaymentMethod, ChargeType };
+
+export interface InvoiceAdditionalChargeRecord {
+  id: string;
+  name: string;
+  type: ChargeType;
+  value: string;
+  amount: string;
+  order: number;
+}
 
 export interface InvoiceItemRecord {
   id: string;
@@ -66,15 +76,31 @@ export interface InvoiceRecord {
   sgstTotal: string;
   igstTotal: string;
   taxTotal: string;
+
+  shippingType: ChargeType;
+  shippingValue: string;
   shippingCharge: string;
+  additionalCharges: InvoiceAdditionalChargeRecord[];
+
+  /** Deprecated — real for historical rows saved before Additional Charges existed; always 0/null on anything saved by current code. */
   miscCharge: string;
   miscChargeLabel: string | null;
+
   additionalDiscount: string;
   roundOff: string;
   grandTotal: string;
 
   customerNotes: string | null;
   termsAndConditions: string | null;
+
+  // Optional — omitted from the preview/PDF entirely when every field is empty.
+  bankAccountHolder: string | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankIfscCode: string | null;
+  bankBranch: string | null;
+  bankUpiId: string | null;
+  bankPaymentInstructions: string | null;
 
   // Only set on CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE documents.
   reason: InvoiceReason | null;
@@ -102,8 +128,8 @@ export interface InvoiceRecord {
   isOverdue: boolean;
 }
 
-/** Lightweight shape for list/dashboard views — no line items. */
-export type InvoiceSummary = Omit<InvoiceRecord, "items">;
+/** Lightweight shape for list/dashboard views — no line items or charge breakdown. */
+export type InvoiceSummary = Omit<InvoiceRecord, "items" | "additionalCharges">;
 
 export interface InvoiceListFilter {
   /** All document types to include — an InvoiceList shows a whole family (e.g. Tax Invoice + Quotation + Credit Note + Sales Return under Sales). */

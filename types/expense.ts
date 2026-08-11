@@ -8,8 +8,11 @@ export interface ExpenseRecord {
 
   occurredAt: string;
   location: string | null;
+  locationLat: number | null;
+  locationLng: number | null;
   category: ExpenseCategory;
   customCategoryLabel: string | null;
+  customCategoryId: string | null;
   amount: string;
   currency: string;
   notes: string | null;
@@ -35,11 +38,19 @@ export interface ExpenseListFilter {
   partyUserId?: string;
 }
 
+export interface ExpenseCustomCategoryOption {
+  id: string;
+  name: string;
+}
+
 export interface ExpenseFormInput {
   occurredAt: string;
   location?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
   category: ExpenseCategory;
   customCategoryLabel?: string;
+  customCategoryId?: string | null;
   amount: string;
   currency: string;
   notes?: string;

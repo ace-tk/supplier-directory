@@ -180,7 +180,11 @@ export function ExpenseImportPage({ basePath }: { basePath: string }) {
                         {row.resolved.occurredAt ? formatShortDate(row.resolved.occurredAt) : row.raw.date || "—"}
                       </td>
                       <td className="px-3 py-2 align-top">
-                        {row.resolved.category ? EXPENSE_CATEGORY_LABELS[row.resolved.category] : row.raw.category || "—"}
+                        {row.resolved.customCategoryId
+                          ? row.raw.category
+                          : row.resolved.category
+                            ? EXPENSE_CATEGORY_LABELS[row.resolved.category]
+                            : row.raw.category || "—"}
                       </td>
                       <td className="px-3 py-2 align-top text-right tabular-nums">{row.raw.amount || "—"}</td>
                       <td className="px-3 py-2 align-top">{row.resolved.partyLabel || row.raw.party || "—"}</td>

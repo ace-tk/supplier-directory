@@ -1,7 +1,8 @@
-import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceRecord } from "@/types/invoicing";
+import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceRecord, ChargeType } from "@/types/invoicing";
 import { formatMoney, formatQuantity, formatShortDate, INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS } from "@/lib/invoicing/ui";
 import { invoiceFamily } from "@/lib/invoicing/family";
 import { StatusBadge } from "@/components/portal/status-badge";
+import { resolveLegacyShipping, resolveLegacyAdditionalCharges } from "@/lib/invoicing/charges";
 
 export interface InvoicePreviewItem {
   productName: string;
@@ -24,11 +25,20 @@ export interface InvoicePreviewTotals {
   sgstTotal: string;
   igstTotal: string;
   taxTotal: string;
+  shippingType: ChargeType;
+  shippingValue: string;
   shippingCharge: string;
-  miscCharge: string;
+  additionalChargesTotal: string;
   additionalDiscount: string;
   roundOff: string;
   grandTotal: string;
+}
+
+export interface InvoicePreviewCharge {
+  name: string;
+  type: ChargeType;
+  value: string;
+  amount: string;
 }
 
 export interface InvoicePreviewProps {
@@ -61,10 +71,20 @@ export interface InvoicePreviewProps {
 
   items: InvoicePreviewItem[];
   totals: InvoicePreviewTotals;
-  miscChargeLabel?: string | null;
+  additionalCharges: InvoicePreviewCharge[];
 
   customerNotes?: string | null;
   termsAndConditions?: string | null;
+
+  // Optional — the whole Banking Details section is omitted when every
+  // field below is empty.
+  bankAccountHolder?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfscCode?: string | null;
+  bankBranch?: string | null;
+  bankUpiId?: string | null;
+  bankPaymentInstructions?: string | null;
 
   className?: string;
 }
@@ -119,15 +139,30 @@ export function toInvoicePreviewProps(invoice: InvoiceRecord, status: InvoiceSta
       sgstTotal: invoice.sgstTotal,
       igstTotal: invoice.igstTotal,
       taxTotal: invoice.taxTotal,
+      ...resolveLegacyShipping(invoice),
       shippingCharge: invoice.shippingCharge,
-      miscCharge: invoice.miscCharge,
+      additionalChargesTotal: resolveLegacyAdditionalCharges(invoice)
+        .reduce((acc, c) => acc + Number(c.amount), 0)
+        .toFixed(2),
       additionalDiscount: invoice.additionalDiscount,
       roundOff: invoice.roundOff,
       grandTotal: invoice.grandTotal,
     },
-    miscChargeLabel: invoice.miscChargeLabel,
+    additionalCharges: resolveLegacyAdditionalCharges(invoice).map((c) => ({
+      name: c.name,
+      type: c.type,
+      value: c.value,
+      amount: c.amount,
+    })),
     customerNotes: invoice.customerNotes,
     termsAndConditions: invoice.termsAndConditions,
+    bankAccountHolder: invoice.bankAccountHolder,
+    bankName: invoice.bankName,
+    bankAccountNumber: invoice.bankAccountNumber,
+    bankIfscCode: invoice.bankIfscCode,
+    bankBranch: invoice.bankBranch,
+    bankUpiId: invoice.bankUpiId,
+    bankPaymentInstructions: invoice.bankPaymentInstructions,
   };
 }
 
@@ -165,11 +200,22 @@ export function InvoicePreview(props: InvoicePreviewProps) {
     taxBreakup,
     items,
     totals,
-    miscChargeLabel,
+    additionalCharges,
     customerNotes,
     termsAndConditions,
+    bankAccountHolder,
+    bankName,
+    bankAccountNumber,
+    bankIfscCode,
+    bankBranch,
+    bankUpiId,
+    bankPaymentInstructions,
     className,
   } = props;
+
+  const hasBankingDetails = Boolean(
+    bankAccountHolder || bankName || bankAccountNumber || bankIfscCode || bankBranch || bankUpiId || bankPaymentInstructions
+  );
 
   const money = (v: string) => formatMoney(v, currency);
   const partyLabel = invoiceFamily(type) === "SALES" ? "Bill To" : "Bill From";
@@ -320,8 +366,19 @@ export function InvoicePreview(props: InvoicePreviewProps) {
             ) : (
               <Row label="Tax (GST)" value={money(totals.taxTotal)} />
             )}
-            {Number(totals.shippingCharge) > 0 && <Row label="Shipping" value={money(totals.shippingCharge)} />}
-            {Number(totals.miscCharge) > 0 && <Row label={miscChargeLabel || "Misc. Charges"} value={money(totals.miscCharge)} />}
+            {Number(totals.shippingCharge) > 0 && (
+              <Row
+                label={totals.shippingType === "PERCENT" ? `Shipping (${totals.shippingValue}%)` : "Shipping"}
+                value={money(totals.shippingCharge)}
+              />
+            )}
+            {additionalCharges.map((c, i) => (
+              <Row
+                key={i}
+                label={c.type === "PERCENT" ? `${c.name} (${c.value}%)` : c.name}
+                value={money(c.amount)}
+              />
+            ))}
             {Number(totals.additionalDiscount) > 0 && (
               <Row label="Additional Discount" value={`− ${money(totals.additionalDiscount)}`} />
             )}
@@ -347,7 +404,35 @@ export function InvoicePreview(props: InvoicePreviewProps) {
             )}
           </div>
         )}
+
+        {hasBankingDetails && (
+          <div className="rounded-xl bg-muted/40 p-4 text-xs">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Banking Details</p>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
+              {bankAccountHolder && <BankRow label="Account Holder" value={bankAccountHolder} />}
+              {bankName && <BankRow label="Bank Name" value={bankName} />}
+              {bankAccountNumber && <BankRow label="Account Number" value={bankAccountNumber} />}
+              {bankIfscCode && <BankRow label="IFSC Code" value={bankIfscCode} />}
+              {bankBranch && <BankRow label="Branch" value={bankBranch} />}
+              {bankUpiId && <BankRow label="UPI ID" value={bankUpiId} />}
+            </div>
+            {bankPaymentInstructions && (
+              <p className="text-muted-foreground whitespace-pre-line mt-2 pt-2 border-t border-border/60">
+                {bankPaymentInstructions}
+              </p>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function BankRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-foreground font-medium">{value}</span>
     </div>
   );
 }
