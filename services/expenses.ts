@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { expenseFormSchema, type ExpenseFormValues } from "@/lib/validations/expense";
 import { getExpenseById, listExpensesForOwner } from "@/lib/expenses/queries";
+import { validateExpenseImportRows } from "@/lib/expenses/import";
+import { EXPENSE_IMPORT_MAX_ROWS } from "@/lib/expenses/import-types";
 import type {
   ExpenseRecord,
   ExpenseListFilter,
@@ -11,6 +13,7 @@ import type {
   InvoiceOption,
 } from "@/types/expense";
 import type { DirectoryOption } from "@/types/invoicing";
+import type { ExpenseImportRawRow, ExpenseImportRowResult, ExpenseImportSummary } from "@/lib/expenses/import-types";
 
 async function requireUser() {
   return getUser();
@@ -138,4 +141,64 @@ export async function deleteExpenseAction(id: string): Promise<ExpenseActionResu
 
   await db.expense.delete({ where: { id } });
   return { success: true, data: undefined };
+}
+
+// ─── Excel import ────────────────────────────────────────────────────────
+//
+// Parsing happens client-side (lib/expenses/expenses-io.ts); everything
+// that matters — resolving parties/invoices against real records the user
+// can access, validating categories/amounts/currency/dates — happens here,
+// server-side, using the exact same validateExpenseImportRows() for both
+// the preview step and the confirm step. Confirm never trusts whatever the
+// client saw during preview; it re-resolves against live data.
+
+export async function validateExpenseImportAction(
+  rawRows: ExpenseImportRawRow[]
+): Promise<ExpenseActionResult<ExpenseImportRowResult[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+  if (rawRows.length === 0) return { success: false, error: "No rows found in that file." };
+  if (rawRows.length > EXPENSE_IMPORT_MAX_ROWS) {
+    return { success: false, error: `Import is limited to ${EXPENSE_IMPORT_MAX_ROWS} rows at a time.` };
+  }
+
+  return { success: true, data: await validateExpenseImportRows(user.id, rawRows) };
+}
+
+export async function confirmExpenseImportAction(
+  rawRows: ExpenseImportRawRow[]
+): Promise<ExpenseActionResult<ExpenseImportSummary>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+  if (rawRows.length === 0) return { success: false, error: "No rows to import." };
+  if (rawRows.length > EXPENSE_IMPORT_MAX_ROWS) {
+    return { success: false, error: `Import is limited to ${EXPENSE_IMPORT_MAX_ROWS} rows at a time.` };
+  }
+
+  const rows = await validateExpenseImportRows(user.id, rawRows);
+  const validRows = rows.filter((r) => r.status === "valid");
+
+  if (validRows.length > 0) {
+    // A single createMany is one INSERT statement — either every valid row
+    // lands or (on an unexpected DB error) none do, so there is no
+    // ambiguous partially-imported state to clean up.
+    await db.expense.createMany({
+      data: validRows.map((r) => ({
+        ownerId: user.id,
+        occurredAt: new Date(r.resolved.occurredAt!),
+        location: r.resolved.location || null,
+        category: r.resolved.category!,
+        amount: r.resolved.amount!,
+        currency: r.resolved.currency!,
+        notes: r.resolved.notes || null,
+        partyUserId: r.resolved.partyUserId,
+        relatedInvoiceId: r.resolved.relatedInvoiceId,
+      })),
+    });
+  }
+
+  return {
+    success: true,
+    data: { importedCount: validRows.length, rejectedCount: rows.length - validRows.length, rows },
+  };
 }

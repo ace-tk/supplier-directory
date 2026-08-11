@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Paperclip, X, Check, ChevronsUpDown, Search } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Loader2, Paperclip, X, Check, ChevronsUpDown, Search, Save } from "lucide-react";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList, CommandInput } from "@/components/ui/command";
 import { ExpenseNotesField } from "./ExpenseNotesField";
 import {
   createExpenseAction,
@@ -59,15 +60,11 @@ function formFromExpense(expense: ExpenseRecord | null): FormState {
   };
 }
 
-function ExpenseForm({
-  expense,
-  onCancel,
-  onSaved,
-}: {
-  expense: ExpenseRecord | null;
-  onCancel: () => void;
-  onSaved: () => void;
-}) {
+/** Full-page Add/Edit Expense — a normal route rather than a dialog, so it
+ * has room to grow (attachments, party/invoice linking) without feeling
+ * cramped. Card-per-section layout, Save/Cancel always visible in the header. */
+export function ExpenseForm({ basePath, expense }: { basePath: string; expense: ExpenseRecord | null }) {
+  const router = useRouter();
   const [form, setForm] = useState<FormState>(() => formFromExpense(expense));
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -76,6 +73,8 @@ function ExpenseForm({
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [invoiceOptions, setInvoiceOptions] = useState<InvoiceOption[]>([]);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+
+  const expensesPath = `${basePath}/expenses`;
 
   function patch(p: Partial<FormState>) {
     setForm((f) => ({ ...f, ...p }));
@@ -137,17 +136,36 @@ function ExpenseForm({
     setSaving(false);
     if (!result.success) return toast.error(result.error);
     toast.success(expense ? "Expense updated" : "Expense added");
-    onSaved();
+    router.push(expensesPath);
+    router.refresh();
   }
 
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>{expense ? "Edit Expense" : "Add Expense"}</DialogTitle>
-      </DialogHeader>
+    <div className="space-y-6 max-w-3xl">
+      <PageHeader
+        title={expense ? "Edit Expense" : "Add Expense"}
+        description="Operational costs — shipping, travel, samples, and more. Kept separate from invoice line items."
+        breadcrumbs={[
+          { label: "Invoice Management", href: basePath },
+          { label: "Expenses", href: expensesPath },
+          { label: expense ? "Edit" : "Add" },
+        ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => router.push(expensesPath)}>
+              <ArrowLeft className="h-3.5 w-3.5" /> Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save Expense
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground">Details</h2>
+        <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Date</Label>
             <Input type="date" value={form.date} onChange={(e) => patch({ date: e.target.value })} />
@@ -157,8 +175,7 @@ function ExpenseForm({
             <Input type="time" value={form.time} onChange={(e) => patch({ time: e.target.value })} />
           </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Category</Label>
             <Select value={form.category} onValueChange={(v) => v && patch({ category: v as ExpenseCategory })}>
@@ -179,15 +196,17 @@ function ExpenseForm({
             <Input value={form.location} onChange={(e) => patch({ location: e.target.value })} placeholder="Optional" />
           </div>
         </div>
-
         {form.category === "OTHER" && (
           <div className="space-y-1.5">
             <Label className="text-xs">Custom Category Label</Label>
             <Input value={form.customCategoryLabel} onChange={(e) => patch({ customCategoryLabel: e.target.value })} />
           </div>
         )}
+      </div>
 
-        <div className="grid grid-cols-2 gap-3">
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground">Amount</h2>
+        <div className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Amount</Label>
             <Input type="number" min={0} value={form.amount} onChange={(e) => patch({ amount: e.target.value })} />
@@ -197,7 +216,10 @@ function ExpenseForm({
             <Input value={form.currency} onChange={(e) => patch({ currency: e.target.value })} />
           </div>
         </div>
+      </div>
 
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground">Linked Records</h2>
         <div className="space-y-1.5">
           <Label className="text-xs">Buyer / Supplier</Label>
           <Popover open={partyOpen} onOpenChange={setPartyOpen}>
@@ -287,71 +309,40 @@ function ExpenseForm({
             </PopoverContent>
           </Popover>
         </div>
-
-        <ExpenseNotesField value={form.notes} onChange={(v) => patch({ notes: v })} />
-
-        <div className="space-y-1.5">
-          <Label className="text-xs">Attachment</Label>
-          {form.attachmentFileName ? (
-            <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
-              <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="text-xs text-foreground truncate flex-1">{form.attachmentFileName}</span>
-              <button
-                type="button"
-                onClick={() => patch({ attachmentFileName: "", attachmentUrl: "" })}
-                aria-label="Remove attachment"
-              >
-                <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-              </button>
-            </div>
-          ) : (
-            <label className="flex items-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer">
-              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-              {uploading ? "Uploading..." : "Attach a file"}
-              <input type="file" className="hidden" onChange={handleAttachment} disabled={uploading} />
-            </label>
-          )}
-        </div>
       </div>
 
-      <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground">Notes</h2>
+        <ExpenseNotesField value={form.notes} onChange={(v) => patch({ notes: v })} />
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-foreground">Attachment</h2>
+        {form.attachmentFileName ? (
+          <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+            <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs text-foreground truncate flex-1">{form.attachmentFileName}</span>
+            <button type="button" onClick={() => patch({ attachmentFileName: "", attachmentUrl: "" })} aria-label="Remove attachment">
+              <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer w-fit">
+            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+            {uploading ? "Uploading..." : "Attach a file"}
+            <input type="file" className="hidden" onChange={handleAttachment} disabled={uploading} />
+          </label>
+        )}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pb-6">
+        <Button variant="outline" onClick={() => router.push(expensesPath)}>
           Cancel
         </Button>
         <Button onClick={handleSave} disabled={saving} className="gap-1.5">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {expense ? "Save Changes" : "Add Expense"}
         </Button>
-      </DialogFooter>
-    </>
-  );
-}
-
-export function ExpenseFormDialog({
-  expense,
-  open,
-  onOpenChange,
-  onSaved,
-}: {
-  expense: ExpenseRecord | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        {open && (
-          <ExpenseForm
-            key={expense?.id ?? "new"}
-            expense={expense}
-            onCancel={() => onOpenChange(false)}
-            onSaved={() => {
-              onSaved();
-              onOpenChange(false);
-            }}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

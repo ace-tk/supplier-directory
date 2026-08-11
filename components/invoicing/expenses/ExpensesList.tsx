@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Paperclip, Receipt } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Paperclip, Receipt, Upload, Download } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,13 +21,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ExpenseFormDialog } from "./ExpenseFormDialog";
 import { listExpensesAction, deleteExpenseAction } from "@/services/expenses";
 import { EXPENSE_CATEGORY_LABELS, EXPENSE_CATEGORY_OPTIONS } from "@/lib/expenses/ui";
 import { formatMoney, formatShortDate } from "@/lib/invoicing/ui";
 import type { ExpenseRecord, ExpenseCategory } from "@/types/expense";
 
 export function ExpensesList({ basePath }: { basePath: string }) {
+  const router = useRouter();
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -34,8 +35,6 @@ export function ExpensesList({ basePath }: { basePath: string }) {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<ExpenseRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ExpenseRecord | null>(null);
 
   function refresh() {
@@ -75,6 +74,11 @@ export function ExpensesList({ basePath }: { basePath: string }) {
     refresh();
   }
 
+  async function handleDownloadTemplate() {
+    const { downloadExpenseImportTemplate } = await import("@/lib/expenses/expenses-io");
+    downloadExpenseImportTemplate();
+  }
+
   const columns: RecordColumn<ExpenseRecord>[] = [
     { key: "date", label: "Date", render: (e) => formatShortDate(e.occurredAt) },
     { key: "category", label: "Category", render: (e) => (e.category === "OTHER" && e.customCategoryLabel ? e.customCategoryLabel : EXPENSE_CATEGORY_LABELS[e.category]) },
@@ -112,10 +116,8 @@ export function ExpensesList({ basePath }: { basePath: string }) {
             variant="ghost"
             size="icon-sm"
             aria-label="Edit"
-            onClick={() => {
-              setEditTarget(e);
-              setDialogOpen(true);
-            }}
+            render={<Link href={`${basePath}/expenses/${e.id}/edit`} />}
+            nativeButton={false}
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
@@ -141,15 +143,23 @@ export function ExpensesList({ basePath }: { basePath: string }) {
         description="Operational costs — shipping, travel, samples, and more. Kept separate from invoice line items."
         breadcrumbs={[{ label: "Invoice Management", href: basePath }, { label: "Expenses" }]}
         actions={
-          <Button
-            className="gap-1.5"
-            onClick={() => {
-              setEditTarget(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> Add Expense
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleDownloadTemplate}>
+              <Download className="h-3.5 w-3.5" /> Download Template
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              render={<Link href={`${basePath}/expenses/import`} />}
+              nativeButton={false}
+            >
+              <Upload className="h-3.5 w-3.5" /> Import Excel
+            </Button>
+            <Button size="sm" className="gap-1.5" render={<Link href={`${basePath}/expenses/new`} />} nativeButton={false}>
+              <Plus className="h-4 w-4" /> Add Expense
+            </Button>
+          </div>
         }
       />
 
@@ -194,13 +204,11 @@ export function ExpensesList({ basePath }: { basePath: string }) {
           icon={Receipt}
           title={expenses.length === 0 ? "No expenses yet" : "No expenses match your filters"}
           description={expenses.length === 0 ? "Log your first expense to start tracking operational costs." : "Try adjusting your search or filters."}
-          action={expenses.length === 0 ? { label: "Add Expense", onClick: () => setDialogOpen(true) } : undefined}
+          action={expenses.length === 0 ? { label: "Add Expense", onClick: () => router.push(`${basePath}/expenses/new`) } : undefined}
         />
       ) : (
         <RecordsTable columns={columns} rows={filtered} />
       )}
-
-      <ExpenseFormDialog expense={editTarget} open={dialogOpen} onOpenChange={setDialogOpen} onSaved={refresh} />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
