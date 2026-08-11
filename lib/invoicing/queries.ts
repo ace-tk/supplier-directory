@@ -28,7 +28,20 @@ function dec(value: { toString(): string } | null | undefined): string {
 // — every other document type has no balance/overdue concept.
 const PAYABLE_TYPES: InvoiceType[] = ["SALES", "PURCHASE"];
 
-const paymentsInclude = { payments: { select: { amount: true } } } as const;
+// NOTE: name predates the sourceInvoice/derivedDocuments additions below —
+// kept as-is (renaming would touch every call site) but now covers more
+// than just payments: it's the shared "summary row" include used by every
+// list/detail read path.
+const paymentsInclude = {
+  payments: { select: { amount: true } },
+  // Cheap to-one relation — powers the "Source Invoice" column on the
+  // Credit Note/Sales Return/Debit Note list views.
+  sourceInvoice: { select: { invoiceNumber: true } },
+  // Only ever non-empty for a QUOTATION that has been converted — powers
+  // the "Converted Invoice" column on the Quotations list. Harmless empty
+  // array for every other document type.
+  derivedDocuments: { where: { type: "SALES" as const }, select: { id: true, invoiceNumber: true }, take: 1 },
+} as const;
 const itemsInclude = { items: { orderBy: { order: "asc" as const } }, ...paymentsInclude };
 
 type InvoiceRow = NonNullable<Awaited<ReturnType<typeof fetchInvoiceRaw>>>;
@@ -138,6 +151,10 @@ function mapSummary(inv: InvoiceSummaryRow): InvoiceSummary {
 
     reason: inv.reason,
     sourceInvoiceId: inv.sourceInvoiceId,
+    sourceInvoiceNumber: inv.sourceInvoice?.invoiceNumber ?? null,
+    convertedInvoice: inv.derivedDocuments[0]
+      ? { id: inv.derivedDocuments[0].id, invoiceNumber: inv.derivedDocuments[0].invoiceNumber }
+      : null,
 
     archivedAt: inv.archivedAt ? inv.archivedAt.toISOString() : null,
 

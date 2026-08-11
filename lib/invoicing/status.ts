@@ -33,3 +33,14 @@ export const DISPLAYABLE_STATUSES_BY_TYPE: Record<InvoiceType, InvoiceStatus[]> 
 export function isManuallySettableStatus(type: InvoiceType, status: InvoiceStatus): boolean {
   return ALLOWED_STATUSES_BY_TYPE[type].includes(status);
 }
+
+/**
+ * The status a fresh, non-draft save lands on — what the editor's "Save
+ * Invoice" button (as opposed to "Save Draft") actually sends. SALES/
+ * PURCHASE/QUOTATION call this "Sent"; Credit Note/Sales Return/Debit Note
+ * have no "Sent" concept in their lifecycle (see ALLOWED_STATUSES_BY_TYPE)
+ * and use "Issued" instead.
+ */
+export function nonDraftInitialStatus(type: InvoiceType): InvoiceStatus {
+  return type === "CREDIT_NOTE" || type === "SALES_RETURN" || type === "DEBIT_NOTE" ? "ISSUED" : "SENT";
+}

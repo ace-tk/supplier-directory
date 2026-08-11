@@ -17,6 +17,7 @@ import { TotalsSummary } from "./editor/TotalsSummary";
 import { InvoicePreview } from "./preview/InvoicePreview";
 import { calculateInvoiceTotals } from "@/lib/invoicing/calc";
 import { invoiceFamily, DEPENDENT_TYPES } from "@/lib/invoicing/family";
+import { nonDraftInitialStatus } from "@/lib/invoicing/status";
 import { INVOICE_TYPE_LABELS } from "@/lib/invoicing/ui";
 import {
   createInvoiceAction,
@@ -25,7 +26,7 @@ import {
   getSellerDefaultsAction,
 } from "@/services/invoicing";
 import { emptyItem, newItemKey, todayISODate, addDaysISODate, type EditorFormState } from "./editor/types";
-import type { InvoiceRecord, InvoiceType } from "@/types/invoicing";
+import type { InvoiceRecord, InvoiceType, InvoiceStatus } from "@/types/invoicing";
 
 function defaultForm(type: InvoiceType): EditorFormState {
   return {
@@ -247,7 +248,7 @@ export function InvoiceEditor({
   // "Save Draft" only makes sense while the invoice hasn't left draft state yet.
   const canSaveAsDraft = !initialInvoice || initialInvoice.status === "DRAFT";
 
-  async function handleSave(targetStatus: "DRAFT" | "SENT") {
+  async function handleSave(targetStatus: "DRAFT" | InvoiceStatus) {
     if (!form.sellerName.trim() || !form.partyName.trim()) {
       toast.error("Seller and party names are required.");
       return;
@@ -379,7 +380,7 @@ export function InvoiceEditor({
                 Save Draft
               </Button>
             )}
-            <Button size="sm" className="gap-1.5" disabled={saving !== null} onClick={() => handleSave("SENT")}>
+            <Button size="sm" className="gap-1.5" disabled={saving !== null} onClick={() => handleSave(nonDraftInitialStatus(type))}>
               {saving === "save" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               {initialInvoice ? "Update Invoice" : "Save Invoice"}
             </Button>

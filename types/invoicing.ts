@@ -82,6 +82,10 @@ export interface InvoiceRecord {
   // Generic "derived from" lineage — see lib/invoicing/family.ts for valid
   // (sourceType -> targetType) pairings.
   sourceInvoiceId: string | null;
+  /** Source document's invoice number, for a display link — null if there's no source. */
+  sourceInvoiceNumber: string | null;
+  /** Only ever set on a QUOTATION that has been converted to a Tax Invoice. */
+  convertedInvoice: { id: string; invoiceNumber: string } | null;
 
   archivedAt: string | null;
 
