@@ -39,6 +39,7 @@ import {
   NotebookText,
   Table2,
   Receipt,
+  BookOpen,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -124,7 +125,9 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Content Management", href: "/content", icon: NotebookText },
       { label: "Catalog Management", href: "/catalog", icon: Table2 },
+      { label: "Product", href: "/product", icon: Package },
       { label: "Invoice Management", href: "/invoices", icon: Receipt },
+      { label: "Articles", href: "/articles", icon: BookOpen },
     ],
   },
   {
@@ -172,7 +175,9 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Content Management", href: "/buyer/content", icon: NotebookText },
       { label: "Catalog Management", href: "/buyer/catalog", icon: Table2 },
+      { label: "Product", href: "/buyer/product", icon: Package },
       { label: "Invoice Management", href: "/buyer/invoices", icon: Receipt },
+      { label: "Articles", href: "/buyer/articles", icon: BookOpen },
     ],
   },
 ];
@@ -223,7 +228,9 @@ export const SUPPLIER_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Content Management", href: "/supplier/content", icon: NotebookText },
       { label: "Catalog Management", href: "/supplier/catalog", icon: Table2 },
+      { label: "Product", href: "/supplier/product", icon: Package },
       { label: "Invoice Management", href: "/supplier/invoices", icon: Receipt },
+      { label: "Articles", href: "/supplier/articles", icon: BookOpen },
     ],
   },
 ];
@@ -263,7 +270,9 @@ export const FREELANCER_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Content Management", href: "/freelancer/content", icon: NotebookText },
       { label: "Catalog Management", href: "/freelancer/catalog", icon: Table2 },
+      { label: "Product", href: "/freelancer/product", icon: Package },
       { label: "Invoice Management", href: "/freelancer/invoices", icon: Receipt },
+      { label: "Articles", href: "/freelancer/articles", icon: BookOpen },
     ],
   },
 ];

@@ -24,6 +24,8 @@ export const catalogRowInputSchema = z.object({
   leadTime: z.string().optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "DRAFT"]).default("ACTIVE"),
   notes: z.string().optional(),
+  warehouse: z.string().optional(),
+  gender: z.string().optional(),
 });
 
 export type CatalogRowInput = z.infer<typeof catalogRowInputSchema>;

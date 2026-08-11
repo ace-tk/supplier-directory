@@ -61,6 +61,8 @@ model User {
   expenseParty            Expense[]                @relation("ExpenseParty")
   expenseCustomCategories ExpenseCustomCategory[]   @relation("ExpenseCustomCategoryOwner")
 
+  articles Article[] @relation("ArticleOwner")
+
   @@index([email])
 }
 
@@ -991,6 +993,15 @@ model CatalogRow {
   notes          String?
   order          Int              @default(0)
 
+  // Free-text like `category` above — not an enum, so any warehouse name
+  // works without a schema change. Product's Warehouse combobox seeds
+  // "Warehouse 1"/"Warehouse 2" (see lib/catalog-ui.ts) but never
+  // constrains the stored value to just those.
+  warehouse String?
+  // Optional apparel-style variant, shown only where relevant — never
+  // assumed for non-apparel categories.
+  gender    String?
+
   images      CatalogRowImage[]
   attachments CatalogRowAttachment[]
   invoiceItems InvoiceItem[]
@@ -1022,6 +1033,33 @@ model CatalogRowAttachment {
   createdAt DateTime   @default(now())
 
   @@index([rowId])
+}
+
+// ─── Module: Articles ───────────────────────────────────────────────────
+// A personal/business research library — saved URLs shown as tiles.
+// Deliberately separate from Content Management (that's authored content;
+// this is bookmarked external links). Metadata (title/description/image)
+// is best-effort and optional — a row is always saveable from a bare URL.
+model Article {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("ArticleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  url          String
+  title        String?
+  description  String? @db.Text
+  notes        String? @db.Text
+  category     String?
+  tags         String[] @default([])
+  thumbnailUrl String?
+  sourceDomain String?
+
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
 }
 
 // ─── Module 3: Invoice Management ──────────────────────────────────────────

@@ -39,6 +39,8 @@ export interface CatalogRowRecord {
   status: CatalogRowStatus;
   notes: string | null;
   order: number;
+  warehouse: string | null;
+  gender: string | null;
   images: CatalogRowImageEntry[];
   attachments: CatalogRowAttachmentEntry[];
   createdAt: string;
@@ -74,6 +76,7 @@ export const CATALOG_COLUMN_LABELS: Record<string, string> = {
   leadTime: "Lead Time",
   status: "Status",
   notes: "Notes",
+  warehouse: "Warehouse",
 };
 
 export const CATALOG_EXPORT_COLUMNS: (keyof CatalogRowRecord)[] = [
@@ -96,4 +99,5 @@ export const CATALOG_EXPORT_COLUMNS: (keyof CatalogRowRecord)[] = [
   "leadTime",
   "status",
   "notes",
+  "warehouse",
 ];

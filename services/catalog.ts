@@ -149,6 +149,8 @@ export async function duplicateRowAction(rowId: string): Promise<ActionResult<Ca
       leadTime: row.leadTime,
       status: row.status,
       notes: row.notes,
+      warehouse: row.warehouse,
+      gender: row.gender,
       order: (maxOrder._max.order ?? -1) + 1,
     },
     include: { images: true, attachments: true },
@@ -185,6 +187,27 @@ export async function addRowImageAction(
   const count = await db.catalogRowImage.count({ where: { rowId } });
   const image = await db.catalogRowImage.create({ data: { rowId, dataUrl: input.dataUrl, order: count } });
   return { success: true, data: { id: image.id, dataUrl: image.dataUrl, order: image.order } };
+}
+
+/** The first image (order 0) after a reorder is the row's cover image
+ * everywhere it's displayed (Product's large preview, the invoice catalog
+ * picker's imageUrl, etc.) — so reordering has real, not just cosmetic,
+ * effect. Mirrors reorderRowsAction's bulk-update-by-index pattern. */
+export async function reorderRowImagesAction(rowId: string, imageIds: string[]): Promise<ActionResult<void>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const row = await requireOwnedRow(rowId, user.id);
+  if (!row) return { success: false, error: "Row not found." };
+
+  const existing = await db.catalogRowImage.findMany({ where: { rowId }, select: { id: true } });
+  const existingIds = new Set(existing.map((i) => i.id));
+  if (imageIds.length !== existing.length || !imageIds.every((id) => existingIds.has(id))) {
+    return { success: false, error: "Image list doesn't match this product's images." };
+  }
+
+  await db.$transaction(imageIds.map((id, index) => db.catalogRowImage.update({ where: { id }, data: { order: index } })));
+  return { success: true, data: undefined };
 }
 
 export async function removeRowImageAction(imageId: string): Promise<ActionResult<void>> {

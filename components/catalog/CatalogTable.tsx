@@ -49,7 +49,7 @@ import {
   importRowsAction,
 } from "@/services/catalog";
 import { exportRowsToFile, parseFileToRows } from "@/lib/catalog-io";
-import { GST_RATE_OPTIONS, computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
+import { GST_RATE_OPTIONS, DEFAULT_WAREHOUSE_OPTIONS, computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
 import type { CatalogRecord, CatalogRowRecord, CatalogRowStatus } from "@/types/catalog";
 import type { CatalogRowInput } from "@/lib/validations/catalog";
 import { cn } from "@/lib/utils";
@@ -93,6 +93,7 @@ function NumberCell({ value, onSave }: { value: number; onSave: (v: number) => v
 function SortableRow({
   row,
   basePath,
+  warehouseOptions,
   onFieldChange,
   onDelete,
   onDuplicate,
@@ -100,6 +101,7 @@ function SortableRow({
 }: {
   row: CatalogRowRecord;
   basePath: string;
+  warehouseOptions: string[];
   onFieldChange: (field: keyof CatalogRowInput, value: unknown) => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -159,6 +161,15 @@ function SortableRow({
           </SelectContent>
         </Select>
       </td>
+      <td className="min-w-[130px]">
+        <Select value={row.warehouse ?? "__none__"} onValueChange={(v) => v && onFieldChange("warehouse", v === "__none__" ? "" : v)}>
+          <SelectTrigger className="w-full h-8 border-none bg-transparent shadow-none"><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">—</SelectItem>
+            {warehouseOptions.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </td>
       <td className="w-40 px-1">
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
@@ -188,7 +199,7 @@ function SortableRow({
 
 const COLUMN_HEADERS = [
   "", "Product Category", "Product Name", "Brand", "SKU", "HSN Code", "Qty", "Sizes", "Color", "MOQ",
-  "Price Before GST", "GST %", "Price", "Currency", "Shipping", "Misc.", "Lead Time", "Status", "",
+  "Price Before GST", "GST %", "Price", "Currency", "Shipping", "Misc.", "Lead Time", "Status", "Warehouse", "",
 ];
 
 export function CatalogTable({ basePath }: { basePath: string }) {
@@ -218,6 +229,10 @@ export function CatalogTable({ basePath }: { basePath: string }) {
 
   const rows = catalog?.rows ?? [];
   const categories = useMemo(() => [...new Set(rows.map((r) => r.category).filter((c): c is string => !!c))], [rows]);
+  const warehouseOptions = useMemo(
+    () => [...new Set([...DEFAULT_WAREHOUSE_OPTIONS, ...rows.map((r) => r.warehouse).filter((w): w is string => !!w)])],
+    [rows]
+  );
 
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
@@ -399,6 +414,7 @@ export function CatalogTable({ basePath }: { basePath: string }) {
                       key={row.id}
                       row={row}
                       basePath={basePath}
+                      warehouseOptions={warehouseOptions}
                       onFieldChange={(field, value) => handleFieldChange(row.id, field, value)}
                       onDelete={() => handleDelete(row.id)}
                       onDuplicate={() => handleDuplicate(row.id)}

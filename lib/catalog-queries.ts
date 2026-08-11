@@ -45,6 +45,8 @@ export function mapRow(r: CatalogWithRows["rows"][number]): CatalogRowRecord {
     status: r.status,
     notes: r.notes,
     order: r.order,
+    warehouse: r.warehouse,
+    gender: r.gender,
     images: r.images.map((i) => ({ id: i.id, dataUrl: i.dataUrl, order: i.order })),
     attachments: r.attachments.map((a) => ({
       id: a.id,
