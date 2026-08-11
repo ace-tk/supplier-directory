@@ -339,7 +339,7 @@ export function InvoiceEditor({
 
   const editForm = (
     <div className="space-y-4">
-      <InvoiceHeaderFields form={form} onChange={patch} />
+      <InvoiceHeaderFields form={form} onChange={patch} excludeId={initialInvoice?.id} />
       <div className={locked ? "pointer-events-none opacity-60 space-y-4" : "space-y-4"}>
         <SellerInfoFields form={form} onChange={patch} />
         <PartyPicker form={form} onChange={patch} />

@@ -53,6 +53,8 @@ model User {
 
   ownedInvoices        Invoice[]        @relation("InvoiceOwner")
   counterpartyInvoices Invoice[]        @relation("InvoiceCounterparty")
+  paymentsRecorded     Payment[]        @relation("PaymentCreatedBy")
+  invoiceActivity      InvoiceActivity[]
   invoiceCounters      InvoiceCounter[]
 
   ownedExpenses Expense[] @relation("ExpenseOwner")
@@ -1050,8 +1052,29 @@ enum InvoiceStatus {
   PENDING
   PARTIALLY_PAID
   PAID
-  OVERDUE
   CANCELLED
+  // OVERDUE intentionally removed — overdue is now derived-only (computed
+  // at query/render time from dueDate + balanceDue), never stored, to
+  // avoid two sources of truth. Confirmed zero rows used it before removal.
+
+  // Quotation lifecycle
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+
+  // Credit Note / Sales Return / Debit Note lifecycle
+  ISSUED
+  APPLIED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CARD
+  CHEQUE
+  OTHER
 }
 
 // Only relevant for CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE documents.
@@ -1171,6 +1194,8 @@ model Invoice {
 
   items    InvoiceItem[]
   expenses Expense[]
+  payments Payment[]
+  activity InvoiceActivity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1182,6 +1207,36 @@ model Invoice {
   @@index([type])
   @@index([invoiceDate])
   @@index([sourceInvoiceId])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount          Decimal       @db.Decimal(14, 2)
+  paymentDate     DateTime
+  method          PaymentMethod
+  referenceNumber String?
+  notes           String?       @db.Text
+  createdById     String
+  createdBy       User          @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@index([createdById])
+}
+
+model InvoiceActivity {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  type        String // "CREATED" | "UPDATED" | "STATUS_CHANGED" | "PAYMENT_RECORDED" | "CONVERTED" | "CREDIT_NOTE_CREATED" | "SALES_RETURN_CREATED" | "DEBIT_NOTE_CREATED"
+  description String
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
 }
 
 model InvoiceItem {

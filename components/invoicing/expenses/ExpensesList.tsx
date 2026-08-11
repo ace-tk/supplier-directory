@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Plus, Search, Pencil, Trash2, Paperclip, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -30,6 +31,8 @@ export function ExpensesList({ basePath }: { basePath: string }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ExpenseRecord | null>(null);
@@ -49,6 +52,8 @@ export function ExpensesList({ basePath }: { basePath: string }) {
   const filtered = useMemo(() => {
     return expenses.filter((e) => {
       if (categoryFilter !== "All" && e.category !== categoryFilter) return false;
+      if (dateFrom && e.occurredAt < dateFrom) return false;
+      if (dateTo && e.occurredAt.slice(0, 10) > dateTo) return false;
       if (search) {
         const q = search.toLowerCase();
         const haystack = `${e.location ?? ""} ${e.notes ?? ""} ${e.partyName ?? ""} ${e.relatedInvoiceNumber ?? ""}`.toLowerCase();
@@ -56,7 +61,10 @@ export function ExpensesList({ basePath }: { basePath: string }) {
       }
       return true;
     });
-  }, [expenses, search, categoryFilter]);
+  }, [expenses, search, categoryFilter, dateFrom, dateTo]);
+
+  const totalAmount = useMemo(() => filtered.reduce((sum, e) => sum + Number(e.amount), 0), [filtered]);
+  const totalCurrency = filtered[0]?.currency ?? "INR";
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -72,12 +80,28 @@ export function ExpensesList({ basePath }: { basePath: string }) {
     { key: "category", label: "Category", render: (e) => (e.category === "OTHER" && e.customCategoryLabel ? e.customCategoryLabel : EXPENSE_CATEGORY_LABELS[e.category]) },
     { key: "location", label: "Location", render: (e) => e.location || "—" },
     { key: "party", label: "Party", render: (e) => e.partyName || "—" },
-    { key: "invoice", label: "Related Invoice", render: (e) => (e.relatedInvoiceNumber ? <span className="font-mono text-xs">{e.relatedInvoiceNumber}</span> : "—") },
+    {
+      key: "invoice",
+      label: "Related Invoice",
+      render: (e) =>
+        e.relatedInvoiceNumber && e.relatedInvoiceId ? (
+          <Link href={`${basePath}/${e.relatedInvoiceId}`} className="font-mono text-xs text-primary hover:underline">
+            {e.relatedInvoiceNumber}
+          </Link>
+        ) : (
+          "—"
+        ),
+    },
     { key: "amount", label: "Amount", render: (e) => <span className="tabular-nums">{formatMoney(e.amount, e.currency)}</span> },
     {
       key: "attachment",
       label: "",
-      render: (e) => (e.attachmentUrl ? <Paperclip className="h-3.5 w-3.5 text-muted-foreground" /> : null),
+      render: (e) =>
+        e.attachmentUrl ? (
+          <a href={e.attachmentUrl} target="_blank" rel="noopener noreferrer" aria-label="View attachment" className="text-muted-foreground hover:text-foreground">
+            <Paperclip className="h-3.5 w-3.5" />
+          </a>
+        ) : null,
     },
     {
       key: "actions",
@@ -134,20 +158,34 @@ export function ExpensesList({ basePath }: { basePath: string }) {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search expenses..." className="pl-8 w-64" />
         </div>
-        <Select value={categoryFilter} onValueChange={(v) => v && setCategoryFilter(v)}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Categories</SelectItem>
-            {EXPENSE_CATEGORY_OPTIONS.map((c: ExpenseCategory) => (
-              <SelectItem key={c} value={c}>
-                {EXPENSE_CATEGORY_LABELS[c]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
+          <Select value={categoryFilter} onValueChange={(v) => v && setCategoryFilter(v)}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Categories</SelectItem>
+              {EXPENSE_CATEGORY_OPTIONS.map((c: ExpenseCategory) => (
+                <SelectItem key={c} value={c}>
+                  {EXPENSE_CATEGORY_LABELS[c]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {!loading && filtered.length > 0 && (
+        <div className="rounded-xl border border-border bg-card px-4 py-3 flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            {filtered.length} expense{filtered.length === 1 ? "" : "s"}
+          </span>
+          <span className="font-semibold text-foreground tabular-nums">Total: {formatMoney(totalAmount, totalCurrency)}</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="rounded-xl border border-border bg-card h-64 animate-pulse" />

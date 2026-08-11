@@ -6,18 +6,22 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { setInvoiceStatusAction } from "@/services/invoicing";
-import { INVOICE_STATUS_LABELS, INVOICE_STATUS_OPTIONS } from "@/lib/invoicing/ui";
-import type { InvoiceStatus } from "@/types/invoicing";
+import { INVOICE_STATUS_LABELS } from "@/lib/invoicing/ui";
+import { ALLOWED_STATUSES_BY_TYPE } from "@/lib/invoicing/status";
+import type { InvoiceStatus, InvoiceType } from "@/types/invoicing";
 
 export function StatusChangeMenu({
   invoiceId,
+  invoiceType,
   currentStatus,
   onChanged,
 }: {
   invoiceId: string;
+  invoiceType: InvoiceType;
   currentStatus: InvoiceStatus;
   onChanged: (status: InvoiceStatus) => void;
 }) {
+  const options = ALLOWED_STATUSES_BY_TYPE[invoiceType];
   const [updating, setUpdating] = useState(false);
 
   async function handleChange(status: InvoiceStatus) {
@@ -37,7 +41,7 @@ export function StatusChangeMenu({
         Change Status <ChevronDown className="h-3.5 w-3.5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {INVOICE_STATUS_OPTIONS.map((s) => (
+        {options.map((s) => (
           <DropdownMenuItem key={s} onClick={() => handleChange(s)} disabled={s === currentStatus}>
             {INVOICE_STATUS_LABELS[s]}
           </DropdownMenuItem>

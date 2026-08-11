@@ -15,6 +15,7 @@ export function InvoiceModuleNav({ basePath }: { basePath: string }) {
     { label: "Sales", href: `${basePath}/sales` },
     { label: "Purchases", href: `${basePath}/purchase` },
     { label: "Expenses", href: `${basePath}/expenses` },
+    { label: "Reports", href: `${basePath}/reports` },
   ];
 
   return (

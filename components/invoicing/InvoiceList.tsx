@@ -20,7 +20,14 @@ import {
 import { CreateDocumentMenu } from "@/components/invoicing/CreateDocumentMenu";
 import { listInvoicesAction, duplicateInvoiceAction, archiveInvoiceAction } from "@/services/invoicing";
 import { typesForFamily, type InvoiceFamily } from "@/lib/invoicing/family";
-import { INVOICE_STATUS_LABELS, INVOICE_STATUS_OPTIONS, INVOICE_TYPE_LABELS, formatMoney, formatShortDate } from "@/lib/invoicing/ui";
+import { DISPLAYABLE_STATUSES_BY_TYPE } from "@/lib/invoicing/status";
+import {
+  INVOICE_STATUS_LABELS,
+  INVOICE_TYPE_LABELS,
+  formatMoney,
+  formatShortDate,
+  getDueIndicatorLabel,
+} from "@/lib/invoicing/ui";
 import type { InvoiceSummary } from "@/types/invoicing";
 
 export function InvoiceList({ basePath, family }: { basePath: string; family: InvoiceFamily }) {
@@ -30,6 +37,10 @@ export function InvoiceList({ basePath, family }: { basePath: string; family: In
   const [statusFilter, setStatusFilter] = useState("All");
 
   const types = useMemo(() => typesForFamily(family), [family]);
+  const statusOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return types.flatMap((t) => DISPLAYABLE_STATUSES_BY_TYPE[t]).filter((s) => (seen.has(s) ? false : seen.add(s)));
+  }, [types]);
 
   function refresh() {
     listInvoicesAction({ types }).then((r) => {
@@ -81,7 +92,19 @@ export function InvoiceList({ basePath, family }: { basePath: string; family: In
       },
       { key: "docType", label: "Document Type", render: (i) => <span className="text-xs text-muted-foreground">{INVOICE_TYPE_LABELS[i.type]}</span> },
       { key: "invoiceDate", label: "Invoice Date", render: (i) => formatShortDate(i.invoiceDate) },
-      { key: "dueDate", label: "Due Date", render: (i) => formatShortDate(i.dueDate) },
+      {
+        key: "dueDate",
+        label: "Due Date",
+        render: (i) => {
+          const dueLabel = getDueIndicatorLabel(i);
+          return (
+            <div className="flex items-center gap-1.5">
+              <span>{formatShortDate(i.dueDate)}</span>
+              {dueLabel && dueLabel !== "Paid" && <StatusBadge status={dueLabel} />}
+            </div>
+          );
+        },
+      },
       { key: "amount", label: "Amount", render: (i) => <span className="tabular-nums">{formatMoney(i.grandTotal, i.currency)}</span> },
       { key: "status", label: "Status", render: (i) => <StatusBadge status={INVOICE_STATUS_LABELS[i.status]} /> },
       {
@@ -145,7 +168,7 @@ export function InvoiceList({ basePath, family }: { basePath: string; family: In
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Status</SelectItem>
-            {INVOICE_STATUS_OPTIONS.map((s) => (
+            {statusOptions.map((s) => (
               <SelectItem key={s} value={s}>
                 {INVOICE_STATUS_LABELS[s]}
               </SelectItem>

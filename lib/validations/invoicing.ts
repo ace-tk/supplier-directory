@@ -15,8 +15,13 @@ const STATUS_VALUES = [
   "PENDING",
   "PARTIALLY_PAID",
   "PAID",
-  "OVERDUE",
   "CANCELLED",
+  "ACCEPTED",
+  "REJECTED",
+  "EXPIRED",
+  "CONVERTED",
+  "ISSUED",
+  "APPLIED",
 ] as const;
 const TAX_MODE_VALUES = ["EXCLUSIVE", "INCLUSIVE"] as const;
 const TAX_BREAKUP_VALUES = ["SINGLE", "CGST_SGST", "IGST"] as const;

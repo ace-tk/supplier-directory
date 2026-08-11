@@ -2,7 +2,12 @@
 // across all four portals. Decimal fields are always converted to plain
 // strings here, before crossing into any client component.
 
+import Decimal from "decimal.js";
+import { format, eachDayOfInterval, eachMonthOfInterval } from "date-fns";
 import { db } from "@/lib/db";
+import { Prisma } from "@/lib/generated/prisma/client";
+import { computeInvoicePaymentSummary, isInvoiceOverdue } from "@/lib/invoicing/payments";
+import { resolvePeriodRange, chartBucketGranularity, type DashboardPeriod } from "@/lib/invoicing/period";
 import type {
   InvoiceRecord,
   InvoiceItemRecord,
@@ -10,20 +15,32 @@ import type {
   InvoiceListFilter,
   InvoiceDashboardStats,
   RelatedDocuments,
+  InvoiceType,
+  InvoiceStatus,
+  InvoiceActivityRecord,
 } from "@/types/invoicing";
 
 function dec(value: { toString(): string } | null | undefined): string {
   return value == null ? "0" : value.toString();
 }
 
-const itemsInclude = { items: { orderBy: { order: "asc" as const } } };
+// Only SALES/PURCHASE documents accept payments (see services/payments.ts)
+// — every other document type has no balance/overdue concept.
+const PAYABLE_TYPES: InvoiceType[] = ["SALES", "PURCHASE"];
+
+const paymentsInclude = { payments: { select: { amount: true } } } as const;
+const itemsInclude = { items: { orderBy: { order: "asc" as const } }, ...paymentsInclude };
 
 type InvoiceRow = NonNullable<Awaited<ReturnType<typeof fetchInvoiceRaw>>>;
 type InvoiceItemRow = InvoiceRow["items"][number];
-type InvoiceSummaryRow = Awaited<ReturnType<typeof db.invoice.findMany>>[number];
+type InvoiceSummaryRow = Awaited<ReturnType<typeof fetchSummaryRowsRaw>>[number];
 
 function fetchInvoiceRaw(id: string) {
   return db.invoice.findUnique({ where: { id }, include: itemsInclude });
+}
+
+function fetchSummaryRowsRaw(where: Prisma.InvoiceWhereInput) {
+  return db.invoice.findMany({ where, include: paymentsInclude, orderBy: { invoiceDate: "desc" } });
 }
 
 function mapItem(item: InvoiceItemRow): InvoiceItemRecord {
@@ -42,6 +59,29 @@ function mapItem(item: InvoiceItemRow): InvoiceItemRecord {
     taxAmount: dec(item.taxAmount),
     lineTotal: dec(item.lineTotal),
     order: item.order,
+  };
+}
+
+/** amountPaid/balanceDue/isOverdue are always derived here, never trusted from a stored column. */
+export function derivePaymentFields(inv: {
+  type: InvoiceType;
+  status: InvoiceStatus;
+  dueDate: Date;
+  grandTotal: { toString(): string } | null;
+  payments: { amount: { toString(): string } | null }[];
+}) {
+  const grandTotal = dec(inv.grandTotal);
+  if (!PAYABLE_TYPES.includes(inv.type)) {
+    return { amountPaid: "0.00", balanceDue: dec(inv.grandTotal), isOverdue: false };
+  }
+  const summary = computeInvoicePaymentSummary(
+    grandTotal,
+    inv.payments.map((p) => ({ amount: dec(p.amount) }))
+  );
+  return {
+    amountPaid: summary.amountPaid,
+    balanceDue: summary.balanceDue,
+    isOverdue: isInvoiceOverdue(inv.dueDate, summary.balanceDue, inv.status),
   };
 }
 
@@ -103,6 +143,8 @@ function mapSummary(inv: InvoiceSummaryRow): InvoiceSummary {
 
     createdAt: inv.createdAt.toISOString(),
     updatedAt: inv.updatedAt.toISOString(),
+
+    ...derivePaymentFields(inv),
   };
 }
 
@@ -119,33 +161,30 @@ export async function listInvoicesForOwner(
   ownerId: string,
   filter: InvoiceListFilter
 ): Promise<InvoiceSummary[]> {
-  const rows = await db.invoice.findMany({
-    where: {
-      ownerId,
-      type: { in: filter.types },
-      archivedAt: null,
-      ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.dateFrom || filter.dateTo
-        ? {
-            invoiceDate: {
-              ...(filter.dateFrom ? { gte: new Date(filter.dateFrom) } : {}),
-              ...(filter.dateTo ? { lte: new Date(filter.dateTo) } : {}),
-            },
-          }
-        : {}),
-      ...(filter.partyName ? { partyName: { contains: filter.partyName, mode: "insensitive" } } : {}),
-      ...(filter.search
-        ? {
-            OR: [
-              { invoiceNumber: { contains: filter.search, mode: "insensitive" } },
-              { partyName: { contains: filter.search, mode: "insensitive" } },
-              { sellerName: { contains: filter.search, mode: "insensitive" } },
-              { items: { some: { productName: { contains: filter.search, mode: "insensitive" } } } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { invoiceDate: "desc" },
+  const rows = await fetchSummaryRowsRaw({
+    ownerId,
+    type: { in: filter.types },
+    archivedAt: null,
+    ...(filter.status ? { status: filter.status } : {}),
+    ...(filter.dateFrom || filter.dateTo
+      ? {
+          invoiceDate: {
+            ...(filter.dateFrom ? { gte: new Date(filter.dateFrom) } : {}),
+            ...(filter.dateTo ? { lte: new Date(filter.dateTo) } : {}),
+          },
+        }
+      : {}),
+    ...(filter.partyName ? { partyName: { contains: filter.partyName, mode: "insensitive" as const } } : {}),
+    ...(filter.search
+      ? {
+          OR: [
+            { invoiceNumber: { contains: filter.search, mode: "insensitive" as const } },
+            { partyName: { contains: filter.search, mode: "insensitive" as const } },
+            { sellerName: { contains: filter.search, mode: "insensitive" as const } },
+            { items: { some: { productName: { contains: filter.search, mode: "insensitive" as const } } } },
+          ],
+        }
+      : {}),
   });
   return rows.map(mapSummary);
 }
@@ -158,8 +197,8 @@ export async function getRelatedDocuments(invoiceId: string): Promise<RelatedDoc
   if (!invoice) return { source: null, derived: [] };
 
   const [sourceRow, derivedRows] = await Promise.all([
-    invoice.sourceInvoiceId ? db.invoice.findUnique({ where: { id: invoice.sourceInvoiceId } }) : null,
-    db.invoice.findMany({ where: { sourceInvoiceId: invoiceId }, orderBy: { createdAt: "desc" } }),
+    invoice.sourceInvoiceId ? db.invoice.findUnique({ where: { id: invoice.sourceInvoiceId }, include: paymentsInclude }) : null,
+    db.invoice.findMany({ where: { sourceInvoiceId: invoiceId }, include: paymentsInclude, orderBy: { createdAt: "desc" } }),
   ]);
 
   return {
@@ -168,39 +207,170 @@ export async function getRelatedDocuments(invoiceId: string): Promise<RelatedDoc
   };
 }
 
-export async function getDashboardStatsForOwner(ownerId: string): Promise<InvoiceDashboardStats> {
-  const unpaidStatuses = ["SENT", "PENDING", "PARTIALLY_PAID", "OVERDUE"] as const;
+export async function getInvoiceActivity(invoiceId: string): Promise<InvoiceActivityRecord[]> {
+  const rows = await db.invoiceActivity.findMany({
+    where: { invoiceId },
+    include: { actor: { select: { name: true, email: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    invoiceId: r.invoiceId,
+    type: r.type,
+    description: r.description,
+    actorName: r.actor ? r.actor.name || r.actor.email : null,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
 
-  const [salesAgg, purchaseAgg, outstandingAgg, paidAgg, overdueCount, draftCount, recentRows] =
-    await Promise.all([
-      db.invoice.aggregate({
-        where: { ownerId, type: "SALES", archivedAt: null },
-        _sum: { grandTotal: true },
-      }),
-      db.invoice.aggregate({
-        where: { ownerId, type: "PURCHASE", archivedAt: null },
-        _sum: { grandTotal: true },
-      }),
-      db.invoice.aggregate({
-        where: { ownerId, archivedAt: null, status: { in: [...unpaidStatuses] } },
-        _sum: { grandTotal: true },
-      }),
-      db.invoice.aggregate({
-        where: { ownerId, archivedAt: null, status: "PAID" },
-        _sum: { grandTotal: true },
-      }),
-      db.invoice.count({ where: { ownerId, archivedAt: null, status: "OVERDUE" } }),
-      db.invoice.count({ where: { ownerId, archivedAt: null, status: "DRAFT" } }),
-      db.invoice.findMany({ where: { ownerId, archivedAt: null }, orderBy: { createdAt: "desc" }, take: 8 }),
-    ]);
+function bucketKeyAndLabel(date: Date, granularity: "day" | "month"): { key: string; label: string } {
+  return granularity === "day"
+    ? { key: format(date, "yyyy-MM-dd"), label: format(date, "MMM d") }
+    : { key: format(date, "yyyy-MM"), label: format(date, "MMM yyyy") };
+}
+
+export async function getDashboardStatsForOwner(ownerId: string, period: DashboardPeriod = "THIS_MONTH"): Promise<InvoiceDashboardStats> {
+  const { from, to } = resolvePeriodRange(period);
+  const dateWindow = { gte: from, lte: to };
+  const granularity = chartBucketGranularity(from, to);
+  const buckets = granularity === "day" ? eachDayOfInterval({ start: from, end: to }) : eachMonthOfInterval({ start: from, end: to });
+
+  const [periodInvoices, expensesAgg, expensesByCategory, periodPayments, draftCount, recentRows] = await Promise.all([
+    db.invoice.findMany({
+      where: { ownerId, archivedAt: null, invoiceDate: dateWindow },
+      select: { type: true, status: true, dueDate: true, invoiceDate: true, grandTotal: true, payments: { select: { amount: true } } },
+    }),
+    db.expense.aggregate({ where: { ownerId, occurredAt: dateWindow }, _sum: { amount: true } }),
+    db.expense.groupBy({ by: ["category"], where: { ownerId, occurredAt: dateWindow }, _sum: { amount: true } }),
+    db.payment.findMany({
+      where: { invoice: { ownerId }, paymentDate: dateWindow },
+      select: { amount: true, paymentDate: true, invoice: { select: { type: true } } },
+    }),
+    db.invoice.count({ where: { ownerId, archivedAt: null, status: "DRAFT" } }),
+    db.invoice.findMany({
+      where: { ownerId, archivedAt: null },
+      include: paymentsInclude,
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+  ]);
+
+  let totalSales = new Decimal(0);
+  let totalPurchases = new Decimal(0);
+  let salesOutstanding = new Decimal(0);
+  let salesOverdue = new Decimal(0);
+  let purchaseOutstanding = new Decimal(0);
+  let purchaseOverdue = new Decimal(0);
+  let creditNotes = new Decimal(0);
+  let salesReturns = new Decimal(0);
+  let debitNotes = new Decimal(0);
+  let overdueCount = 0;
+  let paidAmount = new Decimal(0);
+
+  const salesByBucket = new Map<string, Decimal>();
+  const purchasesByBucket = new Map<string, Decimal>();
+
+  for (const inv of periodInvoices) {
+    const grandTotal = dec(inv.grandTotal);
+    const { balanceDue, amountPaid, isOverdue } = derivePaymentFields(inv);
+
+    if (inv.type === "SALES") {
+      totalSales = totalSales.plus(grandTotal);
+      salesOutstanding = salesOutstanding.plus(balanceDue);
+      if (isOverdue) salesOverdue = salesOverdue.plus(balanceDue);
+      const { key } = bucketKeyAndLabel(inv.invoiceDate, granularity);
+      salesByBucket.set(key, (salesByBucket.get(key) ?? new Decimal(0)).plus(grandTotal));
+    } else if (inv.type === "PURCHASE") {
+      totalPurchases = totalPurchases.plus(grandTotal);
+      purchaseOutstanding = purchaseOutstanding.plus(balanceDue);
+      if (isOverdue) purchaseOverdue = purchaseOverdue.plus(balanceDue);
+      const { key } = bucketKeyAndLabel(inv.invoiceDate, granularity);
+      purchasesByBucket.set(key, (purchasesByBucket.get(key) ?? new Decimal(0)).plus(grandTotal));
+    } else if (inv.type === "CREDIT_NOTE") {
+      creditNotes = creditNotes.plus(grandTotal);
+    } else if (inv.type === "SALES_RETURN") {
+      salesReturns = salesReturns.plus(grandTotal);
+    } else if (inv.type === "DEBIT_NOTE") {
+      debitNotes = debitNotes.plus(grandTotal);
+    }
+
+    if (PAYABLE_TYPES.includes(inv.type)) {
+      paidAmount = paidAmount.plus(amountPaid);
+      if (isOverdue) overdueCount += 1;
+    }
+  }
+
+  let received = new Decimal(0);
+  let paid = new Decimal(0);
+  const receivedByBucket = new Map<string, Decimal>();
+  const paidByBucket = new Map<string, Decimal>();
+  for (const p of periodPayments) {
+    const amount = dec(p.amount);
+    const { key } = bucketKeyAndLabel(p.paymentDate, granularity);
+    if (p.invoice.type === "SALES") {
+      received = received.plus(amount);
+      receivedByBucket.set(key, (receivedByBucket.get(key) ?? new Decimal(0)).plus(amount));
+    } else if (p.invoice.type === "PURCHASE") {
+      paid = paid.plus(amount);
+      paidByBucket.set(key, (paidByBucket.get(key) ?? new Decimal(0)).plus(amount));
+    }
+  }
+
+  const chartSalesVsPurchase = buckets.map((d) => {
+    const { key, label } = bucketKeyAndLabel(d, granularity);
+    return {
+      label,
+      sales: (salesByBucket.get(key) ?? new Decimal(0)).toFixed(2),
+      purchases: (purchasesByBucket.get(key) ?? new Decimal(0)).toFixed(2),
+    };
+  });
+
+  const chartPaymentsOverTime = buckets.map((d) => {
+    const { key, label } = bucketKeyAndLabel(d, granularity);
+    return {
+      label,
+      received: (receivedByBucket.get(key) ?? new Decimal(0)).toFixed(2),
+      paid: (paidByBucket.get(key) ?? new Decimal(0)).toFixed(2),
+    };
+  });
+
+  const chartExpensesByCategory = expensesByCategory
+    .map((g) => ({ category: g.category, amount: dec(g._sum.amount) }))
+    .filter((g) => Number(g.amount) > 0)
+    .sort((a, b) => Number(b.amount) - Number(a.amount));
 
   return {
-    totalSales: dec(salesAgg._sum.grandTotal),
-    totalPurchases: dec(purchaseAgg._sum.grandTotal),
-    outstandingAmount: dec(outstandingAgg._sum.grandTotal),
-    paidAmount: dec(paidAgg._sum.grandTotal),
+    totalSales: totalSales.toFixed(2),
+    totalPurchases: totalPurchases.toFixed(2),
+    outstandingAmount: salesOutstanding.plus(purchaseOutstanding).toFixed(2),
+    paidAmount: paidAmount.toFixed(2),
     overdueCount,
     draftCount,
     recent: recentRows.map(mapSummary),
+
+    receivables: salesOutstanding.toFixed(2),
+    payables: purchaseOutstanding.toFixed(2),
+    overdueReceivable: salesOverdue.toFixed(2),
+    overduePayable: purchaseOverdue.toFixed(2),
+    totalExpenses: dec(expensesAgg._sum.amount),
+
+    salesSummary: {
+      invoiced: totalSales.toFixed(2),
+      received: received.toFixed(2),
+      outstanding: salesOutstanding.toFixed(2),
+      overdue: salesOverdue.toFixed(2),
+      creditNotes: creditNotes.toFixed(2),
+      salesReturns: salesReturns.toFixed(2),
+    },
+    purchaseSummary: {
+      purchased: totalPurchases.toFixed(2),
+      paid: paid.toFixed(2),
+      outstanding: purchaseOutstanding.toFixed(2),
+      debitNotes: debitNotes.toFixed(2),
+    },
+
+    chartSalesVsPurchase,
+    chartPaymentsOverTime,
+    chartExpensesByCategory,
   };
 }

@@ -1,4 +1,4 @@
-import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup } from "@/types/invoicing";
+import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceRecord } from "@/types/invoicing";
 import { formatMoney, formatQuantity, formatShortDate, INVOICE_STATUS_LABELS, INVOICE_TYPE_LABELS } from "@/lib/invoicing/ui";
 import { invoiceFamily } from "@/lib/invoicing/family";
 import { StatusBadge } from "@/components/portal/status-badge";
@@ -67,6 +67,68 @@ export interface InvoicePreviewProps {
   termsAndConditions?: string | null;
 
   className?: string;
+}
+
+/**
+ * The single source of truth for turning a persisted InvoiceRecord into
+ * InvoicePreviewProps — used by the on-screen preview, the PDF builder, and
+ * the print route, so all three can never disagree on what an invoice says.
+ */
+export function toInvoicePreviewProps(invoice: InvoiceRecord, status: InvoiceStatus = invoice.status): InvoicePreviewProps {
+  return {
+    type: invoice.type,
+    status,
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceDate: invoice.invoiceDate,
+    dueDate: invoice.dueDate,
+    currency: invoice.currency,
+    paymentTerms: invoice.paymentTerms,
+    referenceNumber: invoice.referenceNumber,
+    sellerName: invoice.sellerName,
+    sellerAddress: invoice.sellerAddress,
+    sellerTaxId: invoice.sellerTaxId,
+    sellerPhone: invoice.sellerPhone,
+    sellerEmail: invoice.sellerEmail,
+    sellerLogoUrl: invoice.sellerLogoUrl,
+    partyName: invoice.partyName,
+    partyContactPerson: invoice.partyContactPerson,
+    partyEmail: invoice.partyEmail,
+    partyPhone: invoice.partyPhone,
+    partyBillingAddress: invoice.partyBillingAddress,
+    partyShippingAddress: invoice.partyShippingAddress,
+    partyTaxId: invoice.partyTaxId,
+    taxMode: invoice.taxMode,
+    taxBreakup: invoice.taxBreakup,
+    items: invoice.items.map((it) => ({
+      productName: it.productName,
+      description: it.description,
+      hsnSac: it.hsnSac,
+      quantity: it.quantity,
+      unit: it.unit,
+      rate: it.rate,
+      discountPercent: it.discountPercent,
+      taxPercent: it.taxPercent,
+      taxAmount: it.taxAmount,
+      lineTotal: it.lineTotal,
+    })),
+    totals: {
+      subtotal: invoice.subtotal,
+      itemDiscountTotal: invoice.itemDiscountTotal,
+      taxableAmount: invoice.taxableAmount,
+      cgstTotal: invoice.cgstTotal,
+      sgstTotal: invoice.sgstTotal,
+      igstTotal: invoice.igstTotal,
+      taxTotal: invoice.taxTotal,
+      shippingCharge: invoice.shippingCharge,
+      miscCharge: invoice.miscCharge,
+      additionalDiscount: invoice.additionalDiscount,
+      roundOff: invoice.roundOff,
+      grandTotal: invoice.grandTotal,
+    },
+    miscChargeLabel: invoice.miscChargeLabel,
+    customerNotes: invoice.customerNotes,
+    termsAndConditions: invoice.termsAndConditions,
+  };
 }
 
 function isoOrRaw(date: string): string {

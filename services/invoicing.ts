@@ -7,13 +7,18 @@ import { calculateInvoiceTotals } from "@/lib/invoicing/calc";
 import { previewNextInvoiceNumber, consumeNextInvoiceNumber } from "@/lib/invoicing/numbering";
 import { resolveInvoiceAccess } from "@/lib/invoicing/permissions";
 import { invoiceFamily, isValidDerivation } from "@/lib/invoicing/family";
+import { isManuallySettableStatus } from "@/lib/invoicing/status";
+import type { DashboardPeriod } from "@/lib/invoicing/period";
+import { logInvoiceActivity } from "@/lib/invoicing/activity";
 import {
   getInvoiceById,
   listInvoicesForOwner,
   getDashboardStatsForOwner,
   getRelatedDocuments,
+  getInvoiceActivity,
 } from "@/lib/invoicing/queries";
 import { getOrCreateCatalogForOwner } from "@/lib/catalog-queries";
+import { INVOICE_STATUS_LABELS } from "@/lib/invoicing/ui";
 import { invoiceFormSchema, type InvoiceFormValues, type InvoiceItemInputValues } from "@/lib/validations/invoicing";
 import type {
   InvoiceRecord,
@@ -26,6 +31,7 @@ import type {
   DirectoryOption,
   CatalogRowOption,
   RelatedDocuments,
+  InvoiceActivityRecord,
 } from "@/types/invoicing";
 
 async function requireUser() {
@@ -144,10 +150,10 @@ export async function listInvoicesAction(filter: InvoiceListFilter): Promise<Inv
   return { success: true, data: await listInvoicesForOwner(user.id, filter) };
 }
 
-export async function getInvoiceDashboardStatsAction(): Promise<InvoiceActionResult<InvoiceDashboardStats>> {
+export async function getInvoiceDashboardStatsAction(period?: DashboardPeriod): Promise<InvoiceActionResult<InvoiceDashboardStats>> {
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
-  return { success: true, data: await getDashboardStatsForOwner(user.id) };
+  return { success: true, data: await getDashboardStatsForOwner(user.id, period) };
 }
 
 export async function previewNextInvoiceNumberAction(
@@ -256,6 +262,43 @@ export async function getRelatedDocumentsAction(id: string): Promise<InvoiceActi
   return { success: true, data: await getRelatedDocuments(id) };
 }
 
+export async function getInvoiceActivityAction(id: string): Promise<InvoiceActionResult<InvoiceActivityRecord[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const invoice = await getInvoiceById(id);
+  if (!invoice) return { success: false, error: "Invoice not found." };
+  const access = resolveInvoiceAccess({ userId: user.id, invoice });
+  if (!access.canView) return { success: false, error: "Invoice not found." };
+
+  return { success: true, data: await getInvoiceActivity(id) };
+}
+
+/**
+ * UX-only pre-save availability hint — never the source of truth. Two
+ * concurrent requests can both see "available" and both attempt to save;
+ * the real guarantee is the `@@unique([ownerId, type, invoiceNumber])` DB
+ * constraint + the P2002 catch in createInvoiceAction/updateInvoiceAction.
+ */
+export async function checkInvoiceNumberAvailableAction(
+  type: InvoiceType,
+  invoiceNumber: string,
+  excludeId?: string
+): Promise<InvoiceActionResult<{ available: boolean }>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const trimmed = invoiceNumber.trim();
+  if (!trimmed) return { success: true, data: { available: true } };
+
+  const existing = await db.invoice.findUnique({
+    where: { ownerId_type_invoiceNumber: { ownerId: user.id, type, invoiceNumber: trimmed } },
+    select: { id: true },
+  });
+
+  return { success: true, data: { available: !existing || existing.id === excludeId } };
+}
+
 export async function createInvoiceAction(input: InvoiceFormValues): Promise<InvoiceActionResult<{ id: string }>> {
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
@@ -281,6 +324,10 @@ export async function createInvoiceAction(input: InvoiceFormValues): Promise<Inv
     }
   }
 
+  if (!isManuallySettableStatus(d.type, d.status)) {
+    return { success: false, error: "That status isn't valid for this document type." };
+  }
+
   const calc = calculateInvoiceTotals(buildCalcInput(d));
 
   let invoiceNumber = d.invoiceNumber.trim();
@@ -289,20 +336,70 @@ export async function createInvoiceAction(input: InvoiceFormValues): Promise<Inv
     invoiceNumber = await consumeNextInvoiceNumber(user.id, d.type);
   }
 
+  // A Tax Invoice created from a Quotation marks that Quotation CONVERTED —
+  // system-set, mirroring how PAID/PARTIALLY_PAID are system-set from real
+  // payments (see lib/invoicing/status.ts) rather than left to drift.
+  const convertsQuotation = d.sourceInvoiceId && d.type === "SALES";
+
+  // Activity type/description on both the new document and its source
+  // differ per dependent-document kind — spec §19 wants these
+  // distinguishable (Quotation Converted / Credit Note Created / ...).
+  const DEPENDENT_ACTIVITY: Partial<Record<InvoiceType, { type: string; describeNew: (n: string) => string; describeSource: (n: string) => string }>> = {
+    SALES: {
+      type: "CONVERTED",
+      describeNew: (n) => `Created from quotation, ${n}.`,
+      describeSource: (n) => `Converted to Tax Invoice ${n}.`,
+    },
+    CREDIT_NOTE: {
+      type: "CREDIT_NOTE_CREATED",
+      describeNew: (n) => `Created from invoice ${n}.`,
+      describeSource: (n) => `Credit Note ${n} created from this invoice.`,
+    },
+    SALES_RETURN: {
+      type: "SALES_RETURN_CREATED",
+      describeNew: (n) => `Created from invoice ${n}.`,
+      describeSource: (n) => `Sales Return ${n} created from this invoice.`,
+    },
+    DEBIT_NOTE: {
+      type: "DEBIT_NOTE_CREATED",
+      describeNew: (n) => `Created from invoice ${n}.`,
+      describeSource: (n) => `Debit Note ${n} created from this invoice.`,
+    },
+  };
+
   try {
-    const created = await db.invoice.create({
-      data: {
-        ...buildInvoiceData(d, calc),
-        invoiceNumber,
-        ownerId: user.id,
-        sourceInvoiceId: d.sourceInvoiceId || null,
-        items: { create: buildItemsData(d.items, calc) },
-      },
-      select: { id: true },
+    const created = await db.$transaction(async (tx) => {
+      const invoice = await tx.invoice.create({
+        data: {
+          ...buildInvoiceData(d, calc),
+          invoiceNumber,
+          ownerId: user.id,
+          sourceInvoiceId: d.sourceInvoiceId || null,
+          items: { create: buildItemsData(d.items, calc) },
+        },
+        select: { id: true },
+      });
+
+      if (d.sourceInvoiceId) {
+        const sourceNumber = await tx.invoice.findUnique({ where: { id: d.sourceInvoiceId }, select: { invoiceNumber: true } });
+        const meta = DEPENDENT_ACTIVITY[d.type];
+        await logInvoiceActivity(invoice.id, "CREATED", meta ? meta.describeNew(sourceNumber?.invoiceNumber ?? "") : "Invoice created.", user.id, tx);
+        if (meta) {
+          await logInvoiceActivity(d.sourceInvoiceId, meta.type, meta.describeSource(invoiceNumber), user.id, tx);
+        }
+      } else {
+        await logInvoiceActivity(invoice.id, "CREATED", "Invoice created.", user.id, tx);
+      }
+
+      if (convertsQuotation && d.sourceInvoiceId) {
+        await tx.invoice.update({ where: { id: d.sourceInvoiceId }, data: { status: "CONVERTED" } });
+      }
+
+      return invoice;
     });
     return { success: true, data: { id: created.id } };
   } catch (err) {
-    if (isUniqueConstraintError(err)) return { success: false, error: "That invoice number is already used." };
+    if (isUniqueConstraintError(err)) return { success: false, error: "This invoice number is already in use." };
     throw err;
   }
 }
@@ -316,7 +413,7 @@ export async function updateInvoiceAction(
 
   const existing = await db.invoice.findUnique({
     where: { id },
-    select: { ownerId: true, counterpartyUserId: true },
+    select: { ownerId: true, counterpartyUserId: true, type: true },
   });
   if (!existing) return { success: false, error: "Invoice not found." };
   const access = resolveInvoiceAccess({ userId: user.id, invoice: existing });
@@ -326,20 +423,27 @@ export async function updateInvoiceAction(
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
   const d = parsed.data;
 
+  if (!isManuallySettableStatus(existing.type, d.status)) {
+    return { success: false, error: "That status isn't valid for this document type." };
+  }
+
   const calc = calculateInvoiceTotals(buildCalcInput(d));
 
   try {
-    await db.invoice.update({
-      where: { id },
-      data: {
-        ...buildInvoiceData(d, calc),
-        invoiceNumber: d.invoiceNumber.trim(),
-        items: { deleteMany: {}, create: buildItemsData(d.items, calc) },
-      },
+    await db.$transaction(async (tx) => {
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          ...buildInvoiceData(d, calc),
+          invoiceNumber: d.invoiceNumber.trim(),
+          items: { deleteMany: {}, create: buildItemsData(d.items, calc) },
+        },
+      });
+      await logInvoiceActivity(id, "UPDATED", "Invoice details updated.", user.id, tx);
     });
     return { success: true, data: { id } };
   } catch (err) {
-    if (isUniqueConstraintError(err)) return { success: false, error: "That invoice number is already used." };
+    if (isUniqueConstraintError(err)) return { success: false, error: "This invoice number is already in use." };
     throw err;
   }
 }
@@ -424,6 +528,7 @@ export async function duplicateInvoiceAction(id: string): Promise<InvoiceActionR
     },
     select: { id: true },
   });
+  await logInvoiceActivity(copy.id, "CREATED", `Duplicated from ${existing.invoiceNumber}.`, user.id);
   return { success: true, data: { id: copy.id } };
 }
 
@@ -431,12 +536,26 @@ export async function setInvoiceStatusAction(id: string, status: InvoiceStatus):
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
 
-  const existing = await db.invoice.findUnique({ where: { id }, select: { ownerId: true, counterpartyUserId: true } });
+  const existing = await db.invoice.findUnique({ where: { id }, select: { ownerId: true, counterpartyUserId: true, type: true, status: true } });
   if (!existing) return { success: false, error: "Invoice not found." };
   const access = resolveInvoiceAccess({ userId: user.id, invoice: existing });
   if (!access.canChangeStatus) return { success: false, error: "Invoice not found." };
 
-  await db.invoice.update({ where: { id }, data: { status } });
+  if (!isManuallySettableStatus(existing.type, status)) {
+    return { success: false, error: "That status isn't valid for this document type." };
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.invoice.update({ where: { id }, data: { status } });
+    await logInvoiceActivity(
+      id,
+      "STATUS_CHANGED",
+      `Status changed from ${INVOICE_STATUS_LABELS[existing.status]} to ${INVOICE_STATUS_LABELS[status]}.`,
+      user.id,
+      tx
+    );
+  });
+
   return { success: true, data: undefined };
 }
 
@@ -449,6 +568,9 @@ export async function archiveInvoiceAction(id: string): Promise<InvoiceActionRes
   const access = resolveInvoiceAccess({ userId: user.id, invoice: existing });
   if (!access.canArchive) return { success: false, error: "Invoice not found." };
 
-  await db.invoice.update({ where: { id }, data: { archivedAt: new Date() } });
+  await db.$transaction(async (tx) => {
+    await tx.invoice.update({ where: { id }, data: { archivedAt: new Date() } });
+    await logInvoiceActivity(id, "ARCHIVED", "Invoice archived.", user.id, tx);
+  });
   return { success: true, data: undefined };
 }

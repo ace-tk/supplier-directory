@@ -28,6 +28,8 @@ const STATUS_STYLES: Record<string, string> = {
   "Partially Paid": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   "Out of Stock": "bg-red-500/10 text-red-600 dark:text-red-400",
   Overdue: "bg-red-500/10 text-red-600 dark:text-red-400",
+  "Due Today": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  "Due Soon": "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   Unavailable: "bg-red-500/10 text-red-600 dark:text-red-400",
   Deactivated: "bg-red-500/10 text-red-600 dark:text-red-400",
   Restocked: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",

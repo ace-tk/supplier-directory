@@ -1,4 +1,4 @@
-import type { InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceType, InvoiceReason } from "@/types/invoicing";
+import type { InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceType, InvoiceReason, PaymentMethod } from "@/types/invoicing";
 
 export { formatShortDate, formatDateTime } from "@/lib/supply-chain-ui";
 
@@ -35,19 +35,27 @@ export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
   PENDING: "Pending",
   PARTIALLY_PAID: "Partially Paid",
   PAID: "Paid",
-  OVERDUE: "Overdue",
   CANCELLED: "Cancelled",
+  // Quotation lifecycle
+  ACCEPTED: "Accepted",
+  REJECTED: "Rejected",
+  EXPIRED: "Expired",
+  CONVERTED: "Converted",
+  // Credit Note / Sales Return / Debit Note lifecycle
+  ISSUED: "Issued",
+  APPLIED: "Applied",
 };
 
-export const INVOICE_STATUS_OPTIONS: InvoiceStatus[] = [
-  "DRAFT",
-  "SENT",
-  "PENDING",
-  "PARTIALLY_PAID",
-  "PAID",
-  "OVERDUE",
-  "CANCELLED",
-];
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CASH: "Cash",
+  BANK_TRANSFER: "Bank Transfer",
+  UPI: "UPI",
+  CARD: "Card",
+  CHEQUE: "Cheque",
+  OTHER: "Other",
+};
+
+export const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = ["CASH", "BANK_TRANSFER", "UPI", "CARD", "CHEQUE", "OTHER"];
 
 export const TAX_MODE_LABELS: Record<InvoiceTaxMode, string> = {
   EXCLUSIVE: "Tax-exclusive (add tax on top)",
@@ -73,6 +81,20 @@ export function formatMoney(value: string | number, currency = "INR"): string {
   const locale = CURRENCY_LOCALE[currency] ?? "en-IN";
   if (!Number.isFinite(amount)) return "—";
   return amount.toLocaleString(locale, { style: "currency", currency, maximumFractionDigits: 2 });
+}
+
+/** Subtle Due Today/Due Soon/Overdue/Paid indicator for list rows — null means no indicator is warranted. */
+export function getDueIndicatorLabel(inv: { status: InvoiceStatus; dueDate: string; balanceDue: string; isOverdue: boolean }): string | null {
+  if (inv.status === "PAID") return "Paid";
+  if (inv.isOverdue) return "Overdue";
+  if (Number(inv.balanceDue) <= 0) return null;
+
+  const due = new Date(inv.dueDate);
+  if (Number.isNaN(due.getTime())) return null;
+  const daysUntilDue = Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  if (daysUntilDue === 0) return "Due Today";
+  if (daysUntilDue > 0 && daysUntilDue <= 3) return "Due Soon";
+  return null;
 }
 
 export function formatQuantity(value: string | number): string {

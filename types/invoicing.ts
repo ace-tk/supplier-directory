@@ -4,9 +4,10 @@ import type {
   InvoiceTaxMode,
   InvoiceTaxBreakup,
   InvoiceReason,
+  PaymentMethod,
 } from "@/lib/generated/prisma/enums";
 
-export type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason };
+export type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, PaymentMethod };
 
 export interface InvoiceItemRecord {
   id: string;
@@ -88,6 +89,13 @@ export interface InvoiceRecord {
 
   createdAt: string;
   updatedAt: string;
+
+  // Always derived from real Payment rows + dueDate at read time — never
+  // stored. See lib/invoicing/payments.ts. Zero/false for document types
+  // that don't accept payments (Quotation, Credit Note, Sales Return, Debit Note).
+  amountPaid: string;
+  balanceDue: string;
+  isOverdue: boolean;
 }
 
 /** Lightweight shape for list/dashboard views — no line items. */
@@ -103,6 +111,39 @@ export interface InvoiceListFilter {
   partyName?: string;
 }
 
+export interface SalesSummary {
+  invoiced: string;
+  received: string;
+  outstanding: string;
+  overdue: string;
+  creditNotes: string;
+  salesReturns: string;
+}
+
+export interface PurchaseSummary {
+  purchased: string;
+  paid: string;
+  outstanding: string;
+  debitNotes: string;
+}
+
+export interface ChartPoint {
+  label: string;
+  sales: string;
+  purchases: string;
+}
+
+export interface PaymentChartPoint {
+  label: string;
+  received: string;
+  paid: string;
+}
+
+export interface ExpenseCategoryPoint {
+  category: string;
+  amount: string;
+}
+
 export interface InvoiceDashboardStats {
   totalSales: string;
   totalPurchases: string;
@@ -111,6 +152,19 @@ export interface InvoiceDashboardStats {
   overdueCount: number;
   draftCount: number;
   recent: InvoiceSummary[];
+
+  receivables: string;
+  payables: string;
+  overdueReceivable: string;
+  overduePayable: string;
+  totalExpenses: string;
+
+  salesSummary: SalesSummary;
+  purchaseSummary: PurchaseSummary;
+
+  chartSalesVsPurchase: ChartPoint[];
+  chartPaymentsOverTime: PaymentChartPoint[];
+  chartExpensesByCategory: ExpenseCategoryPoint[];
 }
 
 export interface DirectoryOption {
@@ -196,6 +250,36 @@ export interface InvoiceFormInput {
 export interface RelatedDocuments {
   source: InvoiceSummary | null;
   derived: InvoiceSummary[];
+}
+
+export interface PaymentRecord {
+  id: string;
+  invoiceId: string;
+  amount: string;
+  paymentDate: string;
+  method: PaymentMethod;
+  referenceNumber: string | null;
+  notes: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface RecordPaymentInput {
+  amount: string;
+  paymentDate: string;
+  method: PaymentMethod;
+  referenceNumber?: string;
+  notes?: string;
+}
+
+export interface InvoiceActivityRecord {
+  id: string;
+  invoiceId: string;
+  type: string;
+  description: string;
+  actorName: string | null;
+  createdAt: string;
 }
 
 export type InvoiceActionResult<T = void> =
