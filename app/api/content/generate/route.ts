@@ -3,7 +3,7 @@ import { getUser } from "@/lib/session";
 import { runChatCompletion, AIConfigError, OpenAI } from "@/lib/ai/openai-client";
 import { sanitizeEditorHtml } from "@/lib/ai/sanitize-html";
 import { generateContentSchema } from "@/lib/validations/content";
-import { CONTENT_TYPE_LABELS, CONTENT_LANGUAGE_LABELS, CONTENT_TONE_LABELS, CONTENT_AUDIENCE_LABELS } from "@/lib/content-ui";
+import { buildContentGenerationPrompt, GENERATION_MAX_TOKENS } from "@/lib/ai/prompts/content-generation";
 
 // AI Content Studio — the only place OpenAI is called from. The API key
 // never leaves the server: it's read once here via process.env and used to
@@ -27,23 +27,10 @@ export async function POST(req: Request) {
   }
   const { title, contentType, language, tone, audience, prompt } = parsed.data;
 
-  const systemPrompt = [
-    "You are an expert B2B wholesale marketplace copywriter working for SupplyBase, a supplier/buyer trading platform.",
-    "Write copy that is specific, credible, and free of generic filler — no vague superscript claims, no placeholder brackets.",
-    `Content type: ${CONTENT_TYPE_LABELS[contentType]}.`,
-    `Tone: ${CONTENT_TONE_LABELS[tone]}.`,
-    `Target audience: ${CONTENT_AUDIENCE_LABELS[audience]}.`,
-    `Language: write the entire response in ${CONTENT_LANGUAGE_LABELS[language]}.`,
-    "Output ONLY clean semantic HTML fit to insert directly into a rich text editor's content area.",
-    "Use tags like <h2>, <h3>, <p>, <ul>/<li>, <strong>, <em> where appropriate for the content type.",
-    "Do NOT include <html>, <head>, <body>, markdown syntax, or code fences — just the inner HTML fragment.",
-    "Keep the length appropriate to the content type (concise for a product description or social caption, longer for a blog or newsletter).",
-  ].join(" ");
-
-  const userPrompt = `Title: ${title}\n\nInstructions: ${prompt}`;
+  const { system, user: userPrompt } = buildContentGenerationPrompt({ title, contentType, language, tone, audience, prompt });
 
   try {
-    const html = await runChatCompletion({ system: systemPrompt, user: userPrompt });
+    const html = await runChatCompletion({ system, user: userPrompt, maxTokens: GENERATION_MAX_TOKENS });
     return NextResponse.json({ html: sanitizeEditorHtml(html) });
   } catch (err) {
     console.error("[content/generate] OpenAI request failed:", err);

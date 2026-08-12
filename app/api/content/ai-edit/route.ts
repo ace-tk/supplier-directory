@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUser } from "@/lib/session";
 import { runChatCompletion, AIConfigError, OpenAI } from "@/lib/ai/openai-client";
-import { buildContentEditPrompt, maxTokensForAction } from "@/lib/ai/content-edit-actions";
+import { buildContentEditPrompt, maxTokensForAction } from "@/lib/ai/prompts/content-editing";
 import { sanitizeEditorHtml } from "@/lib/ai/sanitize-html";
 import { aiEditContentSchema } from "@/lib/validations/content";
 import { CONTENT_LANGUAGE_LABELS } from "@/lib/content-ui";
