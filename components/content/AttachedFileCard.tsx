@@ -35,7 +35,7 @@ export function AttachedFileCard({
         <p className="text-xs font-medium text-foreground truncate">{file.fileName}</p>
         <p className="text-[10px] text-muted-foreground">
           {getFileTypeLabel(file.mimeType)} · {formatFileSize(file.sizeBytes)}
-          {file.createdAt ? ` · ${formatDateTime(file.createdAt)}` : " · Pending upload"}
+          {file.createdAt ? ` · ${formatDateTime(file.createdAt)}` : " · Not saved yet"}
         </p>
       </div>
       <button

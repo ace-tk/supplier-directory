@@ -1,32 +1,39 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { FileText } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getFileTypeLabel, isPdf } from "@/lib/content-file-types";
 import { getPdfThumbnail } from "@/lib/pdf-thumbnail-cache";
 import { formatFileSize, formatDateTime } from "@/lib/content-ui";
 import type { DraftAttachment } from "@/types/content";
 
-/** Lightweight hover-triggered details card — never opens the full viewer,
- * never covers the row's own controls (positioned to the side). A real PDF
- * page-1 thumbnail is rendered lazily on first hover (and cached); other
- * file types show an icon rather than a fabricated thumbnail. */
+/**
+ * Lightweight hover-triggered details card — pure CSS `:hover`, no click
+ * binding anywhere in this component. Base UI's Popover/PopoverTrigger
+ * always wires up its own click-to-open handler even with `openOnHover`
+ * set (there's no prop to disable it), which meant the wrapped row's own
+ * click-to-select handler and the popover's click-to-open handler fired on
+ * the same click — this is why selecting a file card felt broken. A real
+ * PDF page-1 thumbnail is rendered lazily on first hover (and cached);
+ * other file types show an icon rather than a fabricated thumbnail.
+ */
 export function FileHoverPreview({ file, children }: { file: DraftAttachment; children: ReactNode }) {
   const [thumb, setThumb] = useState<{ dataUrl: string; numPages: number } | null | undefined>(undefined);
+  const loadingRef = useRef(false);
 
-  async function handleOpenChange(isOpen: boolean) {
-    if (isOpen && isPdf(file.mimeType) && thumb === undefined) {
-      setThumb(await getPdfThumbnail(file.id, file.dataUrl));
+  function handleMouseEnter() {
+    if (isPdf(file.mimeType) && thumb === undefined && !loadingRef.current) {
+      loadingRef.current = true;
+      getPdfThumbnail(file.id, file.dataUrl).then(setThumb);
     }
   }
 
   return (
-    <Popover onOpenChange={handleOpenChange}>
-      <PopoverTrigger render={<div className="block" />} nativeButton={false} openOnHover delay={350} closeDelay={100}>
-        {children}
-      </PopoverTrigger>
-      <PopoverContent side="right" align="start" className="w-56 p-3 space-y-2">
+    <div className="relative group/filehover" onMouseEnter={handleMouseEnter}>
+      {children}
+      <div
+        className="pointer-events-none absolute left-full top-0 z-50 ml-2 w-56 rounded-lg border border-border bg-popover p-3 space-y-2 shadow-lg opacity-0 invisible transition-opacity duration-150 group-hover/filehover:opacity-100 group-hover/filehover:visible"
+      >
         <div className="flex items-start gap-2.5">
           {isPdf(file.mimeType) && thumb ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -48,7 +55,7 @@ export function FileHoverPreview({ file, children }: { file: DraftAttachment; ch
           <p>{formatFileSize(file.sizeBytes)}</p>
           <p>{file.createdAt ? formatDateTime(file.createdAt) : "Not saved yet"}</p>
         </div>
-      </PopoverContent>
-    </Popover>
+      </div>
+    </div>
   );
 }

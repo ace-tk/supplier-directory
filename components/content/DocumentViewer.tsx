@@ -13,6 +13,7 @@ import {
   Loader2,
   FileWarning,
   File as FileIcon,
+  RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getPdfjs, dataUrlToUint8Array, dataUrlToText } from "@/lib/pdf-client";
@@ -94,6 +95,9 @@ function PdfViewer({ file }: { file: DraftAttachment }) {
   const [error, setError] = useState<string | null>(null);
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(containerRef);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
+  // Bumped by the error state's "Retry Preview" action to re-run the load
+  // effect below without needing a fresh DocumentViewer instance.
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +110,7 @@ function PdfViewer({ file }: { file: DraftAttachment }) {
         setPageNum(1);
       })
       .catch(() => {
-        if (!cancelled) setError("Couldn't render this PDF.");
+        if (!cancelled) setError("File uploaded, but preview couldn't be loaded.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -114,11 +118,11 @@ function PdfViewer({ file }: { file: DraftAttachment }) {
     return () => {
       cancelled = true;
     };
-    // Runs once per mount — callers key DocumentViewer by file identity so a
-    // different file always gets a fresh instance instead of this effect
-    // re-running with a stale `loading`/`error` reset.
+    // Callers key DocumentViewer by file identity so a different file always
+    // gets a fresh instance; `retryKey` is the only other intentional
+    // re-run trigger (the "Retry Preview" action below).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [retryKey]);
 
   useEffect(() => {
     if (!pdfDoc || !canvasRef.current) return;
@@ -143,7 +147,19 @@ function PdfViewer({ file }: { file: DraftAttachment }) {
     };
   }, [pdfDoc, pageNum, scale]);
 
-  if (error) return <UnsupportedViewer file={file} message={error} />;
+  if (error) {
+    return (
+      <UnsupportedViewer
+        file={file}
+        message={error}
+        onRetry={() => {
+          setError(null);
+          setLoading(true);
+          setRetryKey((k) => k + 1);
+        }}
+      />
+    );
+  }
 
   return (
     <ViewerChrome
@@ -246,7 +262,7 @@ function ImageViewer({ file }: { file: DraftAttachment }) {
   );
 }
 
-function UnsupportedViewer({ file, message }: { file: DraftAttachment; message?: string }) {
+function UnsupportedViewer({ file, message, onRetry }: { file: DraftAttachment; message?: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
       {message ? <FileWarning className="h-8 w-8 text-muted-foreground" /> : <FileIcon className="h-8 w-8 text-muted-foreground" />}
@@ -260,9 +276,16 @@ function UnsupportedViewer({ file, message }: { file: DraftAttachment; message?:
           {file.createdAt ? ` · Uploaded ${formatDateTime(file.createdAt)}` : ""}
         </p>
       </div>
-      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => downloadDataUrl(file.dataUrl, file.fileName)}>
-        <Download className="h-3.5 w-3.5" /> Download
-      </Button>
+      <div className="flex items-center gap-2">
+        {onRetry && (
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={onRetry}>
+            <RotateCw className="h-3.5 w-3.5" /> Retry Preview
+          </Button>
+        )}
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => downloadDataUrl(file.dataUrl, file.fileName)}>
+          <Download className="h-3.5 w-3.5" /> Download
+        </Button>
+      </div>
     </div>
   );
 }

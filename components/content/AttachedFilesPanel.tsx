@@ -32,6 +32,12 @@ export function AttachedFilesPanel({
     if (list.length === 0) return;
     setUploading(true);
     try {
+      // Convert every file first and append them all in one state update —
+      // calling onAttachmentsChange per-file inside the loop would read the
+      // same stale `attachments` closure each time (no re-render happens
+      // between awaits within one call), so a second file in the same
+      // selection would silently replace the first instead of joining it.
+      const added: DraftAttachment[] = [];
       for (const file of list) {
         const validation = validateDocumentOrImage(file.type, file.size, file.name);
         if (!validation.valid) {
@@ -42,11 +48,12 @@ export function AttachedFilesPanel({
         try {
           dataUrl = await fileToDataUrl(file);
         } catch {
-          toast.error(`${file.name}: Upload failed. Please try again.`);
+          toast.error(`${file.name}: Upload failed — Retry.`);
           continue;
         }
-        onAttachmentsChange([...attachments, { fileName: file.name, mimeType: file.type, sizeBytes: file.size, dataUrl }]);
+        added.push({ fileName: file.name, mimeType: file.type, sizeBytes: file.size, dataUrl });
       }
+      if (added.length > 0) onAttachmentsChange([...attachments, ...added]);
     } finally {
       setUploading(false);
     }
