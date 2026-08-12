@@ -10,6 +10,8 @@ export const DOCUMENT_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
   "application/zip",
   "application/x-zip-compressed",
 ];
@@ -45,7 +47,7 @@ export function validateVideo(mimeType: string, sizeBytes: number): FileValidati
 
 export function validateDocument(mimeType: string, sizeBytes: number): FileValidationResult {
   if (!DOCUMENT_MIME_TYPES.includes(mimeType)) {
-    return { valid: false, error: "Only PDF, Word, Excel, or ZIP files are supported." };
+    return { valid: false, error: "Only PDF, Word, PowerPoint, Excel, TXT, or ZIP files are supported." };
   }
   if (sizeBytes > MAX_DOCUMENT_BYTES) {
     return { valid: false, error: "Files must be under 10MB." };

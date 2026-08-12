@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { VoiceNotesField } from "./VoiceNotesField";
 import { createArticleAction, updateArticleAction, fetchArticleMetadataAction } from "@/services/article";
 import type { ArticleRecord } from "@/types/article";
 
@@ -133,10 +133,7 @@ export function ArticleFormDialog({
             <Input value={form.title} onChange={(e) => patch({ title: e.target.value })} placeholder="Optional" />
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">Description / Notes</Label>
-            <Textarea rows={3} value={form.description} onChange={(e) => patch({ description: e.target.value })} placeholder="Optional" />
-          </div>
+          <VoiceNotesField value={form.description} onChange={(v) => patch({ description: v })} />
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">

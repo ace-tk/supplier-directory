@@ -18,6 +18,7 @@ export const AI_EDIT_ACTIONS = [
   "FIX_GRAMMAR",
   "SIMPLIFY",
   "SEO_OPTIMIZE",
+  "SUMMARIZE",
 ] as const;
 
 export type AIEditAction = (typeof AI_EDIT_ACTIONS)[number];
@@ -35,6 +36,7 @@ export const AI_EDIT_ACTION_LABELS: Record<AIEditAction, string> = {
   FIX_GRAMMAR: "Fix Grammar",
   SIMPLIFY: "Simplify",
   SEO_OPTIMIZE: "SEO Optimize",
+  SUMMARIZE: "AI Summarize",
 };
 
 const ACTION_INSTRUCTIONS: Record<AIEditAction, string> = {
@@ -50,6 +52,7 @@ const ACTION_INSTRUCTIONS: Record<AIEditAction, string> = {
   FIX_GRAMMAR: "Correct grammar and spelling without changing the meaning.",
   SIMPLIFY: "Rewrite using simpler, plainer language.",
   SEO_OPTIMIZE: "Optimize headings, keyword usage, and readability for SEO while preserving the existing structure.",
+  SUMMARIZE: "Produce a concise summary (3-6 sentences) of the key points, as a short HTML fragment (a heading-free paragraph or short bullet list). Do not pad it out — shorter is better if the source is short.",
 };
 
 // EXPAND/TRANSLATE/SEO get a slightly higher ceiling since their output can
@@ -68,6 +71,7 @@ const ACTION_MAX_TOKENS: Record<AIEditAction, number> = {
   FIX_GRAMMAR: 1400,
   SIMPLIFY: 1400,
   SEO_OPTIMIZE: 1800,
+  SUMMARIZE: 500,
 };
 
 export function maxTokensForAction(action: AIEditAction): number {

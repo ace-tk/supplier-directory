@@ -17,6 +17,19 @@ export interface ContentAttachmentEntry {
   createdAt: string;
 }
 
+/** The editor's in-memory attachment shape — a superset-compatible subset
+ * of ContentAttachmentEntry. `id`/`createdAt` are only present for
+ * attachments that already exist in the DB; a freshly-added-this-session
+ * file has neither until the item is saved. */
+export interface DraftAttachment {
+  id?: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  dataUrl: string;
+  createdAt?: string;
+}
+
 export interface ContentItemRecord {
   id: string;
   title: string;

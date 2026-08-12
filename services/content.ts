@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateImage, validateDocument } from "@/lib/file-validation";
 import { saveContentSchema } from "@/lib/validations/content";
-import { getContentItemForOwner, getContentListForOwner, getTemplatesForOwner } from "@/lib/content-queries";
+import { getContentItemForOwner, getContentListForOwner, getTemplatesForOwner, getContentStorageUsageForOwner } from "@/lib/content-queries";
 import type { ContentItemRecord, ContentItemSummary } from "@/types/content";
 import type { ContentStatus, ContentType, ContentLanguage, ContentTone, ContentAudience } from "@/lib/generated/prisma/enums";
 
@@ -25,6 +25,12 @@ export async function getTemplatesAction(): Promise<ActionResult<ContentItemSumm
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
   return { success: true, data: await getTemplatesForOwner(user.id) };
+}
+
+export async function getContentStorageUsageAction(): Promise<ActionResult<{ totalBytes: number; fileCount: number }>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+  return { success: true, data: await getContentStorageUsageForOwner(user.id) };
 }
 
 export async function getContentItemAction(id: string): Promise<ActionResult<ContentItemRecord>> {

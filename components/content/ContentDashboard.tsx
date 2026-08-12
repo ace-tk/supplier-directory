@@ -135,11 +135,14 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
         title="Content Management"
         description="Create and manage rich content across your organization."
         actions={
-          <Link href={`${basePath}/new`}>
-            <Button className="gap-1.5">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="gap-1.5" render={<Link href={`${basePath}/templates`} />} nativeButton={false}>
+              <BookMarked className="h-4 w-4" /> Template Library
+            </Button>
+            <Button className="gap-1.5" render={<Link href={`${basePath}/new`} />} nativeButton={false}>
               <Plus className="h-4 w-4" /> Create Content
             </Button>
-          </Link>
+          </div>
         }
       />
 

@@ -99,3 +99,15 @@ export async function getTemplatesForOwner(ownerId: string): Promise<ContentItem
 
   return rows.map(mapSummary);
 }
+
+/** Real, measurable usage — the sum of every ContentAttachment's byte size
+ * for this owner. There is no quota/plan concept anywhere in this app, so
+ * only the actual usage number is ever shown, never a fabricated plan size. */
+export async function getContentStorageUsageForOwner(ownerId: string): Promise<{ totalBytes: number; fileCount: number }> {
+  const result = await db.contentAttachment.aggregate({
+    where: { content: { ownerId } },
+    _sum: { sizeBytes: true },
+    _count: { _all: true },
+  });
+  return { totalBytes: result._sum.sizeBytes ?? 0, fileCount: result._count._all };
+}

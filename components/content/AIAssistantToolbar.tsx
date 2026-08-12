@@ -18,12 +18,14 @@ import {
   Feather,
   SearchCheck,
   Loader2,
+  FileSearch,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AIComparisonModal } from "@/components/content/AIComparisonModal";
 import { AI_EDIT_ACTION_LABELS, type AIEditAction } from "@/lib/ai/content-edit-actions";
+import { runContentAiAction } from "@/lib/ai/run-content-ai-action";
 import { CONTENT_LANGUAGE_LABELS } from "@/lib/content-ui";
 import type { ContentLanguage } from "@/types/content";
 import { cn } from "@/lib/utils";
@@ -41,6 +43,10 @@ const ACTION_ICONS: Record<AIEditAction, LucideIcon> = {
   FIX_GRAMMAR: SpellCheck2,
   SIMPLIFY: Feather,
   SEO_OPTIMIZE: SearchCheck,
+  // Not shown in this toolbar's groups (see ACTION_GROUPS below) — Summarize
+  // lives in the Files/Templates AI Summarize action instead — but every
+  // AIEditAction needs an icon entry to satisfy the Record type.
+  SUMMARIZE: FileSearch,
 };
 
 const ACTION_GROUPS: { heading: string; actions: AIEditAction[] }[] = [
@@ -86,14 +92,8 @@ export function AIAssistantToolbar({
     onProcessingChange?.(true);
 
     try {
-      const res = await fetch("/api/content/ai-edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, html: currentHtml, targetLanguage }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "AI editing failed. Please try again.");
-      setComparison({ action, currentHtml, aiHtml: data.html });
+      const aiHtml = await runContentAiAction(action, currentHtml, targetLanguage);
+      setComparison({ action, currentHtml, aiHtml });
     } catch (err) {
       const message = err instanceof Error ? err.message : "AI editing failed. Please try again.";
       toast.error(message, { action: { label: "Retry", onClick: () => runAction({ action, targetLanguage }) } });
