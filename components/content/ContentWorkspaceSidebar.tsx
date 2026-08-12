@@ -10,11 +10,15 @@ export function ContentWorkspaceSidebar({
   attachments,
   onAttachmentsChange,
   onUseTemplate,
+  selectedAttachment,
+  onSelectAttachment,
 }: {
   basePath: string;
   attachments: DraftAttachment[];
   onAttachmentsChange: (next: DraftAttachment[]) => void;
   onUseTemplate: (item: ContentItemRecord) => void;
+  selectedAttachment: DraftAttachment | null;
+  onSelectAttachment: (file: DraftAttachment | null) => void;
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -28,7 +32,12 @@ export function ContentWorkspaceSidebar({
           </TabsTrigger>
         </TabsList>
         <TabsContent value="files" className="pt-3">
-          <AttachedFilesPanel attachments={attachments} onAttachmentsChange={onAttachmentsChange} />
+          <AttachedFilesPanel
+            attachments={attachments}
+            onAttachmentsChange={onAttachmentsChange}
+            selected={selectedAttachment}
+            onSelect={onSelectAttachment}
+          />
         </TabsContent>
         <TabsContent value="templates" className="pt-3">
           <CompactTemplateBrowser basePath={basePath} onUseTemplate={onUseTemplate} />

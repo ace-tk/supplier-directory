@@ -36,11 +36,16 @@ import { RichTextEditor } from "@/components/content/RichTextEditor";
 import { ContentGenerationForm } from "@/components/content/ContentGenerationForm";
 import { AIAssistantToolbar } from "@/components/content/AIAssistantToolbar";
 import { ContentWorkspaceSidebar } from "@/components/content/ContentWorkspaceSidebar";
+import { DocumentViewerPanel } from "@/components/content/DocumentViewerPanel";
 import { fileToDataUrl } from "@/lib/file-to-data-url";
 import { validateImage } from "@/lib/file-validation";
 import { saveContentAction, type SaveContentPayload } from "@/services/content";
 import { CONTENT_CATEGORIES } from "@/lib/content-ui";
+import { cn } from "@/lib/utils";
 import type { ContentItemRecord, ContentType, ContentLanguage, ContentTone, ContentAudience, DraftAttachment } from "@/types/content";
+
+const MOBILE_TABS_WITH_VIEWER = ["files", "preview", "editor"] as const;
+type MobileTab = (typeof MOBILE_TABS_WITH_VIEWER)[number];
 
 export function ContentEditor({
   basePath,
@@ -59,6 +64,12 @@ export function ContentEditor({
   const [featuredImage, setFeaturedImage] = useState<string | null>(initialItem?.featuredImageUrl ?? null);
   const [bodyHtml, setBodyHtml] = useState(initialItem?.bodyHtml ?? "");
   const [attachments, setAttachments] = useState<DraftAttachment[]>(initialItem?.attachments ?? []);
+  // The center Document Viewer column only ever opens because of an
+  // explicit click on a file card (AttachedFilesPanel/AttachedFileCard) —
+  // never as a side effect of uploading. See handleAttachmentsChange /
+  // handleSelectAttachment below for the only two places this is set.
+  const [selectedAttachment, setSelectedAttachment] = useState<DraftAttachment | null>(null);
+  const [mobileTab, setMobileTab] = useState<MobileTab>("files");
   const [saving, setSaving] = useState<"draft" | "publish" | "archive" | "template" | null>(null);
   const [preview, setPreview] = useState(startInPreview);
   const [mode, setMode] = useState<"generate" | "edit">(initialItem ? "edit" : "generate");
@@ -155,6 +166,7 @@ export function ContentEditor({
     setFeaturedImage(item.featuredImageUrl);
     setBodyHtml(item.bodyHtml);
     setAttachments(item.attachments);
+    setSelectedAttachment(null);
     toast.success(`Applied template "${item.title}"`);
   }
 
@@ -167,12 +179,35 @@ export function ContentEditor({
     }
   }
 
+  // Keeps the open viewer in sync with the file list — if the currently
+  // viewed attachment gets removed, the viewer closes with it (removal
+  // itself never touches the attachment's persisted/pending data).
+  function handleAttachmentsChange(next: DraftAttachment[]) {
+    setAttachments(next);
+    if (selectedAttachment && !next.includes(selectedAttachment)) {
+      setSelectedAttachment(null);
+    }
+  }
+
+  function handleSelectAttachment(file: DraftAttachment | null) {
+    setSelectedAttachment(file);
+    if (file) setMobileTab("preview");
+  }
+
+  // Real, explicit "Edit in Editor" — only ever called from a user click in
+  // DocumentViewerPanel, and only for formats it could genuinely extract
+  // text from. Appends rather than overwrites so existing writing is never
+  // silently destroyed.
+  function handleEditInEditor(html: string) {
+    setBodyHtml((prev) => (prev && prev.trim() ? prev + html : html));
+  }
+
   if (mode === "generate") {
     return <ContentGenerationForm basePath={basePath} onGenerated={handleGenerated} onSkip={() => setMode("edit")} />;
   }
 
   return (
-    <div className="space-y-4 max-w-[1400px]">
+    <div className={cn("space-y-4", selectedAttachment ? "max-w-[1680px]" : "max-w-[1400px]")}>
       <PageHeader
         title={initialItem ? "Edit Content" : "Create Content"}
         breadcrumbs={[{ label: "Content Management", href: basePath }, { label: initialItem ? "Edit" : "Create" }]}
@@ -224,15 +259,49 @@ export function ContentEditor({
           <div className="tiptap-content" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[300px_minmax(0,1fr)] gap-4 items-start">
-          <ContentWorkspaceSidebar
-            basePath={basePath}
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-            onUseTemplate={handleUseTemplate}
-          />
+        <>
+          {selectedAttachment && (
+            <div className="lg:hidden flex items-center gap-1 rounded-lg bg-muted p-1 mb-4">
+              {MOBILE_TABS_WITH_VIEWER.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setMobileTab(tab)}
+                  className={cn(
+                    "flex-1 rounded-md px-2 py-1.5 text-xs font-medium capitalize transition-colors",
+                    mobileTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                  )}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          )}
 
-          <div className="space-y-4 min-w-0">
+          <div className={cn("grid gap-4 items-start", selectedAttachment ? "lg:grid-cols-[23fr_40fr_37fr]" : "lg:grid-cols-[300px_minmax(0,1fr)]")}>
+            <div className={cn(selectedAttachment && (mobileTab === "files" ? "block" : "hidden"), "lg:block min-w-0")}>
+              <ContentWorkspaceSidebar
+                basePath={basePath}
+                attachments={attachments}
+                onAttachmentsChange={handleAttachmentsChange}
+                onUseTemplate={handleUseTemplate}
+                selectedAttachment={selectedAttachment}
+                onSelectAttachment={handleSelectAttachment}
+              />
+            </div>
+
+            {selectedAttachment && (
+              <div className={cn(mobileTab === "preview" ? "block" : "hidden", "lg:block min-w-0")}>
+                <DocumentViewerPanel
+                  key={selectedAttachment.id ?? selectedAttachment.fileName}
+                  file={selectedAttachment}
+                  onClose={() => setSelectedAttachment(null)}
+                  onEditInEditor={handleEditInEditor}
+                />
+              </div>
+            )}
+
+            <div className={cn(selectedAttachment && (mobileTab === "editor" ? "block" : "hidden"), "lg:block space-y-4 min-w-0")}>
             <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Title</Label>
@@ -327,7 +396,8 @@ export function ContentEditor({
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       <AlertDialog open={!!pendingTemplate} onOpenChange={(open) => !open && setPendingTemplate(null)}>

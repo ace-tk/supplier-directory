@@ -34,3 +34,20 @@ export function dataUrlToText(dataUrl: string): string {
     return atob(base64);
   }
 }
+
+/** Real per-page text extraction via pdfjs's own text layer (the same
+ * layer it uses for text selection) — never a fabricated summary of a PDF
+ * that couldn't actually be parsed. Returns "" if the PDF has no
+ * extractable text layer (e.g. a scanned image PDF). */
+export async function extractPdfText(dataUrl: string): Promise<string> {
+  const pdfjs = await getPdfjs();
+  const doc = await pdfjs.getDocument({ data: dataUrlToUint8Array(dataUrl) }).promise;
+  const pages: string[] = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
+    if (text.trim()) pages.push(text.trim());
+  }
+  return pages.join("\n\n");
+}

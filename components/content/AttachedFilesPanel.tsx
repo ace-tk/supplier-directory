@@ -8,21 +8,30 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AttachedFileCard } from "./AttachedFileCard";
 import { FileHoverPreview } from "./FileHoverPreview";
-import { CollapsibleFilePreview } from "./CollapsibleFilePreview";
 import { fileToDataUrl } from "@/lib/file-to-data-url";
 import { validateDocumentOrImage, MAX_DOCUMENT_BYTES, SUPPORTED_DOCUMENT_LABEL, SUPPORTED_IMAGE_LABEL } from "@/lib/file-validation";
 import { cn } from "@/lib/utils";
 import type { DraftAttachment } from "@/types/content";
 
+/**
+ * Files-only left panel: list, search, drag/drop, Add Files. The document
+ * viewer itself lives in the separate center column (DocumentViewerPanel)
+ * — it never renders in here, so it's never squeezed into this narrow
+ * width. Selection is controlled by the parent (ContentEditor) so the
+ * center column and this list can share which file is open.
+ */
 export function AttachedFilesPanel({
   attachments,
   onAttachmentsChange,
+  selected,
+  onSelect,
 }: {
   attachments: DraftAttachment[];
   onAttachmentsChange: (next: DraftAttachment[]) => void;
+  selected: DraftAttachment | null;
+  onSelect: (file: DraftAttachment | null) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<DraftAttachment | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +46,8 @@ export function AttachedFilesPanel({
       // same stale `attachments` closure each time (no re-render happens
       // between awaits within one call), so a second file in the same
       // selection would silently replace the first instead of joining it.
+      // Newly added files are never auto-selected/auto-opened — the large
+      // viewer only opens when the user explicitly clicks a file card.
       const added: DraftAttachment[] = [];
       for (const file of list) {
         const validation = validateDocumentOrImage(file.type, file.size, file.name);
@@ -61,7 +72,7 @@ export function AttachedFilesPanel({
 
   function handleRemove(target: DraftAttachment) {
     onAttachmentsChange(attachments.filter((a) => a !== target));
-    if (selected === target) setSelected(null);
+    if (selected === target) onSelect(null);
   }
 
   const filtered = attachments.filter((a) => a.fileName.toLowerCase().includes(search.toLowerCase()));
@@ -118,8 +129,6 @@ export function AttachedFilesPanel({
         Supports {SUPPORTED_DOCUMENT_LABEL}, {SUPPORTED_IMAGE_LABEL} · Max {MAX_DOCUMENT_BYTES / (1024 * 1024)}MB per file
       </p>
 
-      {selected && <CollapsibleFilePreview key={selected.id ?? selected.fileName} file={selected} />}
-
       {attachments.length === 0 ? (
         <EmptyState icon={Paperclip} title="No files attached" description="Add supporting PDFs, docs, or images." />
       ) : filtered.length === 0 ? (
@@ -131,7 +140,7 @@ export function AttachedFilesPanel({
               <AttachedFileCard
                 file={file}
                 selected={selected === file}
-                onClick={() => setSelected((s) => (s === file ? null : file))}
+                onClick={() => onSelect(selected === file ? null : file)}
                 onRemove={() => handleRemove(file)}
               />
             </FileHoverPreview>
