@@ -1,6 +1,6 @@
-import type { ExpenseCategory } from "@/lib/generated/prisma/enums";
+import type { ExpenseCategory, PaymentMethod } from "@/lib/generated/prisma/enums";
 
-export type { ExpenseCategory };
+export type { ExpenseCategory, PaymentMethod };
 
 export interface ExpenseRecord {
   id: string;
@@ -16,6 +16,12 @@ export interface ExpenseRecord {
   amount: string;
   currency: string;
   notes: string | null;
+
+  gstNumber: string | null;
+  gstPercent: number | null;
+  paymentMethod: PaymentMethod | null;
+  department: string | null;
+  expenseType: string | null;
 
   partyUserId: string | null;
   partyName: string | null;
@@ -54,6 +60,11 @@ export interface ExpenseFormInput {
   amount: string;
   currency: string;
   notes?: string;
+  gstNumber?: string;
+  gstPercent?: number | null;
+  paymentMethod?: PaymentMethod | null;
+  department?: string;
+  expenseType?: string;
   partyUserId?: string | null;
   relatedInvoiceId?: string | null;
   attachmentFileName?: string;

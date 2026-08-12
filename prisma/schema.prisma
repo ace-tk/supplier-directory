@@ -1425,6 +1425,20 @@ model Expense {
   currency String  @default("INR")
   notes    String? @db.Text
 
+  // Optional GST/tax details for this expense — a plain percent, not
+  // linked to any GST engine (that lives on Invoice/CatalogRow); kept as
+  // a simple additive field for the expense's own tax record-keeping.
+  gstNumber  String?
+  gstPercent Float?
+
+  // Reuses the existing PaymentMethod enum (already used by Payment) —
+  // never a second payment-method source of truth.
+  paymentMethod PaymentMethod?
+
+  // Free-text, optional classification fields.
+  department  String?
+  expenseType String?
+
   // Optional Buyer/Supplier this expense relates to — reuses the existing
   // platform-account directory, same as an Invoice's party.
   partyUserId String?

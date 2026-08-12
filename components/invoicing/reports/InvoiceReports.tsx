@@ -15,8 +15,8 @@ import type { InvoiceStatus, InvoiceType } from "@/types/invoicing";
 const REPORT_KINDS: ReportKind[] = ["SALES", "PURCHASE", "RECEIVABLES", "PAYABLES", "GST_SUMMARY", "EXPENSE", "PAYMENT"];
 const STATUS_OPTIONS: InvoiceStatus[] = ["DRAFT", "SENT", "PENDING", "PARTIALLY_PAID", "PAID", "CANCELLED"];
 
-export function InvoiceReports({ basePath }: { basePath: string }) {
-  const [kind, setKind] = useState<ReportKind>("SALES");
+export function InvoiceReports({ basePath, initialKind }: { basePath: string; initialKind?: ReportKind }) {
+  const [kind, setKind] = useState<ReportKind>(initialKind && REPORT_KINDS.includes(initialKind) ? initialKind : "SALES");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [partyName, setPartyName] = useState("");

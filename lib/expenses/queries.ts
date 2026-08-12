@@ -33,6 +33,12 @@ function mapExpense(e: ExpenseRow): ExpenseRecord {
     currency: e.currency,
     notes: e.notes,
 
+    gstNumber: e.gstNumber,
+    gstPercent: e.gstPercent,
+    paymentMethod: e.paymentMethod,
+    department: e.department,
+    expenseType: e.expenseType,
+
     partyUserId: e.partyUserId,
     partyName: e.partyUser
       ? (e.partyUser.buyer?.companyName ?? e.partyUser.supplier?.companyName ?? e.partyUser.name)

@@ -13,6 +13,7 @@ import type {
   ExpenseActionResult,
   InvoiceOption,
   ExpenseCustomCategoryOption,
+  PaymentMethod,
 } from "@/types/expense";
 import type { DirectoryOption } from "@/types/invoicing";
 import type { ExpenseImportRawRow, ExpenseImportRowResult, ExpenseImportSummary } from "@/lib/expenses/import-types";
@@ -56,6 +57,11 @@ async function buildExpenseData(ownerId: string, d: ExpenseFormValues) {
     amount: d.amount,
     currency: d.currency,
     notes: d.notes?.trim() || null,
+    gstNumber: d.gstNumber?.trim() || null,
+    gstPercent: d.gstPercent ?? null,
+    paymentMethod: (d.paymentMethod as PaymentMethod | null | undefined) ?? null,
+    department: d.department?.trim() || null,
+    expenseType: d.expenseType?.trim() || null,
     partyUserId: d.partyUserId || null,
     relatedInvoiceId: d.relatedInvoiceId || null,
     attachmentFileName: d.attachmentFileName?.trim() || null,
