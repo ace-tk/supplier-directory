@@ -104,7 +104,7 @@ export function DocumentViewerPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col h-[70vh] min-h-[420px] lg:h-[calc(100vh-210px)] lg:min-h-[700px]">
+    <div className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col h-[clamp(300px,70vh,900px)] lg:h-[clamp(420px,calc(100vh-210px),1400px)]">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
         <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
         <p className="text-sm font-medium text-foreground truncate flex-1 min-w-0">{file.fileName}</p>
