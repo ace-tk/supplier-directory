@@ -1,4 +1,4 @@
-import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, ChargeType } from "@/types/invoicing";
+import type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, ChargeType, InvoiceTemplate } from "@/types/invoicing";
 
 export interface EditorItemState {
   key: string;
@@ -67,6 +67,9 @@ export interface EditorFormState {
   bankBranch: string;
   bankUpiId: string;
   bankPaymentInstructions: string;
+
+  // Presentation only — which document design this invoice renders as.
+  template: InvoiceTemplate;
 
   // Only relevant for CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE.
   reason: InvoiceReason | "";

@@ -13,9 +13,10 @@ import { PartyPicker } from "./editor/PartyPicker";
 import { ItemTable } from "./editor/ItemTable";
 import { ChargesAndNotesFields } from "./editor/ChargesAndNotesFields";
 import { BankingDetailsFields } from "./editor/BankingDetailsFields";
+import { TemplateSelector } from "./editor/TemplateSelector";
 import { ReasonField } from "./editor/ReasonField";
 import { TotalsSummary } from "./editor/TotalsSummary";
-import { InvoicePreview } from "./preview/InvoicePreview";
+import { InvoiceTemplateRenderer } from "./templates/InvoiceTemplateRenderer";
 import { calculateInvoiceTotals } from "@/lib/invoicing/calc";
 import { invoiceFamily, DEPENDENT_TYPES } from "@/lib/invoicing/family";
 import { nonDraftInitialStatus } from "@/lib/invoicing/status";
@@ -70,6 +71,7 @@ function defaultForm(type: InvoiceType): EditorFormState {
     bankBranch: "",
     bankUpiId: "",
     bankPaymentInstructions: "",
+    template: "REGULAR",
     reason: "",
   };
 }
@@ -132,6 +134,7 @@ function formFromRecord(record: InvoiceRecord): EditorFormState {
     bankBranch: record.bankBranch ?? "",
     bankUpiId: record.bankUpiId ?? "",
     bankPaymentInstructions: record.bankPaymentInstructions ?? "",
+    template: record.template,
     reason: record.reason ?? "",
   };
 }
@@ -194,6 +197,7 @@ function formFromSource(source: InvoiceRecord, targetType: InvoiceType): EditorF
     bankBranch: "",
     bankUpiId: "",
     bankPaymentInstructions: "",
+    template: source.template,
     reason: "",
   };
 }
@@ -406,6 +410,13 @@ export function InvoiceEditor({
         <>
           <ChargesAndNotesFields form={form} onChange={patch} />
           <BankingDetailsFields form={form} onChange={patch} />
+          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Invoice Design</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Choose how this document looks — switching never changes any values.</p>
+            </div>
+            <TemplateSelector value={form.template} onChange={(template) => patch({ template })} />
+          </div>
         </>
       )}
       <TotalsSummary calc={calc} currency={form.currency} />
@@ -458,7 +469,7 @@ export function InvoiceEditor({
           </TabsList>
           <TabsContent value="edit">{editForm}</TabsContent>
           <TabsContent value="preview">
-            <InvoicePreview {...previewProps} />
+            <InvoiceTemplateRenderer template={form.template} {...previewProps} />
           </TabsContent>
         </Tabs>
       </div>
@@ -467,7 +478,7 @@ export function InvoiceEditor({
       <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start">
         {editForm}
         <div className="sticky top-4">
-          <InvoicePreview {...previewProps} />
+          <InvoiceTemplateRenderer template={form.template} {...previewProps} />
         </div>
       </div>
     </div>

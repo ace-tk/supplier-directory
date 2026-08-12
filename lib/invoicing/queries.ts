@@ -177,6 +177,8 @@ function mapSummary(inv: InvoiceSummaryRow): InvoiceSummary {
     bankUpiId: inv.bankUpiId,
     bankPaymentInstructions: inv.bankPaymentInstructions,
 
+    template: inv.template,
+
     reason: inv.reason,
     sourceInvoiceId: inv.sourceInvoiceId,
     sourceInvoiceNumber: inv.sourceInvoice?.invoiceNumber ?? null,

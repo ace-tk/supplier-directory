@@ -86,6 +86,14 @@ export interface InvoicePreviewProps {
   bankUpiId?: string | null;
   bankPaymentInstructions?: string | null;
 
+  // Optional — real, already-computed payment figures (see
+  // lib/invoicing/payments.ts). Omitted (undefined) for a not-yet-saved
+  // invoice in the editor's live preview, where no payment records exist
+  // yet; templates should hide any Balance Due row when these are absent
+  // rather than showing a fabricated ₹0.
+  amountPaid?: string;
+  balanceDue?: string;
+
   className?: string;
 }
 
@@ -163,6 +171,8 @@ export function toInvoicePreviewProps(invoice: InvoiceRecord, status: InvoiceSta
     bankBranch: invoice.bankBranch,
     bankUpiId: invoice.bankUpiId,
     bankPaymentInstructions: invoice.bankPaymentInstructions,
+    amountPaid: invoice.amountPaid,
+    balanceDue: invoice.balanceDue,
   };
 }
 

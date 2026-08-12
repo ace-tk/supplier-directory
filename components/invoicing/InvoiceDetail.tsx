@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { StatusChangeMenu } from "./StatusChangeMenu";
-import { InvoicePreview, toInvoicePreviewProps } from "./preview/InvoicePreview";
+import { toInvoicePreviewProps } from "./preview/InvoicePreview";
+import { InvoiceTemplateRenderer } from "./templates/InvoiceTemplateRenderer";
 import { RelatedDocuments } from "./RelatedDocuments";
 import { ShareMenu } from "./ShareMenu";
 import { ActivityTimeline } from "./ActivityTimeline";
@@ -82,6 +83,16 @@ export function InvoiceDetail({
   const shareUrl = typeof window !== "undefined" ? window.location.href : "";
 
   async function handleDownloadPdf() {
+    // The instant one-click PDF is a hand-drawn jsPDF layout that matches
+    // the Regular template exactly. Classic Red / Minimal Studio don't have
+    // an equivalent jsPDF drawer (that would mean maintaining every visual
+    // design twice) — for those, the print route (real HTML + print CSS)
+    // renders the correct design, and the browser's own "Save as PDF"
+    // destination produces a real, correctly-styled PDF instead.
+    if (invoice.template !== "REGULAR") {
+      handlePrint();
+      return;
+    }
     setDownloading(true);
     try {
       const { downloadInvoicePdf } = await import("@/lib/invoicing/pdf");
@@ -250,7 +261,7 @@ export function InvoiceDetail({
             <Meta label="Created At" value={formatDateTime(invoice.createdAt)} />
             <Meta label="Updated At" value={formatDateTime(invoice.updatedAt)} />
           </div>
-          <InvoicePreview {...toInvoicePreviewProps(invoice, status)} />
+          <InvoiceTemplateRenderer template={invoice.template} {...toInvoicePreviewProps(invoice, status)} />
         </TabsContent>
 
         {acceptsPayments && (

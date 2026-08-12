@@ -113,6 +113,8 @@ function buildInvoiceData(d: InvoiceFormValues, calc: ReturnType<typeof calculat
     bankUpiId: d.bankUpiId?.trim() || null,
     bankPaymentInstructions: d.bankPaymentInstructions?.trim() || null,
 
+    template: d.template,
+
     reason: d.reason ?? null,
   };
 }
@@ -541,6 +543,8 @@ export async function duplicateInvoiceAction(id: string): Promise<InvoiceActionR
       bankBranch: existing.bankBranch,
       bankUpiId: existing.bankUpiId,
       bankPaymentInstructions: existing.bankPaymentInstructions,
+
+      template: existing.template,
 
       additionalCharges: {
         create: existing.additionalCharges.map((c) => ({

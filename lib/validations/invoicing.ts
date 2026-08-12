@@ -26,6 +26,7 @@ const STATUS_VALUES = [
 const TAX_MODE_VALUES = ["EXCLUSIVE", "INCLUSIVE"] as const;
 const TAX_BREAKUP_VALUES = ["SINGLE", "CGST_SGST", "IGST"] as const;
 const CHARGE_TYPE_VALUES = ["FIXED", "PERCENT"] as const;
+const TEMPLATE_VALUES = ["REGULAR", "CLASSIC_RED", "MINIMAL_STUDIO"] as const;
 
 /** Decimal-ish string: numeric, may be blank/omitted (defaults handled by calc engine). */
 const moneyString = z
@@ -112,6 +113,8 @@ export const invoiceFormSchema = z
     bankBranch: z.string().optional(),
     bankUpiId: z.string().optional(),
     bankPaymentInstructions: z.string().optional(),
+
+    template: z.enum(TEMPLATE_VALUES).default("REGULAR"),
 
     reason: z.enum(REASON_VALUES).optional(),
     sourceInvoiceId: z.string().nullish(),

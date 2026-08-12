@@ -6,9 +6,10 @@ import type {
   InvoiceReason,
   PaymentMethod,
   ChargeType,
+  InvoiceTemplate,
 } from "@/lib/generated/prisma/enums";
 
-export type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, PaymentMethod, ChargeType };
+export type { InvoiceType, InvoiceStatus, InvoiceTaxMode, InvoiceTaxBreakup, InvoiceReason, PaymentMethod, ChargeType, InvoiceTemplate };
 
 export interface InvoiceAdditionalChargeRecord {
   id: string;
@@ -101,6 +102,9 @@ export interface InvoiceRecord {
   bankBranch: string | null;
   bankUpiId: string | null;
   bankPaymentInstructions: string | null;
+
+  // Presentation only — which document design this invoice renders as.
+  template: InvoiceTemplate;
 
   // Only set on CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE documents.
   reason: InvoiceReason | null;

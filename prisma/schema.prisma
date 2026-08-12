@@ -1143,6 +1143,15 @@ enum ChargeType {
   PERCENT
 }
 
+// Presentation-only — which visual layout the invoice document renders in.
+// Never read by calculation logic; templates are pure renderers over the
+// same computed InvoicePreviewProps (see components/invoicing/templates/).
+enum InvoiceTemplate {
+  REGULAR
+  CLASSIC_RED
+  MINIMAL_STUDIO
+}
+
 // Per-owner, per-type, per-year atomic sequence powering INV-2026-0001 /
 // PUR-2026-0001 numbering (see lib/invoicing/numbering.ts).
 model InvoiceCounter {
@@ -1247,6 +1256,11 @@ model Invoice {
   bankBranch              String?
   bankUpiId               String?
   bankPaymentInstructions String? @db.Text
+
+  // Presentation only — which of the 3 document designs this invoice
+  // renders as (Regular/Classic Red/Minimal Studio). Existing rows default
+  // to REGULAR automatically; never read by calc/GST/totals logic.
+  template InvoiceTemplate @default(REGULAR)
 
   // Only set on CREDIT_NOTE / SALES_RETURN / DEBIT_NOTE documents.
   reason InvoiceReason?
