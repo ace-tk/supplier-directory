@@ -10,7 +10,7 @@ import { AttachedFileCard } from "./AttachedFileCard";
 import { FileHoverPreview } from "./FileHoverPreview";
 import { CollapsibleFilePreview } from "./CollapsibleFilePreview";
 import { fileToDataUrl } from "@/lib/file-to-data-url";
-import { validateImage, validateDocument } from "@/lib/file-validation";
+import { validateDocumentOrImage, MAX_DOCUMENT_BYTES, SUPPORTED_DOCUMENT_LABEL, SUPPORTED_IMAGE_LABEL } from "@/lib/file-validation";
 import { cn } from "@/lib/utils";
 import type { DraftAttachment } from "@/types/content";
 
@@ -33,13 +33,18 @@ export function AttachedFilesPanel({
     setUploading(true);
     try {
       for (const file of list) {
-        const okDoc = validateDocument(file.type, file.size).valid;
-        const okImg = validateImage(file.type, file.size).valid;
-        if (!okDoc && !okImg) {
-          toast.error(`${file.name}: unsupported file type or too large.`);
+        const validation = validateDocumentOrImage(file.type, file.size, file.name);
+        if (!validation.valid) {
+          toast.error(`${file.name}: ${validation.error}`);
           continue;
         }
-        const dataUrl = await fileToDataUrl(file);
+        let dataUrl: string;
+        try {
+          dataUrl = await fileToDataUrl(file);
+        } catch {
+          toast.error(`${file.name}: Upload failed. Please try again.`);
+          continue;
+        }
         onAttachmentsChange([...attachments, { fileName: file.name, mimeType: file.type, sizeBytes: file.size, dataUrl }]);
       }
     } finally {
@@ -102,6 +107,9 @@ export function AttachedFilesPanel({
         <Paperclip className="h-3.5 w-3.5" />
         {uploading ? "Uploading…" : "Drag & drop files, or click to browse"}
       </div>
+      <p className="text-[10px] text-muted-foreground text-center -mt-1.5">
+        Supports {SUPPORTED_DOCUMENT_LABEL}, {SUPPORTED_IMAGE_LABEL} · Max {MAX_DOCUMENT_BYTES / (1024 * 1024)}MB per file
+      </p>
 
       {selected && <CollapsibleFilePreview key={selected.id ?? selected.fileName} file={selected} />}
 

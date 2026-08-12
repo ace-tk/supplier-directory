@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
-import { validateImage, validateDocument } from "@/lib/file-validation";
+import { validateImage, validateDocumentOrImage } from "@/lib/file-validation";
 import { saveContentSchema } from "@/lib/validations/content";
 import { getContentItemForOwner, getContentListForOwner, getTemplatesForOwner, getContentStorageUsageForOwner } from "@/lib/content-queries";
 import type { ContentItemRecord, ContentItemSummary } from "@/types/content";
@@ -74,10 +74,9 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
     if (!v.valid) return { success: false, error: v.error! };
   }
   for (const att of data.attachments) {
-    const okAsDocument = validateDocument(att.mimeType, att.sizeBytes).valid;
-    const okAsImage = validateImage(att.mimeType, att.sizeBytes).valid;
-    if (!okAsDocument && !okAsImage) {
-      return { success: false, error: `${att.fileName}: unsupported file type or file too large.` };
+    const validation = validateDocumentOrImage(att.mimeType, att.sizeBytes, att.fileName);
+    if (!validation.valid) {
+      return { success: false, error: `${att.fileName}: ${validation.error}` };
     }
   }
 

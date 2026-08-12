@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { getPdfjs, dataUrlToUint8Array, dataUrlToText } from "@/lib/pdf-client";
 import { getFileTypeLabel, isPdf, isText, isImage } from "@/lib/content-file-types";
-import { formatFileSize } from "@/lib/content-ui";
+import { formatFileSize, formatDateTime } from "@/lib/content-ui";
 import type { DraftAttachment } from "@/types/content";
 
 const MIN_SCALE = 0.5;
@@ -253,7 +253,11 @@ function UnsupportedViewer({ file, message }: { file: DraftAttachment; message?:
       <div>
         <p className="text-sm font-medium text-foreground">{file.fileName}</p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {message ?? `Inline preview isn't available for ${getFileTypeLabel(file.mimeType)} files yet.`} · {formatFileSize(file.sizeBytes)}
+          {message ?? `File uploaded successfully, but inline preview isn't available for ${getFileTypeLabel(file.mimeType)} files.`}
+        </p>
+        <p className="text-[11px] text-muted-foreground/80 mt-1">
+          {getFileTypeLabel(file.mimeType)} · {formatFileSize(file.sizeBytes)}
+          {file.createdAt ? ` · Uploaded ${formatDateTime(file.createdAt)}` : ""}
         </p>
       </div>
       <Button variant="outline" size="sm" className="gap-1.5" onClick={() => downloadDataUrl(file.dataUrl, file.fileName)}>
