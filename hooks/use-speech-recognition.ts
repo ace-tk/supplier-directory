@@ -41,12 +41,18 @@ interface UseSpeechRecognitionOptions {
 export function useSpeechRecognition({ onResult }: UseSpeechRecognitionOptions) {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSupported] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
-  });
+  // Starts false on both server and the initial client render (SSR has no
+  // `window` to check) — actual feature detection happens in an effect
+  // after mount instead of a lazy useState initializer, so the first
+  // client render always matches the server-rendered HTML and React never
+  // has to discard/regenerate this subtree for a hydration mismatch.
+  const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onResultRef = useRef(onResult);
+
+  useEffect(() => {
+    setIsSupported(!!(window.SpeechRecognition ?? window.webkitSpeechRecognition));
+  }, []);
 
   useEffect(() => {
     onResultRef.current = onResult;

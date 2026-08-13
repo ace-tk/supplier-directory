@@ -1,11 +1,14 @@
-import type { CatalogRowStatus, ProductLocationType } from "@/lib/generated/prisma/enums";
+import type { CatalogRowStatus, ProductLocationType, ProductImageView } from "@/lib/generated/prisma/enums";
 
-export type { CatalogRowStatus, ProductLocationType };
+export type { CatalogRowStatus, ProductLocationType, ProductImageView };
 
 export interface CatalogRowImageEntry {
   id: string;
   dataUrl: string;
   order: number;
+  // Additive classification for the Product visual workspace's view tabs
+  // (Front/Back/Side/Wash Care) — defaults to OTHER, never fabricated.
+  view: ProductImageView;
 }
 
 export interface CatalogRowAttachmentEntry {

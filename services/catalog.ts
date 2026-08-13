@@ -6,7 +6,7 @@ import { validateImage, validateDocument } from "@/lib/file-validation";
 import { catalogRowInputSchema, type CatalogRowInput } from "@/lib/validations/catalog";
 import { getOrCreateCatalogForOwner, mapRow } from "@/lib/catalog-queries";
 import { computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
-import type { CatalogRecord, CatalogRowRecord } from "@/types/catalog";
+import type { CatalogRecord, CatalogRowRecord, ProductImageView } from "@/types/catalog";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
 
@@ -217,8 +217,8 @@ export async function reorderRowsAction(rowIds: string[]): Promise<ActionResult<
 
 export async function addRowImageAction(
   rowId: string,
-  input: { dataUrl: string; mimeType: string; sizeBytes: number }
-): Promise<ActionResult<{ id: string; dataUrl: string; order: number }>> {
+  input: { dataUrl: string; mimeType: string; sizeBytes: number; view?: ProductImageView }
+): Promise<ActionResult<{ id: string; dataUrl: string; order: number; view: ProductImageView }>> {
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
 
@@ -229,8 +229,27 @@ export async function addRowImageAction(
   if (!v.valid) return { success: false, error: v.error! };
 
   const count = await db.catalogRowImage.count({ where: { rowId } });
-  const image = await db.catalogRowImage.create({ data: { rowId, dataUrl: input.dataUrl, order: count } });
-  return { success: true, data: { id: image.id, dataUrl: image.dataUrl, order: image.order } };
+  const image = await db.catalogRowImage.create({
+    data: { rowId, dataUrl: input.dataUrl, order: count, view: input.view ?? "OTHER" },
+  });
+  return { success: true, data: { id: image.id, dataUrl: image.dataUrl, order: image.order, view: image.view } };
+}
+
+/** Reclassifies an existing image's view tag (Front/Back/Side/Wash Care/
+ * Other) for the Product visual workspace's view tabs — a real, persisted
+ * change, not UI-only state. */
+export async function updateRowImageViewAction(imageId: string, view: ProductImageView): Promise<ActionResult<void>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const image = await db.catalogRowImage.findUnique({
+    where: { id: imageId },
+    include: { row: { include: { catalog: { select: { ownerId: true } } } } },
+  });
+  if (!image || image.row.catalog.ownerId !== user.id) return { success: false, error: "Image not found." };
+
+  await db.catalogRowImage.update({ where: { id: imageId }, data: { view } });
+  return { success: true, data: undefined };
 }
 
 /** The first image (order 0) after a reorder is the row's cover image

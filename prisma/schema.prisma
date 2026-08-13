@@ -1076,12 +1076,26 @@ model RetailStore {
   @@index([ownerId])
 }
 
+// Small additive classification for the Product visual workspace's view
+// tabs (Front/Back/Side/Wash Care). Deliberately narrow — no Video/Colors
+// entries, since there's no persisted video-upload path or multi-colorway
+// image gallery in this app; adding those would need real new upload/
+// storage capability, not just a label.
+enum ProductImageView {
+  FRONT
+  BACK
+  SIDE
+  WASH_CARE
+  OTHER
+}
+
 model CatalogRowImage {
-  id      String     @id @default(cuid())
+  id      String           @id @default(cuid())
   rowId   String
-  row     CatalogRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
-  dataUrl String     @db.Text
-  order   Int        @default(0)
+  row     CatalogRow       @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  dataUrl String           @db.Text
+  order   Int              @default(0)
+  view    ProductImageView @default(OTHER)
 
   @@index([rowId])
 }
