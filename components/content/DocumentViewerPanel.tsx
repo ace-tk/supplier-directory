@@ -9,7 +9,10 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { DocumentViewer } from "./DocumentViewer";
 import { AISummaryDialog } from "./AISummaryDialog";
 import { extractPdfText, dataUrlToText } from "@/lib/pdf-client";
-import { getFileTypeLabel, isPdf, isText } from "@/lib/content-file-types";
+import { renderDocxToHtml } from "@/lib/docx-client";
+import { readPptx, pptxToOutlineHtml } from "@/lib/pptx-client";
+import { readSpreadsheet, sheetToSummaryHtml } from "@/lib/spreadsheet-client";
+import { getFileTypeLabel, getFileKind, type FileKind } from "@/lib/content-file-types";
 import { formatFileSize, formatDateTime } from "@/lib/content-ui";
 import type { DraftAttachment } from "@/types/content";
 
@@ -22,18 +25,12 @@ function downloadDataUrl(dataUrl: string, fileName: string) {
   a.remove();
 }
 
-/** Real per-file text extraction for the two formats this app can
- * genuinely read (TXT decodes directly; PDF via pdfjs's own text layer).
- * Returns null for every other format — callers must not fabricate a
- * summary or an "extracted" editor insert for those. */
-async function extractText(file: DraftAttachment): Promise<string | null> {
-  if (isText(file.mimeType)) return dataUrlToText(file.dataUrl);
-  if (isPdf(file.mimeType)) {
-    const text = await extractPdfText(file.dataUrl);
-    return text.trim() ? text : null;
-  }
-  return null;
-}
+// Formats this app can genuinely extract real content from. XLSX/XLS can
+// only feed AI Summarize (via the first sheet) — dumping a full sheet's
+// cells into the rich text editor would not be a meaningful "edit"
+// experience, so Edit in Editor stays unavailable for spreadsheets.
+const SUMMARIZABLE_KINDS: FileKind[] = ["pdf", "text", "docx", "pptx", "spreadsheet"];
+const EDITABLE_KINDS: FileKind[] = ["pdf", "text", "docx", "pptx"];
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -50,13 +47,49 @@ function textToHtml(text: string): string {
     .join("");
 }
 
+/** Real per-format extraction — TXT decodes directly, PDF via pdfjs's text
+ * layer, DOCX via mammoth's structural HTML, PPTX via the parsed slide
+ * text outline, XLSX/XLS via the first sheet's serialized cells. Returns
+ * null when there's genuinely nothing to extract (e.g. a scanned PDF with
+ * no text layer, or an empty sheet) — callers must not fabricate content
+ * for that case. */
+async function extractContentHtml(file: DraftAttachment): Promise<string | null> {
+  const kind = getFileKind(file.mimeType, file.fileName);
+  switch (kind) {
+    case "text": {
+      const text = dataUrlToText(file.dataUrl);
+      return text.trim() ? textToHtml(text) : null;
+    }
+    case "pdf": {
+      const text = await extractPdfText(file.dataUrl);
+      return text.trim() ? textToHtml(text) : null;
+    }
+    case "docx": {
+      const { html } = await renderDocxToHtml(file.dataUrl);
+      return html.trim() ? html : null;
+    }
+    case "pptx": {
+      const pres = await readPptx(file.dataUrl);
+      const html = pptxToOutlineHtml(pres);
+      return html.trim() ? html : null;
+    }
+    case "spreadsheet": {
+      const workbook = await readSpreadsheet(file.dataUrl);
+      const sheet = workbook.sheets[0];
+      return sheet && sheet.rows.length ? sheetToSummaryHtml(sheet) : null;
+    }
+    default:
+      return null;
+  }
+}
+
 /**
  * The center document-viewer column (Files=left, Viewer=center, Editor=
  * right). Opens only when a file is explicitly selected — never
  * auto-inserts anything into the rich text editor; that only happens if
  * the user clicks "Edit in Editor" here, and only for formats this app can
- * genuinely extract text from (TXT, PDF-with-a-text-layer). Everything
- * else gets an honest "not available" state instead of a fake action.
+ * genuinely extract structured content from. Everything else gets an
+ * honest "not available" state instead of a fake action.
  */
 export function DocumentViewerPanel({
   file,
@@ -71,16 +104,18 @@ export function DocumentViewerPanel({
   const [summarySource, setSummarySource] = useState<string | null>(null);
   const [extracting, setExtracting] = useState<"summarize" | "edit" | null>(null);
 
-  const extractable = isText(file.mimeType) || isPdf(file.mimeType);
+  const kind = getFileKind(file.mimeType, file.fileName);
+  const canSummarize = SUMMARIZABLE_KINDS.includes(kind);
+  const canEdit = EDITABLE_KINDS.includes(kind);
 
   async function handleSummarize() {
     setExtracting("summarize");
     try {
-      const text = await extractText(file);
-      setSummarySource(text ? textToHtml(text) : null);
+      const html = await extractContentHtml(file);
+      setSummarySource(html);
       setSummaryOpen(true);
     } catch {
-      toast.error("Couldn't extract text from this file.");
+      toast.error("Couldn't extract content from this file.");
     } finally {
       setExtracting(null);
     }
@@ -89,15 +124,15 @@ export function DocumentViewerPanel({
   async function handleEditInEditor() {
     setExtracting("edit");
     try {
-      const text = await extractText(file);
-      if (!text) {
-        toast.error("No extractable text found in this file.");
+      const html = await extractContentHtml(file);
+      if (!html) {
+        toast.error("No extractable content found in this file.");
         return;
       }
-      onEditInEditor(textToHtml(text));
+      onEditInEditor(html);
       toast.success(`Inserted ${file.fileName}'s content into the editor.`);
     } catch {
-      toast.error("Couldn't extract text from this file.");
+      toast.error("Couldn't extract content from this file.");
     } finally {
       setExtracting(null);
     }
@@ -138,21 +173,28 @@ export function DocumentViewerPanel({
           <div className="min-w-0">
             <p className="text-xs font-medium text-foreground truncate">{file.fileName}</p>
             <p className="text-[11px] text-muted-foreground">
-              {getFileTypeLabel(file.mimeType)} Document · {formatFileSize(file.sizeBytes)}
+              {getFileTypeLabel(file.mimeType, file.fileName)} Document · {formatFileSize(file.sizeBytes)}
               {file.createdAt ? ` · Uploaded ${formatDateTime(file.createdAt)}` : " · Not saved yet"}
             </p>
           </div>
         </div>
-        {extractable ? (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button variant="outline" size="sm" className="gap-1.5" disabled={extracting !== null} onClick={handleSummarize}>
-              {extracting === "summarize" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              AI Summarize
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" disabled={extracting !== null} onClick={handleEditInEditor}>
-              {extracting === "edit" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PencilLine className="h-3.5 w-3.5" />}
-              Edit in Editor
-            </Button>
+        {canSummarize || canEdit ? (
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {canSummarize && (
+              <Button variant="outline" size="sm" className="gap-1.5" disabled={extracting !== null} onClick={handleSummarize}>
+                {extracting === "summarize" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                AI Summarize
+              </Button>
+            )}
+            {canEdit && (
+              <Button variant="outline" size="sm" className="gap-1.5" disabled={extracting !== null} onClick={handleEditInEditor}>
+                {extracting === "edit" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PencilLine className="h-3.5 w-3.5" />}
+                Edit in Editor
+              </Button>
+            )}
+            {canSummarize && !canEdit && (
+              <p className="text-[11px] text-muted-foreground w-full text-right">Edit in Editor isn&apos;t available for spreadsheets.</p>
+            )}
           </div>
         ) : (
           <p className="text-[11px] text-muted-foreground shrink-0 max-w-[220px] text-right">

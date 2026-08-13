@@ -69,7 +69,9 @@ function TemplateDetails({ basePath, templateId }: { basePath: string; templateI
         </div>
         <div className="grid grid-cols-2 gap-x-2 gap-y-2 text-[11px]">
           <div>
-            <p className="text-foreground font-medium">{firstAttachment ? getFileTypeLabel(firstAttachment.mimeType) : "Rich Text"}</p>
+            <p className="text-foreground font-medium">
+              {firstAttachment ? getFileTypeLabel(firstAttachment.mimeType, firstAttachment.fileName) : "Rich Text"}
+            </p>
             <p className="text-muted-foreground">Type</p>
           </div>
           <div>

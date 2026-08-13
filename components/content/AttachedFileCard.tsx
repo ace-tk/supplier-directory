@@ -34,7 +34,7 @@ export function AttachedFileCard({
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-foreground truncate">{file.fileName}</p>
         <p className="text-[10px] text-muted-foreground">
-          {getFileTypeLabel(file.mimeType)} · {formatFileSize(file.sizeBytes)}
+          {getFileTypeLabel(file.mimeType, file.fileName)} · {formatFileSize(file.sizeBytes)}
           {file.createdAt ? ` · ${formatDateTime(file.createdAt)}` : " · Not saved yet"}
         </p>
       </div>

@@ -128,6 +128,9 @@ export function AttachedFilesPanel({
       <p className="text-[10px] text-muted-foreground text-center -mt-1.5">
         Supports {SUPPORTED_DOCUMENT_LABEL}, {SUPPORTED_IMAGE_LABEL} · Max {MAX_DOCUMENT_BYTES / (1024 * 1024)}MB per file
       </p>
+      <p className="text-[10px] text-muted-foreground/80 text-center -mt-1.5">
+        PDF, DOCX, XLS/XLSX, PPTX, TXT, and images preview inline · legacy DOC/PPT show file details only
+      </p>
 
       {attachments.length === 0 ? (
         <EmptyState icon={Paperclip} title="No files attached" description="Add supporting PDFs, docs, or images." />
