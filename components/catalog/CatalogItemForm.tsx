@@ -171,7 +171,7 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <PageHeader
         title={initialRow ? "Edit Product" : "Add Product"}
         breadcrumbs={[{ label: "Catalog Management", href: basePath }, { label: initialRow ? "Edit" : "Add" }]}
@@ -188,185 +188,193 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
         }
       />
 
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-foreground">Product Details</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Product Name</Label>
-            <Input value={form.productName} onChange={(e) => patch({ productName: e.target.value })} />
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+        {/* Left / main column — existing Catalog fields, unchanged */}
+        <div className="space-y-6 min-w-0">
+          <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-foreground">Product Details</h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Product Name</Label>
+                <Input value={form.productName} onChange={(e) => patch({ productName: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Product Category</Label>
+                <Input value={form.category} onChange={(e) => patch({ category: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Brand Name</Label>
+                <Input value={form.brandName} onChange={(e) => patch({ brandName: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">SKU</Label>
+                <Input value={form.sku} onChange={(e) => patch({ sku: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Description</Label>
+              <Textarea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
+            </div>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Quantity</Label>
+                <Input type="number" min={0} value={form.quantity} onChange={(e) => patch({ quantity: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">MOQ</Label>
+                <Input type="number" min={0} value={form.moq} onChange={(e) => patch({ moq: e.target.value })} placeholder="Optional" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Color</Label>
+                <Input value={form.color} onChange={(e) => patch({ color: e.target.value })} placeholder="Optional" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Sizes</Label>
+              <Input value={form.sizes} onChange={(e) => patch({ sizes: e.target.value })} placeholder="S, M, L (comma separated)" />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Product Category</Label>
-            <Input value={form.category} onChange={(e) => patch({ category: e.target.value })} />
-          </div>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Brand Name</Label>
-            <Input value={form.brandName} onChange={(e) => patch({ brandName: e.target.value })} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">SKU</Label>
-            <Input value={form.sku} onChange={(e) => patch({ sku: e.target.value })} />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Description</Label>
-          <Textarea rows={2} value={form.description} onChange={(e) => patch({ description: e.target.value })} />
-        </div>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Quantity</Label>
-            <Input type="number" min={0} value={form.quantity} onChange={(e) => patch({ quantity: e.target.value })} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">MOQ</Label>
-            <Input type="number" min={0} value={form.moq} onChange={(e) => patch({ moq: e.target.value })} placeholder="Optional" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Color</Label>
-            <Input value={form.color} onChange={(e) => patch({ color: e.target.value })} placeholder="Optional" />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Sizes</Label>
-          <Input value={form.sizes} onChange={(e) => patch({ sizes: e.target.value })} placeholder="S, M, L (comma separated)" />
-        </div>
-      </div>
 
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-foreground">Pricing & Tax</h2>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Price Before GST</Label>
-            <Input type="number" min={0} value={form.priceBeforeGst} onChange={(e) => patch({ priceBeforeGst: e.target.value })} />
+          <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-foreground">Pricing & Tax</h2>
+            <div className="grid sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Price Before GST</Label>
+                <Input type="number" min={0} value={form.priceBeforeGst} onChange={(e) => patch({ priceBeforeGst: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">GST / Tax %</Label>
+                <Select value={String(form.gstPercent)} onValueChange={(v) => v && patch({ gstPercent: Number(v) })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GST_RATE_OPTIONS.map((r) => (
+                      <SelectItem key={r} value={String(r)}>
+                        {r}%
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Price (after GST)</Label>
+                <div className="h-8 flex items-center px-2.5 rounded-lg bg-muted/50 text-sm font-medium tabular-nums text-foreground">
+                  {priceAfterGst.toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">HSN Code</Label>
+                <Input value={form.hsnCode} onChange={(e) => patch({ hsnCode: e.target.value })} placeholder="Optional" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Currency</Label>
+                <Select value={form.currency} onValueChange={(v) => v && patch({ currency: v })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CURRENCY_OPTIONS.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Shipping Cost</Label>
+                <Input type="number" min={0} value={form.shippingCost} onChange={(e) => patch({ shippingCost: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Misc. Cost</Label>
+                <Input type="number" min={0} value={form.miscCost} onChange={(e) => patch({ miscCost: e.target.value })} />
+              </div>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">GST / Tax %</Label>
-            <Select value={String(form.gstPercent)} onValueChange={(v) => v && patch({ gstPercent: Number(v) })}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {GST_RATE_OPTIONS.map((r) => (
-                  <SelectItem key={r} value={String(r)}>
-                    {r}%
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Price (after GST)</Label>
-            <div className="h-8 flex items-center px-2.5 rounded-lg bg-muted/50 text-sm font-medium tabular-nums text-foreground">
-              {priceAfterGst.toFixed(2)}
+
+          <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-foreground">Fulfillment & Status</h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Lead Time</Label>
+                <Input value={form.leadTime} onChange={(e) => patch({ leadTime: e.target.value })} placeholder="e.g. 15 days" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status</Label>
+                <Select value={form.status} onValueChange={(v) => v && patch({ status: v as CatalogRowStatus })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Notes</Label>
+              <Textarea rows={2} value={form.notes} onChange={(e) => patch({ notes: e.target.value })} placeholder="Optional" />
             </div>
           </div>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">HSN Code</Label>
-            <Input value={form.hsnCode} onChange={(e) => patch({ hsnCode: e.target.value })} placeholder="Optional" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Currency</Label>
-            <Select value={form.currency} onValueChange={(v) => v && patch({ currency: v })}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCY_OPTIONS.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Shipping Cost</Label>
-            <Input type="number" min={0} value={form.shippingCost} onChange={(e) => patch({ shippingCost: e.target.value })} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Misc. Cost</Label>
-            <Input type="number" min={0} value={form.miscCost} onChange={(e) => patch({ miscCost: e.target.value })} />
-          </div>
-        </div>
-      </div>
 
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-foreground">Fulfillment & Status</h2>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Lead Time</Label>
-            <Input value={form.leadTime} onChange={(e) => patch({ leadTime: e.target.value })} placeholder="e.g. 15 days" />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Status</Label>
-            <Select value={form.status} onValueChange={(v) => v && patch({ status: v as CatalogRowStatus })}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Notes</Label>
-          <Textarea rows={2} value={form.notes} onChange={(e) => patch({ notes: e.target.value })} placeholder="Optional" />
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
-        <h2 className="text-sm font-semibold text-foreground">Images</h2>
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-          <button
-            type="button"
-            onClick={() => imageInputRef.current?.click()}
-            disabled={uploadingImage}
-            className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-          >
-            {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          </button>
-          <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageAdd} />
-
-          {images.map((img) => (
-            <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
+        {/* Right column — existing Images section, relocated from the bottom of the page */}
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-foreground">Images</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
               <button
                 type="button"
-                onClick={() => handleRemoveImage(img.id)}
-                className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                aria-label="Remove image"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploadingImage}
+                className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
               >
-                <X className="h-3 w-3" />
+                {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               </button>
-            </div>
-          ))}
+              <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageAdd} />
 
-          {pendingImages.map((img, i) => (
-            <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={() => handleRemovePendingImage(i)}
-                className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                aria-label="Remove image"
-              >
-                <X className="h-3 w-3" />
-              </button>
+              {images.map((img) => (
+                <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(img.id)}
+                    className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+
+              {pendingImages.map((img, i) => (
+                <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePendingImage(i)}
+                    className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>
