@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { GST_RATE_OPTIONS } from "@/lib/catalog-ui";
 
+export const PRODUCT_LOCATION_TYPES = ["WAREHOUSE", "RETAIL_STORE"] as const;
+
 export const catalogRowInputSchema = z.object({
   category: z.string().optional(),
   productName: z.string().min(1, "Product name is required").default("Untitled Product"),
@@ -26,6 +28,13 @@ export const catalogRowInputSchema = z.object({
   notes: z.string().optional(),
   warehouse: z.string().optional(),
   gender: z.string().optional(),
+  // Real Warehouse-vs-Retail-Store assignment (Product module). `.nullish()`
+  // (not `.optional()`) so a caller can distinguish "not touching this
+  // field" (omitted) from "explicitly clearing it" (null) — see the
+  // location-normalization logic in services/catalog.ts.
+  locationType: z.enum(PRODUCT_LOCATION_TYPES).nullish(),
+  warehouseId: z.string().nullish(),
+  retailStoreId: z.string().nullish(),
 });
 
 export type CatalogRowInput = z.infer<typeof catalogRowInputSchema>;

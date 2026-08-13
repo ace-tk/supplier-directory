@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save, Send } from "lucide-react";
@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TextCombobox } from "./TextCombobox";
 import { VariantsSection } from "./VariantsSection";
 import { ProductImageUploader, type PendingImage } from "./ProductImageUploader";
-import { GST_RATE_OPTIONS, DEFAULT_WAREHOUSE_OPTIONS, computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
+import { ProductLocationSection, type ProductLocationValue } from "./ProductLocationSection";
+import { GST_RATE_OPTIONS, computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
 import { getCatalogAction, addRowAction, updateRowAction, addRowImageAction } from "@/services/catalog";
 import type { CatalogRowRecord, CatalogRowImageEntry, CatalogRowStatus } from "@/types/catalog";
 import type { CatalogRowInput } from "@/lib/validations/catalog";
@@ -30,7 +31,7 @@ interface FormState {
   quantity: string;
   priceBeforeGst: string;
   gstPercent: number;
-  warehouse: string;
+  location: ProductLocationValue;
 }
 
 function formFromRow(row: CatalogRowRecord | null): FormState {
@@ -46,7 +47,11 @@ function formFromRow(row: CatalogRowRecord | null): FormState {
     quantity: String(row?.quantity ?? 0),
     priceBeforeGst: String(row?.priceBeforeGst ?? 0),
     gstPercent: row?.gstPercent ?? 0,
-    warehouse: row?.warehouse ?? "",
+    location: {
+      locationType: row?.locationType ?? null,
+      warehouseId: row?.warehouseId ?? null,
+      retailStoreId: row?.retailStoreId ?? null,
+    },
   };
 }
 
@@ -64,20 +69,13 @@ export function ProductForm({ basePath, initialRow }: { basePath: string; initia
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
   const [existingCategories, setExistingCategories] = useState<string[]>([]);
-  const [existingWarehouses, setExistingWarehouses] = useState<string[]>([]);
 
   useEffect(() => {
     getCatalogAction().then((r) => {
       if (!r.success) return;
       setExistingCategories([...new Set(r.data.rows.map((row) => row.category).filter((c): c is string => !!c))]);
-      setExistingWarehouses([...new Set(r.data.rows.map((row) => row.warehouse).filter((w): w is string => !!w))]);
     });
   }, []);
-
-  const warehouseOptions = useMemo(
-    () => [...new Set([...DEFAULT_WAREHOUSE_OPTIONS, ...existingWarehouses])],
-    [existingWarehouses]
-  );
 
   function patch(p: Partial<FormState>) {
     setForm((f) => ({ ...f, ...p }));
@@ -107,7 +105,9 @@ export function ProductForm({ basePath, initialRow }: { basePath: string; initia
       quantity: Number(form.quantity) || 0,
       priceBeforeGst: Number(form.priceBeforeGst) || 0,
       gstPercent: form.gstPercent,
-      warehouse: form.warehouse || undefined,
+      locationType: form.location.locationType,
+      warehouseId: form.location.warehouseId,
+      retailStoreId: form.location.retailStoreId,
       status: resolvedStatus,
     };
 
@@ -267,16 +267,7 @@ export function ProductForm({ basePath, initialRow }: { basePath: string; initia
             />
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Warehouse</h2>
-            <TextCombobox
-              value={form.warehouse}
-              onChange={(v) => patch({ warehouse: v })}
-              options={warehouseOptions}
-              placeholder="Select warehouse"
-              addLabel="Add Warehouse"
-            />
-          </div>
+          <ProductLocationSection value={form.location} onChange={(location) => patch({ location })} />
         </div>
       </div>
     </div>

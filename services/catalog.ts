@@ -21,6 +21,41 @@ async function requireOwnedRow(rowId: string, ownerId: string) {
   return row;
 }
 
+/**
+ * Validates and normalizes the Warehouse-vs-Retail-Store fields in place on
+ * a parsed catalogRowInputSchema result — mutates `data` so the caller can
+ * pass it straight to `db.catalogRow.create`/`update`. Only runs when
+ * `locationType` is actually part of this update (Catalog Management's own
+ * save path never sends it, so it's a no-op there); a `locationType` of
+ * `null` means "unassigned", clearing both location relations.
+ *
+ * Never allows WAREHOUSE+retailStoreId or RETAIL_STORE+warehouseId to
+ * reach the database together, and confirms the referenced
+ * warehouse/store is actually owned by this user before saving its id.
+ */
+async function normalizeLocationFields(
+  ownerId: string,
+  data: Partial<CatalogRowInput>
+): Promise<{ error: string } | null> {
+  if (data.locationType === undefined) return null;
+
+  if (data.locationType === "WAREHOUSE") {
+    if (!data.warehouseId) return { error: "Select a warehouse." };
+    const warehouse = await db.warehouse.findUnique({ where: { id: data.warehouseId }, select: { ownerId: true } });
+    if (!warehouse || warehouse.ownerId !== ownerId) return { error: "Invalid warehouse selection." };
+    data.retailStoreId = null;
+  } else if (data.locationType === "RETAIL_STORE") {
+    if (!data.retailStoreId) return { error: "Select a retail store." };
+    const store = await db.retailStore.findUnique({ where: { id: data.retailStoreId }, select: { ownerId: true } });
+    if (!store || store.ownerId !== ownerId) return { error: "Invalid retail store selection." };
+    data.warehouseId = null;
+  } else {
+    data.warehouseId = null;
+    data.retailStoreId = null;
+  }
+  return null;
+}
+
 export async function getCatalogAction(): Promise<ActionResult<CatalogRecord>> {
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
@@ -35,6 +70,9 @@ export async function addRowAction(input?: Partial<CatalogRowInput>): Promise<Ac
   const parsed = catalogRowInputSchema.safeParse(input ?? {});
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
+  const locationError = await normalizeLocationFields(user.id, parsed.data);
+  if (locationError) return { success: false, error: locationError.error };
+
   const maxOrder = await db.catalogRow.aggregate({ where: { catalogId: catalog.id }, _max: { order: true } });
   const row = await db.catalogRow.create({
     data: {
@@ -43,7 +81,7 @@ export async function addRowAction(input?: Partial<CatalogRowInput>): Promise<Ac
       catalogId: catalog.id,
       order: (maxOrder._max.order ?? -1) + 1,
     },
-    include: { images: true, attachments: true },
+    include: { images: true, attachments: true, assignedWarehouse: { select: { name: true } }, assignedRetailStore: { select: { name: true } } },
   });
 
   return { success: true, data: mapRow(row) };
@@ -92,6 +130,9 @@ export async function updateRowAction(
   const parsed = catalogRowInputSchema.partial().safeParse(input);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
+  const locationError = await normalizeLocationFields(user.id, parsed.data);
+  if (locationError) return { success: false, error: locationError.error };
+
   const data: Record<string, unknown> = { ...parsed.data };
   delete data.priceAfterGst;
   if (parsed.data.priceBeforeGst !== undefined || parsed.data.gstPercent !== undefined) {
@@ -103,7 +144,7 @@ export async function updateRowAction(
   const updated = await db.catalogRow.update({
     where: { id: rowId },
     data,
-    include: { images: true, attachments: true },
+    include: { images: true, attachments: true, assignedWarehouse: { select: { name: true } }, assignedRetailStore: { select: { name: true } } },
   });
   return { success: true, data: mapRow(updated) };
 }
@@ -151,9 +192,12 @@ export async function duplicateRowAction(rowId: string): Promise<ActionResult<Ca
       notes: row.notes,
       warehouse: row.warehouse,
       gender: row.gender,
+      locationType: row.locationType,
+      warehouseId: row.warehouseId,
+      retailStoreId: row.retailStoreId,
       order: (maxOrder._max.order ?? -1) + 1,
     },
-    include: { images: true, attachments: true },
+    include: { images: true, attachments: true, assignedWarehouse: { select: { name: true } }, assignedRetailStore: { select: { name: true } } },
   });
 
   return { success: true, data: mapRow(copy) };

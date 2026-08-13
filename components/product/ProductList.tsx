@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/portal/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { RecordsTable, type RecordColumn } from "@/components/portal/records-table";
@@ -33,6 +34,18 @@ const STATUS_OPTIONS: { value: CatalogRowStatus; label: string }[] = [
   { value: "DRAFT", label: "Draft" },
 ];
 
+type LocationFilter = "ALL" | "WAREHOUSE" | "RETAIL_STORE";
+
+function typeLabel(row: CatalogRowRecord): string {
+  if (row.locationType === "WAREHOUSE") return "Warehouse";
+  if (row.locationType === "RETAIL_STORE") return "Retail Store";
+  return "Unassigned";
+}
+
+function locationLabel(row: CatalogRowRecord): string {
+  return row.warehouseName ?? row.retailStoreName ?? "—";
+}
+
 /**
  * The Product workspace's main screen — a friendlier view over the exact
  * same CatalogRow records Catalog Management owns (same getCatalogAction/
@@ -46,6 +59,7 @@ export function ProductList({ basePath }: { basePath: string }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>("ALL");
   const [detailRow, setDetailRow] = useState<CatalogRowRecord | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CatalogRowRecord | null>(null);
@@ -65,8 +79,15 @@ export function ProductList({ basePath }: { basePath: string }) {
   const rows = catalog?.rows ?? [];
   const categories = useMemo(() => [...new Set(rows.map((r) => r.category).filter((c): c is string => !!c))], [rows]);
 
+  // Real persisted counts derived from the same rows the table filters —
+  // never hardcoded.
+  const warehouseCount = useMemo(() => rows.filter((r) => r.locationType === "WAREHOUSE").length, [rows]);
+  const retailStoreCount = useMemo(() => rows.filter((r) => r.locationType === "RETAIL_STORE").length, [rows]);
+
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
+      if (locationFilter === "WAREHOUSE" && r.locationType !== "WAREHOUSE") return false;
+      if (locationFilter === "RETAIL_STORE" && r.locationType !== "RETAIL_STORE") return false;
       if (statusFilter !== "All" && r.status !== statusFilter) return false;
       if (categoryFilter !== "All Categories" && r.category !== categoryFilter) return false;
       if (search) {
@@ -76,7 +97,7 @@ export function ProductList({ basePath }: { basePath: string }) {
       }
       return true;
     });
-  }, [rows, search, statusFilter, categoryFilter]);
+  }, [rows, search, statusFilter, categoryFilter, locationFilter]);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -118,7 +139,8 @@ export function ProductList({ basePath }: { basePath: string }) {
     { key: "quantity", label: "Stock", render: (r) => <span className="tabular-nums">{r.quantity}</span> },
     { key: "price", label: "Price", render: (r) => <span className="tabular-nums">{formatMoney(String(r.priceAfterGst), r.currency)}</span> },
     { key: "gstPercent", label: "GST", render: (r) => <span className="tabular-nums">{r.gstPercent}%</span> },
-    { key: "warehouse", label: "Warehouse", render: (r) => r.warehouse || "—" },
+    { key: "location", label: "Location", render: (r) => locationLabel(r) },
+    { key: "locationType", label: "Type", render: (r) => <StatusBadge status={typeLabel(r)} /> },
     {
       key: "status",
       label: "Status",
@@ -178,6 +200,14 @@ export function ProductList({ basePath }: { basePath: string }) {
           </Button>
         }
       />
+
+      <Tabs value={locationFilter} onValueChange={(v) => v && setLocationFilter(v as LocationFilter)}>
+        <TabsList>
+          <TabsTrigger value="ALL">All ({rows.length})</TabsTrigger>
+          <TabsTrigger value="WAREHOUSE">Warehouse ({warehouseCount})</TabsTrigger>
+          <TabsTrigger value="RETAIL_STORE">Retail Stores ({retailStoreCount})</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
         <div className="relative">

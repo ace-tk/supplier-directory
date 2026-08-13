@@ -45,6 +45,9 @@ const STATUS_STYLES: Record<string, string> = {
   Viewed: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
   Published: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
   Archived: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  Warehouse: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  "Retail Store": "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  Unassigned: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
 };
 
 export function StatusBadge({ status }: { status: string }) {

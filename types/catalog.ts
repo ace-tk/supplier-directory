@@ -1,6 +1,6 @@
-import type { CatalogRowStatus } from "@/lib/generated/prisma/enums";
+import type { CatalogRowStatus, ProductLocationType } from "@/lib/generated/prisma/enums";
 
-export type { CatalogRowStatus };
+export type { CatalogRowStatus, ProductLocationType };
 
 export interface CatalogRowImageEntry {
   id: string;
@@ -41,6 +41,14 @@ export interface CatalogRowRecord {
   order: number;
   warehouse: string | null;
   gender: string | null;
+  // Real, persisted Warehouse-vs-Retail-Store assignment (Product module).
+  // `warehouse` above is the legacy free-text field Catalog Management
+  // still owns — unrelated, kept separate on purpose.
+  locationType: ProductLocationType | null;
+  warehouseId: string | null;
+  warehouseName: string | null;
+  retailStoreId: string | null;
+  retailStoreName: string | null;
   images: CatalogRowImageEntry[];
   attachments: CatalogRowAttachmentEntry[];
   createdAt: string;

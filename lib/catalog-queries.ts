@@ -11,6 +11,8 @@ const catalogInclude = {
     include: {
       images: { orderBy: { order: "asc" as const } },
       attachments: { orderBy: { createdAt: "asc" as const } },
+      assignedWarehouse: { select: { name: true } },
+      assignedRetailStore: { select: { name: true } },
     },
   },
 };
@@ -47,6 +49,11 @@ export function mapRow(r: CatalogWithRows["rows"][number]): CatalogRowRecord {
     order: r.order,
     warehouse: r.warehouse,
     gender: r.gender,
+    locationType: r.locationType,
+    warehouseId: r.warehouseId,
+    warehouseName: r.assignedWarehouse?.name ?? null,
+    retailStoreId: r.retailStoreId,
+    retailStoreName: r.assignedRetailStore?.name ?? null,
     images: r.images.map((i) => ({ id: i.id, dataUrl: i.dataUrl, order: i.order })),
     attachments: r.attachments.map((a) => ({
       id: a.id,
