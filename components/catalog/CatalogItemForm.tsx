@@ -105,6 +105,7 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
   }
 
   const priceAfterGst = computeCatalogPriceAfterGst(Number(form.priceBeforeGst) || 0, form.gstPercent);
+  const coverImage = images[0] ?? pendingImages[0] ?? null;
 
   async function handleImageAdd(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -333,19 +334,32 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
         <div className="space-y-6">
           <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
             <h2 className="text-sm font-semibold text-foreground">Images</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-              <button
-                type="button"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={uploadingImage}
-                className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-              >
-                {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              </button>
-              <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageAdd} />
 
+            {/* Large cover preview — the whole area is the upload target
+                until there's an image to show; keeps full aspect ratio via
+                object-contain so nothing gets cropped/distorted. */}
+            <div className="w-full h-[360px] rounded-xl border border-border bg-muted/40 overflow-hidden relative">
+              {coverImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={coverImage.dataUrl} alt="Product" className="w-full h-full object-contain" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="w-full h-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                >
+                  {uploadingImage ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6" />}
+                  <span className="text-xs font-medium">{uploadingImage ? "Uploading…" : "Upload cover image"}</span>
+                </button>
+              )}
+            </div>
+            <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageAdd} />
+
+            {/* Thumbnail rail + add-more tile */}
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
               {images.map((img) => (
-                <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
+                <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
                   <button
@@ -360,7 +374,7 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
               ))}
 
               {pendingImages.map((img, i) => (
-                <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
+                <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
                   <button
@@ -373,7 +387,18 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
                   </button>
                 </div>
               ))}
+
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploadingImage}
+                className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+              >
+                {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </button>
             </div>
+
+            <p className="text-[11px] text-muted-foreground">JPEG, PNG, WEBP, or GIF, up to 5MB.</p>
           </div>
         </div>
       </div>
