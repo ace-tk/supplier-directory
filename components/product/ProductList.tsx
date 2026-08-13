@@ -13,7 +13,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/portal/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { RecordsTable, type RecordColumn } from "@/components/portal/records-table";
-import { RowDetailSheet } from "@/components/catalog/RowDetailSheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,8 +48,9 @@ function locationLabel(row: CatalogRowRecord): string {
 /**
  * The Product workspace's main screen — a friendlier view over the exact
  * same CatalogRow records Catalog Management owns (same getCatalogAction/
- * deleteRowAction/duplicateRowAction, same RowDetailSheet for "View"), not
- * a parallel product list.
+ * deleteRowAction/duplicateRowAction). "View" opens the full Product Detail
+ * page (/{basePath}/{id}) rather than the old RowDetailSheet — that page
+ * now owns viewing + Design Your Own / Manufacture Your Own entry points.
  */
 export function ProductList({ basePath }: { basePath: string }) {
   const router = useRouter();
@@ -60,8 +60,6 @@ export function ProductList({ basePath }: { basePath: string }) {
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("ALL");
-  const [detailRow, setDetailRow] = useState<CatalogRowRecord | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CatalogRowRecord | null>(null);
 
   function refresh() {
@@ -155,10 +153,8 @@ export function ProductList({ basePath }: { basePath: string }) {
             variant="ghost"
             size="icon-sm"
             aria-label="View"
-            onClick={() => {
-              setDetailRow(r);
-              setDetailOpen(true);
-            }}
+            render={<Link href={`${basePath}/${r.id}`} />}
+            nativeButton={false}
           >
             <Maximize2 className="h-3.5 w-3.5" />
           </Button>
@@ -256,16 +252,6 @@ export function ProductList({ basePath }: { basePath: string }) {
       ) : (
         <RecordsTable columns={columns} rows={filteredRows} />
       )}
-
-      <RowDetailSheet
-        row={detailRow}
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        onRowChange={(updated) => {
-          setDetailRow(updated);
-          setCatalog((prev) => (prev ? { ...prev, rows: prev.rows.map((r) => (r.id === updated.id ? updated : r)) } : prev));
-        }}
-      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>

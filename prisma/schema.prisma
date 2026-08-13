@@ -53,6 +53,9 @@ model User {
   warehouses   Warehouse[]   @relation("WarehouseOwner")
   retailStores RetailStore[] @relation("RetailStoreOwner")
 
+  productDesigns        ProductDesign[]        @relation("ProductDesignOwner")
+  manufacturingRequests ManufacturingRequest[] @relation("ManufacturingRequestOwner")
+
   ownedInvoices        Invoice[]         @relation("InvoiceOwner")
   counterpartyInvoices Invoice[]         @relation("InvoiceCounterparty")
   paymentsRecorded     Payment[]         @relation("PaymentCreatedBy")
@@ -1027,6 +1030,10 @@ model CatalogRow {
   attachments  CatalogRowAttachment[]
   invoiceItems InvoiceItem[]
 
+  // Product Detail's "Design Your Own" / "Manufacture Your Own" workflows.
+  designs               ProductDesign[]
+  manufacturingRequests ManufacturingRequest[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1111,6 +1118,115 @@ model CatalogRowAttachment {
   createdAt DateTime   @default(now())
 
   @@index([rowId])
+}
+
+// ─── Module: Product Detail — Design Your Own / Manufacture Your Own ────
+// Two small additive models. No existing model (CatalogRow, SupplyChain,
+// Invoice*) could honestly represent "a saved customization spec a buyer
+// can return to and later turn into a manufacturing brief" without
+// overloading its meaning, so these are new — kept minimal per the task:
+// structured/free-form customization choices live in one `specification`
+// JSON field rather than a wide, rigid set of new CatalogRow columns.
+
+model ProductDesign {
+  id String @id @default(cuid())
+
+  productId String
+  product   CatalogRow @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  ownerId String
+  owner   User   @relation("ProductDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("My Design")
+
+  // Free-form customization choices from the Design Your Own stepper —
+  // fabric/color/fit/sizes/waist/buttons/pockets/labels/packaging/other
+  // details. Kept as JSON (not individual columns) so new customization
+  // options never require a schema change, and so the core CatalogRow
+  // model is never polluted with design-request-only fields.
+  specification Json?
+  notes         String?
+
+  attachments           ProductDesignAttachment[]
+  manufacturingRequests ManufacturingRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([ownerId])
+}
+
+model ProductDesignAttachment {
+  id        String        @id @default(cuid())
+  designId  String
+  design    ProductDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  dataUrl   String        @db.Text
+  createdAt DateTime      @default(now())
+
+  @@index([designId])
+}
+
+enum ManufacturingRequestStatus {
+  SUBMITTED
+  IN_REVIEW
+  QUOTED
+  CLOSED
+}
+
+model ManufacturingRequest {
+  id String @id @default(cuid())
+
+  productId String
+  product   CatalogRow @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Optional — set when this request originated from "Manufacture This
+  // Design" on a saved ProductDesign, which is how the design's
+  // specification gets pre-filled here (see services/manufacturing.ts).
+  designId String?
+  design   ProductDesign? @relation(fields: [designId], references: [id], onDelete: SetNull)
+
+  ownerId String
+  owner   User   @relation("ManufacturingRequestOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Carried over from the linked design (if any) and independently
+  // editable here — a manufacturing request can adjust specs without
+  // mutating the original saved design.
+  specification Json?
+
+  quantity         Int
+  targetPrice      Float?
+  currency         String                     @default("INR")
+  sampleRequired   Boolean                    @default(false)
+  deliveryLocation String?
+  requiredBy       DateTime?
+  notes            String?
+  status           ManufacturingRequestStatus @default(SUBMITTED)
+
+  attachments ManufacturingRequestAttachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([designId])
+  @@index([ownerId])
+}
+
+model ManufacturingRequestAttachment {
+  id        String               @id @default(cuid())
+  requestId String
+  request   ManufacturingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  dataUrl   String               @db.Text
+  createdAt DateTime             @default(now())
+
+  @@index([requestId])
 }
 
 // ─── Module: Articles ───────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 interface SpeechRecognitionResultLike {
   [index: number]: { transcript: string };
@@ -38,21 +38,28 @@ interface UseSpeechRecognitionOptions {
   onResult: (transcript: string) => void;
 }
 
+// Feature support never changes over a session, so subscribe is a no-op —
+// this is the standard useSyncExternalStore shape for reading a browser-
+// only global safely: `getServerSnapshot` returns false during SSR/the
+// initial client render (so hydration always matches), and `getSnapshot`
+// reflects the real client value afterward, without ever calling setState
+// inside an effect (which would itself trigger cascading renders).
+function subscribeNoop() {
+  return () => {};
+}
+function getSpeechSupportSnapshot() {
+  return !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+}
+function getSpeechSupportServerSnapshot() {
+  return false;
+}
+
 export function useSpeechRecognition({ onResult }: UseSpeechRecognitionOptions) {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Starts false on both server and the initial client render (SSR has no
-  // `window` to check) — actual feature detection happens in an effect
-  // after mount instead of a lazy useState initializer, so the first
-  // client render always matches the server-rendered HTML and React never
-  // has to discard/regenerate this subtree for a hydration mismatch.
-  const [isSupported, setIsSupported] = useState(false);
+  const isSupported = useSyncExternalStore(subscribeNoop, getSpeechSupportSnapshot, getSpeechSupportServerSnapshot);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onResultRef = useRef(onResult);
-
-  useEffect(() => {
-    setIsSupported(!!(window.SpeechRecognition ?? window.webkitSpeechRecognition));
-  }, []);
 
   useEffect(() => {
     onResultRef.current = onResult;

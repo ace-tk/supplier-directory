@@ -16,6 +16,12 @@ export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
 /** Optional — only shown/set where a product's category makes it relevant. */
 export const GENDER_OPTIONS = ["Men", "Women", "Unisex"];
 
+/** Suggestion seeds for the Design Your Own configurator — same role as
+ * SIZE_OPTIONS/GENDER_OPTIONS above (quick-pick chips, never a stored
+ * enum); a custom value can always be typed instead. */
+export const FABRIC_OPTIONS = ["Cotton", "Linen", "Denim", "Wool", "Polyester", "Silk", "Blended"];
+export const FIT_OPTIONS = ["Slim Fit", "Regular Fit", "Relaxed Fit", "Oversized"];
+
 /**
  * priceAfterGst is always server-derived from priceBeforeGst + gstPercent —
  * never hand-edited. Rounded to 2dp to match the money-display convention
