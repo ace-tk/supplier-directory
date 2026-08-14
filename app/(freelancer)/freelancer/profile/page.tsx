@@ -53,7 +53,7 @@ export default async function FreelancerProfilePage() {
           </div>
         </div>
         <Link
-          href="/freelancer/portfolio"
+          href="/freelancer/profile/edit"
           className="flex items-center gap-1 text-xs font-medium text-primary hover:underline shrink-0"
         >
           Edit details <ArrowRight className="h-3 w-3" />
@@ -118,9 +118,9 @@ export default async function FreelancerProfilePage() {
       {profile.portfolioItems.length > 0 && (
         <section className="space-y-3">
           <SectionHeader
-            title="Portfolio"
+            title="Gallery"
             actions={
-              <Link href="/freelancer/portfolio" className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+              <Link href="/freelancer/profile/edit" className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             }

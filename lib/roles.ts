@@ -259,7 +259,7 @@ export const FREELANCER_NAV_GROUPS: NavGroup[] = [
   {
     group: "Profile",
     items: [
-      { label: "Portfolio", href: "/freelancer/portfolio", icon: ImageIcon },
+      { label: "My Portfolio", href: "/freelancer/portfolio", icon: ImageIcon },
       { label: "Messages", href: "/freelancer/messages", icon: MessageSquare },
       { label: "Notifications", href: "/freelancer/notifications", icon: Bell },
       { label: "Profile", href: "/freelancer/profile", icon: UserCircle },

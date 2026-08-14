@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { MoreHorizontal, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -57,6 +58,7 @@ export function FreelancerCard({ freelancer, index, onView, onEdit, onAssignTask
             <MoreHorizontal className="h-3.5 w-3.5" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onView(freelancer)}>View Details</DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(freelancer)}>Edit</DropdownMenuItem>
             <DropdownMenuItem onClick={() => onAssignTask(freelancer)} disabled={isDeactivated}>
               Assign Task
@@ -126,12 +128,12 @@ export function FreelancerCard({ freelancer, index, onView, onEdit, onAssignTask
 
       <div className="mx-4 mt-3 border-t border-border" />
 
-      {/* Connect Card */}
+      {/* Connect Card — opens the freelancer's published portfolio website */}
       <div className="px-4 pt-3">
-        <button
-          type="button"
-          onClick={() => onView(freelancer)}
-          className="relative w-full text-left rounded-lg bg-muted/50 p-3.5 overflow-hidden hover:bg-muted transition-colors group"
+        <Link
+          href={`/portfolio/${freelancer.id}`}
+          target="_blank"
+          className="relative block w-full text-left rounded-lg bg-muted/50 p-3.5 overflow-hidden hover:bg-muted transition-colors group"
         >
           <div
             aria-hidden
@@ -150,7 +152,7 @@ export function FreelancerCard({ freelancer, index, onView, onEdit, onAssignTask
             View Profile
             <ArrowUpRight className="h-3 w-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </span>
-        </button>
+        </Link>
       </div>
 
       {/* Stats — the only place these numbers appear */}

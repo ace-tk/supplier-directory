@@ -1,27 +1,20 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/session";
-import { PageHeader } from "@/components/layout/page-header";
-import { getFreelancerProfile } from "@/lib/freelancer-queries";
-import { PortfolioEditor } from "@/components/freelancer/portfolio-editor";
+import { getOwnPortfolioViewModel } from "@/lib/portfolio-queries";
+import { PortfolioBuilder } from "@/components/portfolio/builder/portfolio-builder";
 
 export default async function FreelancerPortfolioPage() {
   const user = await getUser();
   if (!user) redirect("/login?from=/freelancer/portfolio");
-  const profile = await getFreelancerProfile(user.id);
 
-  if (!profile) {
+  const portfolio = await getOwnPortfolioViewModel(user.id);
+  if (!portfolio) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Portfolio" description="Showcase your work, links, and experience." />
         <p className="text-sm text-muted-foreground">Freelancer profile not found.</p>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Portfolio" description="Showcase your work, links, and experience." />
-      <PortfolioEditor initialProfile={profile} />
-    </div>
-  );
+  return <PortfolioBuilder initialData={portfolio} userId={user.id} />;
 }

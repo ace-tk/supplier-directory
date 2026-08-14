@@ -647,6 +647,7 @@ model Freelancer {
 
   portfolioItems FreelancerPortfolioItem[]
   experience     FreelancerExperience[]
+  portfolio      FreelancerPortfolio?
 
   @@index([userId])
 }
@@ -676,6 +677,106 @@ model FreelancerExperience {
   createdAt    DateTime   @default(now())
 
   @@index([freelancerId])
+}
+
+enum PortfolioStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// One-page portfolio website. Template-independent content only — name,
+// avatar, role, location, availability, skills, and social links stay
+// canonical on Freelancer/User and are read from there at render time
+// rather than duplicated here (see lib/portfolio-queries.ts).
+model FreelancerPortfolio {
+  id           String @id @default(cuid())
+  freelancerId String @unique
+  freelancer   Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  templateKey String          @default("editorial01")
+  status      PortfolioStatus @default(DRAFT)
+
+  headline        String?
+  tagline         String?
+  aboutLong       String?  @db.Text
+  services        String[] @default([])
+  website         String?
+  experienceYears Int?
+
+  // Freelancer-authored repeatable sections with no natural relational
+  // shape (order, small field sets) — kept as JSON rather than three more
+  // tables, consistent with `specification Json?` elsewhere in this schema.
+  processSteps Json?
+  testimonials Json?
+  clients      Json?
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  projects PortfolioProject[]
+  boards   PortfolioBoard[]
+
+  @@index([freelancerId])
+}
+
+model PortfolioProject {
+  id          String              @id @default(cuid())
+  portfolioId String
+  portfolio   FreelancerPortfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  title         String
+  category      String?
+  description   String?  @db.Text
+  coverImage    String?  @db.Text
+  galleryImages String[] @default([])
+  projectUrl    String?
+  clientName    String?
+  year          Int?
+  tools         String[] @default([])
+  role          String?
+  featured      Boolean  @default(false)
+  position      Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([portfolioId])
+}
+
+// Pinterest-style visual collection.
+model PortfolioBoard {
+  id          String              @id @default(cuid())
+  portfolioId String
+  portfolio   FreelancerPortfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  coverImage  String? @db.Text
+  position    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pins PortfolioPin[]
+
+  @@index([portfolioId])
+}
+
+model PortfolioPin {
+  id      String         @id @default(cuid())
+  boardId String
+  board   PortfolioBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  title       String?
+  description String?
+  image       String  @db.Text
+  externalUrl String?
+  position    Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([boardId])
 }
 
 model Proposal {

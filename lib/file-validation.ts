@@ -47,6 +47,16 @@ export interface FileValidationResult {
   error?: string;
 }
 
+/** Pulls the MIME type and approximate byte size out of a base64 data URL,
+ * for server actions that receive an already-encoded upload (e.g. avatar,
+ * portfolio images) and need to validate it the same way as a raw File. */
+export function extractDataUrlMeta(dataUrl: string): { mimeType: string; sizeBytes: number } {
+  const match = /^data:(.+);base64,/.exec(dataUrl);
+  const mimeType = match?.[1] ?? "";
+  const sizeBytes = Math.round((dataUrl.length * 3) / 4);
+  return { mimeType, sizeBytes };
+}
+
 function getExtension(fileName?: string): string {
   if (!fileName) return "";
   const dot = fileName.lastIndexOf(".");
