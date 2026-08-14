@@ -6,6 +6,13 @@ export interface FreelancerRecord {
   id: string;
   name: string;
   email: string;
+  avatar: string | null;
+  location: string | null;
+  // Most recent FreelancerExperience entry's role/title, if the freelancer
+  // has logged any — real data, never a fabricated "profession". null when
+  // no experience entry exists.
+  role: string | null;
+  bio: string | null;
   skills: string[];
   assignedClients: string[];
   assignedSuppliers: string[];

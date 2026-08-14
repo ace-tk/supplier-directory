@@ -117,11 +117,12 @@ export default function FreelancersPage() {
         ]}
       />
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((freelancer) => (
+      <div className="grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+        {filtered.map((freelancer, index) => (
           <FreelancerCard
             key={freelancer.id}
             freelancer={freelancer}
+            index={index}
             onView={handleView}
             onEdit={handleEdit}
             onAssignTask={handleAssignTask}
