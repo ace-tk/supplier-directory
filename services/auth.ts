@@ -41,7 +41,6 @@ export async function loginAction(
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar: user.avatar,
       },
       rememberMe
     );
@@ -106,7 +105,6 @@ export async function signupAction(
       name: user.name,
       email: user.email,
       role: user.role,
-      avatar: user.avatar,
     });
 
     return { success: true, data: undefined };
