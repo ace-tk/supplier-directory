@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Copy, Maximize2, PackageSearch } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Copy, Maximize2, PackageSearch, LayoutGrid, List } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/portal/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { RecordsTable, type RecordColumn } from "@/components/portal/records-table";
+import { ProductGrid } from "@/components/product/ProductGrid";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,21 +30,24 @@ import { getCatalogAction, deleteRowAction, duplicateRowAction } from "@/service
 import { formatMoney } from "@/lib/invoicing/ui";
 import type { CatalogRecord, CatalogRowRecord, CatalogRowStatus } from "@/types/catalog";
 
-const STATUS_OPTIONS: { value: CatalogRowStatus; label: string }[] = [
+export const STATUS_OPTIONS: { value: CatalogRowStatus; label: string }[] = [
   { value: "ACTIVE", label: "Active" },
   { value: "INACTIVE", label: "Inactive" },
   { value: "DRAFT", label: "Draft" },
 ];
 
 type LocationFilter = "ALL" | "WAREHOUSE" | "RETAIL_STORE";
+type ViewMode = "list" | "grid";
 
-function typeLabel(row: CatalogRowRecord): string {
+const VIEW_MODE_STORAGE_KEY = "product-view-mode";
+
+export function typeLabel(row: CatalogRowRecord): string {
   if (row.locationType === "WAREHOUSE") return "Warehouse";
   if (row.locationType === "RETAIL_STORE") return "Retail Store";
   return "Unassigned";
 }
 
-function locationLabel(row: CatalogRowRecord): string {
+export function locationLabel(row: CatalogRowRecord): string {
   return row.warehouseName ?? row.retailStoreName ?? "—";
 }
 
@@ -61,6 +67,7 @@ export function ProductList({ basePath }: { basePath: string }) {
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("ALL");
   const [deleteTarget, setDeleteTarget] = useState<CatalogRowRecord | null>(null);
+  const [viewMode, setViewMode] = useLocalStorage<ViewMode>(VIEW_MODE_STORAGE_KEY, "list");
 
   function refresh() {
     getCatalogAction().then((result) => {
@@ -237,6 +244,23 @@ export function ProductList({ basePath }: { basePath: string }) {
               ))}
             </SelectContent>
           </Select>
+          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 shrink-0">
+            {(["list", "grid"] as ViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                className={cn(
+                  "relative flex items-center justify-center w-8 h-8 rounded-md transition-colors text-muted-foreground hover:text-foreground",
+                  viewMode === mode && "bg-background shadow-sm text-foreground"
+                )}
+                aria-label={mode === "grid" ? "Switch to grid view" : "Switch to list view"}
+                title={mode === "grid" ? "Switch to grid view" : "Switch to list view"}
+              >
+                {mode === "grid" ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -249,8 +273,10 @@ export function ProductList({ basePath }: { basePath: string }) {
           description={rows.length === 0 ? "Add your first product to get started." : "Try adjusting your search or filters."}
           action={rows.length === 0 ? { label: "Add Product", onClick: () => router.push(`${basePath}/new`) } : undefined}
         />
-      ) : (
+      ) : viewMode === "list" ? (
         <RecordsTable columns={columns} rows={filteredRows} />
+      ) : (
+        <ProductGrid rows={filteredRows} basePath={basePath} onDuplicate={handleDuplicate} onDelete={setDeleteTarget} />
       )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
