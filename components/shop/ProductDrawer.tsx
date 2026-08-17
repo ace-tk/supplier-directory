@@ -18,6 +18,7 @@ import { Supplier } from "@/types/supplier";
 import { useState } from "react";
 import Link from "next/link";
 import { getProductTags, getTagColor } from "@/lib/product-tags";
+import { shareDetails } from "@/lib/card-actions";
 import { cn } from "@/lib/utils";
 
 export function ProductDrawer({
@@ -25,11 +26,15 @@ export function ProductDrawer({
   isOpen,
   onClose,
   onViewSupplier,
+  isSaved,
+  onToggleSave,
 }: {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
   onViewSupplier: (supplier: Supplier) => void;
+  isSaved: boolean;
+  onToggleSave: (product: Product) => void;
 }) {
   const [activeImage, setActiveImage] = useState(0);
 
@@ -71,11 +76,28 @@ export function ProductDrawer({
                 <h2 className="font-semibold text-foreground">Product Details</h2>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
+                <button
+                  onClick={() =>
+                    shareDetails({
+                      title: product.name,
+                      text: `${product.name} from ${supplier?.companyName ?? "a verified supplier"} — ${product.priceRange ?? ""}`,
+                      url: `${window.location.origin}/shop?productId=${product.id}`,
+                    })
+                  }
+                  className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                  aria-label="Share product"
+                >
                   <Share2 className="w-5 h-5" />
                 </button>
-                <button className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
-                  <Bookmark className="w-5 h-5" />
+                <button
+                  onClick={() => onToggleSave(product)}
+                  className={cn(
+                    "p-2 rounded-full hover:bg-muted transition-colors",
+                    isSaved ? "text-rose-500" : "text-muted-foreground"
+                  )}
+                  aria-label="Save product"
+                >
+                  <Bookmark className="w-5 h-5" fill={isSaved ? "currentColor" : "none"} />
                 </button>
               </div>
             </div>

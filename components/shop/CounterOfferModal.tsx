@@ -65,13 +65,27 @@ export function CounterOfferModal({
   product,
   open,
   onOpenChange,
+  initialStep = "terms",
 }: {
   product: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** "terms" = View Offer entry point, "offer" = Counter Offer entry point
+   * — same modal/state/API either way, just a different starting step. */
+  initialStep?: "terms" | "offer";
 }) {
-  const [step, setStep] = useState<Step>("terms");
+  const [step, setStep] = useState<Step>(initialStep);
   const supplier = product?.supplier;
+
+  // Adjusted during render (not in an effect) so reopening with a
+  // different initialStep (e.g. "View Offer" then later "Counter Offer")
+  // always lands on the right step, even though the modal stays mounted
+  // between opens.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setStep(initialStep);
+  }
 
   const {
     register,

@@ -62,6 +62,8 @@ model User {
   invoiceActivity      InvoiceActivity[]
   invoiceCounters      InvoiceCounter[]
 
+  savedProducts SavedProduct[] @relation("SavedProductUser")
+
   ownedExpenses           Expense[]               @relation("ExpenseOwner")
   expenseParty            Expense[]               @relation("ExpenseParty")
   expenseCustomCategories ExpenseCustomCategory[] @relation("ExpenseCustomCategoryOwner")
@@ -154,12 +156,33 @@ model Product {
   images         String[]
   savedCount     Int      @default(0)
 
+  savedBy SavedProduct[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([supplierId])
   @@index([category])
   @@index([country])
+}
+
+/**
+ * Real, persisted Shop "save" — replaces the old component-local-only
+ * toggle. Toggling this also increments/decrements Product.savedCount in
+ * the same transaction (services/shop.ts), so the counter and this join
+ * table never drift apart.
+ */
+model SavedProduct {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("SavedProductUser", fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
 }
 
 // Auto-incrementing sequence for SB-XXXXXX supplier IDs
@@ -1118,6 +1141,13 @@ model CatalogRow {
   // assumed for non-apparel categories.
   gender    String?
 
+  // Set only when this row was auto-seeded by the Shop page's "Design Your
+  // Own"/"Manufacture Your Own" bridge (services/shop.ts) from a Shop
+  // Product the buyer doesn't own a catalog row for yet. Lets repeated
+  // clicks on the same Shop product reuse the same seeded row instead of
+  // creating duplicates. Never surfaced in the Product Management UI.
+  sourceShopProductId String?
+
   // Real, persisted Warehouse-vs-Retail-Store bifurcation for the Product
   // module. Nullable/unset (locationType = null) is the honest
   // "Unassigned" state for old rows — never backfilled automatically.
@@ -1146,6 +1176,7 @@ model CatalogRow {
   @@index([warehouseId])
   @@index([retailStoreId])
   @@index([locationType])
+  @@index([sourceShopProductId])
 }
 
 enum ProductLocationType {

@@ -29,31 +29,27 @@ export function isReadyStock(product: Pick<Product, "id">): boolean {
   return hashString(product.id + "stock") % 2 === 0;
 }
 
-const SUSTAINABLE_MATERIALS = ["Cotton", "Linen", "Organic Cotton", "Handloom Cotton"];
-
+/**
+ * Real-data-only tags — every entry here must be a direct, honest
+ * derivation of an actual Product/SupplierListing field. Previously this
+ * also pushed "Ready Stock"/"Premium"/"Sustainable" (each gated by a
+ * hash of product.id, i.e. fabricated) and an unconditional "Wholesale"
+ * on every single product — all removed. Best Seller/Trending stay: they
+ * read Product.savedCount, which is now a genuinely live counter (see
+ * services/shop.ts toggleSavedProductAction).
+ */
 export function getProductTags(product: Product): string[] {
   const tags: string[] = [];
 
   if (product.material) tags.push(product.material.split(" ")[0]);
   if (product.supplier?.supplierType) tags.push(product.supplier.supplierType);
   if (isExportQuality(product)) tags.push("Export Quality");
-  if (isReadyStock(product)) tags.push("Ready Stock");
 
   const moq = getMoqNumber(product);
   if (moq !== null && moq < 100) tags.push(`MOQ ${moq}`);
 
   if (product.savedCount > 480) tags.push("Best Seller");
   else if (product.savedCount > 320) tags.push("Trending");
-
-  if (hashString(product.id + "premium") % 4 === 0) tags.push("Premium");
-  if (
-    SUSTAINABLE_MATERIALS.some((m) => product.material?.includes(m)) &&
-    hashString(product.id + "sustainable") % 3 === 0
-  ) {
-    tags.push("Sustainable");
-  }
-
-  tags.push("Wholesale");
 
   return Array.from(new Set(tags)).slice(0, 6);
 }

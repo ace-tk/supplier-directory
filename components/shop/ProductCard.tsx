@@ -15,18 +15,31 @@ import {
   MapPin,
   PlayCircle,
   Video,
-  Briefcase,
+  Wallet,
+  Handshake,
+  Pencil,
+  Factory,
+  Loader2,
 } from "lucide-react";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
 import { getProductTags, getTagColor } from "@/lib/product-tags";
 import { downloadDetails, shareDetails } from "@/lib/card-actions";
 import { hasProductVideo } from "@/lib/product-engagement";
+import { createCatalogRowFromShopProductAction } from "@/services/shop";
 import { useSession } from "@/hooks/use-session";
 import { ProductImageSlider } from "./ProductImageSlider";
-import { BuyerInterestPill } from "./BuyerInterestPill";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
+/** Design Your Own / Manufacture Your Own live under CatalogRow-based
+ * routes, one variant per portal — Shop itself is only reachable from
+ * buyer/supplier/freelancer, so this always resolves to a real route. */
+function productBasePath(role: string | undefined): string {
+  if (role === "SUPPLIER") return "/supplier/product";
+  if (role === "FREELANCER") return "/freelancer/product";
+  return "/buyer/product";
+}
 
 export function ProductCard({
   product,
@@ -35,21 +48,35 @@ export function ProductCard({
   onWatchVideo,
   onRequestVideo,
   onCounterOffer,
+  isSaved,
+  onToggleSave,
 }: {
   product: Product;
   onClick: (product: Product) => void;
   onViewSupplier: (supplier: Supplier) => void;
   onWatchVideo: (product: Product) => void;
   onRequestVideo: (product: Product) => void;
-  onCounterOffer: (product: Product) => void;
+  onCounterOffer: (product: Product, initialStep: "terms" | "offer") => void;
+  isSaved: boolean;
+  onToggleSave: (product: Product) => void;
 }) {
   const router = useRouter();
   const session = useSession();
   const [isHovered, setIsHovered] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [pendingWorkflow, setPendingWorkflow] = useState<"design" | "manufacture" | null>(null);
   const tags = getProductTags(product);
   const supplier = product.supplier;
   const hasVideo = hasProductVideo(product);
+  const basePath = productBasePath(session?.role);
+
+  function requireAuth(reason: string, action: () => void) {
+    if (!session) {
+      const returnUrl = `/shop?openRequestVideo=${product.id}`;
+      router.push(`/signup?from=${encodeURIComponent(returnUrl)}&reason=${reason}`);
+      return;
+    }
+    action();
+  }
 
   function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
@@ -84,6 +111,11 @@ export function ProductCard({
     });
   }
 
+  function handleSaveClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    requireAuth("save", () => onToggleSave(product));
+  }
+
   function handleWatchVideo(e: React.MouseEvent) {
     e.stopPropagation();
     onWatchVideo(product);
@@ -91,17 +123,32 @@ export function ProductCard({
 
   function handleRequestVideoClick(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!session) {
-      const returnUrl = `/shop?openRequestVideo=${product.id}`;
-      router.push(`/signup?from=${encodeURIComponent(returnUrl)}&reason=video`);
-      return;
-    }
-    onRequestVideo(product);
+    requireAuth("video", () => onRequestVideo(product));
+  }
+
+  function handleViewOfferClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    onCounterOffer(product, "terms");
   }
 
   function handleCounterOfferClick(e: React.MouseEvent) {
     e.stopPropagation();
-    onCounterOffer(product);
+    requireAuth("offer", () => onCounterOffer(product, "offer"));
+  }
+
+  async function handleWorkflowClick(e: React.MouseEvent, workflow: "design" | "manufacture") {
+    e.stopPropagation();
+    requireAuth(workflow, async () => {
+      if (pendingWorkflow) return;
+      setPendingWorkflow(workflow);
+      try {
+        const result = await createCatalogRowFromShopProductAction(product.id);
+        if (!result.success) return;
+        router.push(`${basePath}/${result.data.rowId}/${workflow}`);
+      } finally {
+        setPendingWorkflow(null);
+      }
+    });
   }
 
   return (
@@ -114,6 +161,30 @@ export function ProductCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Header: product name + Design/Manufacture Your Own */}
+      <div className="px-5 pt-5 pb-3 cursor-pointer" onClick={() => onClick(product)}>
+        <h3 className="font-semibold text-foreground text-base leading-snug mb-3 line-clamp-2">{product.name}</h3>
+
+        <div className="flex flex-col gap-1.5">
+          <button
+            onClick={(e) => handleWorkflowClick(e, "design")}
+            disabled={pendingWorkflow !== null}
+            className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary transition-colors disabled:opacity-60"
+          >
+            {pendingWorkflow === "design" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pencil className="w-3.5 h-3.5" />}
+            Design Your Own
+          </button>
+          <button
+            onClick={(e) => handleWorkflowClick(e, "manufacture")}
+            disabled={pendingWorkflow !== null}
+            className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary transition-colors disabled:opacity-60"
+          >
+            {pendingWorkflow === "manufacture" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Factory className="w-3.5 h-3.5" />}
+            Manufacture Your Own
+          </button>
+        </div>
+      </div>
+
       {/* Image slider */}
       <div className="relative overflow-hidden bg-muted cursor-pointer" onClick={() => onClick(product)}>
         <ProductImageSlider images={product.images} alt={product.name} />
@@ -136,10 +207,7 @@ export function ProductCard({
             <TooltipTrigger
               render={
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsSaved((v) => !v);
-                  }}
+                  onClick={handleSaveClick}
                   className={cn(
                     "p-2 rounded-full backdrop-blur-md transition-colors duration-200",
                     isSaved ? "bg-rose-500 text-white" : "bg-black/40 text-white hover:bg-black/60"
@@ -227,10 +295,6 @@ export function ProductCard({
 
       {/* Content */}
       <div className="p-5 cursor-pointer" onClick={() => onClick(product)}>
-        <h3 className="font-semibold text-foreground text-base leading-snug mb-2 line-clamp-2">
-          {product.name}
-        </h3>
-
         {supplier && (
           <button
             onClick={(e) => {
@@ -244,25 +308,21 @@ export function ProductCard({
           </button>
         )}
 
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-3 flex-wrap">
-          {supplier?.city && (
-            <span className="flex items-center gap-1">
-              <MapPin className="w-3 h-3" /> {supplier.city}
-            </span>
-          )}
-          <BuyerInterestPill product={product} />
-        </div>
+        {supplier?.city && (
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-3">
+            <MapPin className="w-3 h-3" /> {supplier.city}
+          </div>
+        )}
 
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full", getTagColor(tag))}
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {tags.map((tag) => (
+              <span key={tag} className={cn("px-2 py-0.5 text-[10px] font-medium rounded-full", getTagColor(tag))}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-end justify-between pt-3 pb-4 border-t border-border/60">
           <div>
@@ -292,12 +352,20 @@ export function ProductCard({
             </button>
           )}
 
-          <button
-            onClick={handleCounterOfferClick}
-            className="flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors duration-200"
-          >
-            <Briefcase className="w-3.5 h-3.5" /> View / Counter Offer
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleViewOfferClick}
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors duration-200"
+            >
+              <Wallet className="w-3.5 h-3.5" /> View Offer
+            </button>
+            <button
+              onClick={handleCounterOfferClick}
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors duration-200"
+            >
+              <Handshake className="w-3.5 h-3.5" /> Counter Offer
+            </button>
+          </div>
         </div>
       </div>
     </motion.div>

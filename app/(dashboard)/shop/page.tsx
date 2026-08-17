@@ -16,6 +16,7 @@ import { SupplierDrawer } from "@/components/suppliers/supplier-drawer";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
 import { getMoqNumber, getPriceMin, isReadyStock } from "@/lib/product-tags";
+import { getMySavedProductIdsAction, toggleSavedProductAction } from "@/services/shop";
 
 const PAGE_SIZE = 24;
 
@@ -44,6 +45,9 @@ function ShopPageContent() {
   const [requestVideoModalOpen, setRequestVideoModalOpen] = useState(false);
   const [counterOfferProduct, setCounterOfferProduct] = useState<Product | null>(null);
   const [counterOfferModalOpen, setCounterOfferModalOpen] = useState(false);
+  const [counterOfferInitialStep, setCounterOfferInitialStep] = useState<"terms" | "offer">("terms");
+
+  const [savedProductIds, setSavedProductIds] = useState<Set<string>>(new Set());
 
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -121,6 +125,32 @@ function ShopPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    getMySavedProductIdsAction().then((r) => {
+      if (r.success) setSavedProductIds(new Set(r.data));
+    });
+  }, []);
+
+  async function handleToggleSave(product: Product) {
+    const wasSaved = savedProductIds.has(product.id);
+    setSavedProductIds((prev) => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(product.id);
+      else next.add(product.id);
+      return next;
+    });
+    const result = await toggleSavedProductAction(product.id);
+    if (!result.success) {
+      // Roll back the optimistic update on failure.
+      setSavedProductIds((prev) => {
+        const next = new Set(prev);
+        if (wasSaved) next.add(product.id);
+        else next.delete(product.id);
+        return next;
+      });
+    }
+  }
+
   async function loadMore() {
     const nextPage = pageRef.current + 1;
     setLoadingMore(true);
@@ -193,8 +223,9 @@ function ShopPageContent() {
     setRequestVideoModalOpen(true);
   }
 
-  function openCounterOfferModal(product: Product) {
+  function openCounterOfferModal(product: Product, initialStep: "terms" | "offer") {
     setCounterOfferProduct(product);
+    setCounterOfferInitialStep(initialStep);
     setCounterOfferModalOpen(true);
   }
 
@@ -240,6 +271,8 @@ function ShopPageContent() {
                 onWatchVideo={openVideoModal}
                 onRequestVideo={openRequestVideoModal}
                 onCounterOffer={openCounterOfferModal}
+                savedProductIds={savedProductIds}
+                onToggleSave={handleToggleSave}
               />
               {hasMore && (
                 <div className="flex justify-center mt-10 mb-6">
@@ -281,6 +314,8 @@ function ShopPageContent() {
         isOpen={!!selectedProduct}
         onClose={() => setSelectedProduct(null)}
         onViewSupplier={openSupplier}
+        isSaved={selectedProduct ? savedProductIds.has(selectedProduct.id) : false}
+        onToggleSave={handleToggleSave}
       />
 
       <SupplierDrawer
@@ -303,6 +338,7 @@ function ShopPageContent() {
         product={counterOfferProduct}
         open={counterOfferModalOpen}
         onOpenChange={setCounterOfferModalOpen}
+        initialStep={counterOfferInitialStep}
       />
     </div>
   );
