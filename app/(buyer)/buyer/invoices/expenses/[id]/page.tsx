@@ -1,9 +1,9 @@
 import { redirect, notFound } from "next/navigation";
 import { getUser } from "@/lib/session";
 import { getExpenseById } from "@/lib/expenses/queries";
-import { ExpenseForm } from "@/components/invoicing/expenses/ExpenseForm";
+import { ExpenseDetailView } from "@/components/invoicing/expenses/ExpenseDetailView";
 
-export default async function BuyerEditExpensePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BuyerExpenseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getUser();
   if (!user) redirect("/login?from=/buyer/invoices/expenses");
 
@@ -11,5 +11,5 @@ export default async function BuyerEditExpensePage({ params }: { params: Promise
   const expense = await getExpenseById(id);
   if (!expense || expense.ownerId !== user.id) notFound();
 
-  return <ExpenseForm basePath="/buyer/invoices" expense={expense} ownerName={user.name} />;
+  return <ExpenseDetailView basePath="/buyer/invoices" expense={expense} ownerName={user.name} />;
 }

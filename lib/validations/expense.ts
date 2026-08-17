@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/invoicing/ui";
 
 const PAYMENT_METHOD_VALUES = PAYMENT_METHOD_OPTIONS as [string, ...string[]];
+const VOUCHER_TEMPLATE_VALUES = ["REGULAR", "CLASSIC_RED", "MINIMAL_STUDIO"] as const;
 
 const CATEGORY_VALUES = [
   "SHIPPING",
@@ -37,6 +38,18 @@ export const expenseFormSchema = z.object({
   expenseType: z.string().optional(),
   partyUserId: z.string().nullish(),
   relatedInvoiceId: z.string().nullish(),
+  buyerUserId: z.string().nullish(),
+  supplierUserId: z.string().nullish(),
+  relatedPurchaseInvoiceId: z.string().nullish(),
+  manualPartyName: z.string().optional(),
+  contactId: z.string().nullish(),
+  manualContactName: z.string().optional(),
+  manualContactPhone: z.string().optional(),
+  manualContactCountryCode: z.string().optional(),
+  paymentAccountId: z.string().nullish(),
+  referenceNumber: z.string().optional(),
+  createVoucher: z.boolean().optional().default(false),
+  voucherTemplate: z.enum(VOUCHER_TEMPLATE_VALUES).nullish(),
   attachmentFileName: z.string().optional(),
   attachmentUrl: z.string().optional(),
 });

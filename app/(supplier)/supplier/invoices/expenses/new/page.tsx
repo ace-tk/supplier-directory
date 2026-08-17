@@ -6,5 +6,5 @@ export default async function SupplierNewExpensePage() {
   const user = await getUser();
   if (!user) redirect("/login?from=/supplier/invoices/expenses/new");
 
-  return <ExpenseForm basePath="/supplier/invoices" expense={null} />;
+  return <ExpenseForm basePath="/supplier/invoices" expense={null} ownerName={user.name} />;
 }

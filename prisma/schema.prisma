@@ -65,6 +65,10 @@ model User {
   ownedExpenses           Expense[]               @relation("ExpenseOwner")
   expenseParty            Expense[]               @relation("ExpenseParty")
   expenseCustomCategories ExpenseCustomCategory[] @relation("ExpenseCustomCategoryOwner")
+  expenseBuyerFor         Expense[]               @relation("ExpenseBuyer")
+  expenseSupplierFor      Expense[]               @relation("ExpenseSupplier")
+  expenseContacts         ExpenseContact[]        @relation("ExpenseContactOwner")
+  paymentAccounts         PaymentAccount[]        @relation("PaymentAccountOwner")
 
   articles Article[] @relation("ArticleOwner")
 
@@ -1575,10 +1579,11 @@ model Invoice {
   // status, which stays visible.
   archivedAt DateTime?
 
-  items    InvoiceItem[]
-  expenses Expense[]
-  payments Payment[]
-  activity InvoiceActivity[]
+  items              InvoiceItem[]
+  expenses           Expense[]         @relation("ExpenseRelatedInvoice")
+  expensesAsPurchase Expense[]         @relation("ExpenseRelatedPurchase")
+  payments           Payment[]
+  activity           InvoiceActivity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1755,13 +1760,54 @@ model Expense {
   expenseType String?
 
   // Optional Buyer/Supplier this expense relates to — reuses the existing
-  // platform-account directory, same as an Invoice's party.
+  // platform-account directory, same as an Invoice's party. Legacy/generic
+  // field, kept for backward compatibility with rows written before the
+  // buyerUserId/supplierUserId split below existed.
   partyUserId String?
   partyUser   User?   @relation("ExpenseParty", fields: [partyUserId], references: [id], onDelete: SetNull)
 
-  // Optional related Sales/Purchase document.
+  // Optional related Sales/Purchase document. Legacy/generic field — going
+  // forward this is populated specifically by the Buyer-linked-invoice flow
+  // (see relatedPurchaseInvoiceId below for the Supplier-linked-purchase
+  // side, since a "Purchase" is just an Invoice with a PURCHASE-family type).
   relatedInvoiceId String?
-  relatedInvoice   Invoice? @relation(fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
+  relatedInvoice   Invoice? @relation("ExpenseRelatedInvoice", fields: [relatedInvoiceId], references: [id], onDelete: SetNull)
+
+  // Distinct Buyer vs Supplier linkage — both optional, both reuse the same
+  // User directory as Invoice.counterpartyUserId (Buyer/Supplier profiles
+  // have no back-relations of their own; User is the real hub).
+  buyerUserId    String?
+  buyerUser      User?   @relation("ExpenseBuyer", fields: [buyerUserId], references: [id], onDelete: SetNull)
+  supplierUserId String?
+  supplierUser   User?   @relation("ExpenseSupplier", fields: [supplierUserId], references: [id], onDelete: SetNull)
+
+  // Optional related Purchase document for the Supplier flow — same Invoice
+  // table, filtered to the PURCHASE family server-side.
+  relatedPurchaseInvoiceId String?
+  relatedPurchaseInvoice   Invoice? @relation("ExpenseRelatedPurchase", fields: [relatedPurchaseInvoiceId], references: [id], onDelete: SetNull)
+
+  // Company/person name captured manually when no Buyer/Supplier is linked.
+  manualPartyName String?
+
+  // Optional saved contact, or a manually-entered one-off contact (never
+  // auto-saved to ExpenseContact unless the user explicitly opts in).
+  contactId                 String?
+  contact                   ExpenseContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  manualContactName         String?
+  manualContactPhone        String?
+  manualContactCountryCode  String?
+
+  // Optional saved payment account ("Paid By"), plus a reference number
+  // whose meaning depends on paymentMethod (cheque number / bank ref / UPI
+  // txn id).
+  paymentAccountId String?
+  paymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id], onDelete: SetNull)
+  referenceNumber  String?
+
+  // Optional voucher generation, reusing the existing InvoiceTemplate enum
+  // and renderer instead of a new rendering engine.
+  createVoucher   Boolean          @default(false)
+  voucherTemplate InvoiceTemplate?
 
   // File reference, not a base64 blob — reuses the existing filesystem
   // upload endpoint (app/api/supplier-portal/upload) which returns a
@@ -1779,4 +1825,62 @@ model Expense {
   @@index([category])
   @@index([occurredAt])
   @@index([relatedInvoiceId])
+  @@index([buyerUserId])
+  @@index([supplierUserId])
+  @@index([relatedPurchaseInvoiceId])
+}
+
+/**
+ * A lightweight, owner-scoped address-book entry optionally tagged to a
+ * Buyer/Supplier User — deliberately its own model rather than reusing/
+ * extending Buyer/Supplier (which are thin 1:1 User profile stubs with no
+ * contacts concept today). Never created automatically; only inserted when
+ * the user explicitly opts in via "Save to contacts".
+ */
+model ExpenseContact {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("ExpenseContactOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Optional: which Buyer/Supplier User this contact belongs to. Null means
+  // a general contact not tied to a specific party.
+  partyUserId String?
+
+  name        String
+  email       String?
+  phone       String?
+  countryCode String? @default("+91")
+
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+
+  @@index([ownerId])
+  @@index([ownerId, partyUserId])
+}
+
+/**
+ * Minimal, owner-scoped "Paid By" account (card/bank/UPI) — no such
+ * structure existed anywhere in the schema before this; kept intentionally
+ * small (label + provider + last4) rather than a full banking-details model
+ * since nothing else in the app needs more than that yet.
+ */
+model PaymentAccount {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("PaymentAccountOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  label String // "HDFC Corporate Visa"
+  type  PaymentMethod // reuses the existing enum — never a second source of truth
+
+  provider      String? // "HDFC Bank"
+  last4         String?
+  accountNumber String?
+  ifscCode      String?
+  upiId         String?
+  isDefault     Boolean @default(false)
+
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+
+  @@index([ownerId])
 }

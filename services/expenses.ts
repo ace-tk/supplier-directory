@@ -7,12 +7,16 @@ import { expenseFormSchema, type ExpenseFormValues } from "@/lib/validations/exp
 import { getExpenseById, listExpensesForOwner } from "@/lib/expenses/queries";
 import { validateExpenseImportRows } from "@/lib/expenses/import";
 import { EXPENSE_IMPORT_MAX_ROWS } from "@/lib/expenses/import-types";
+import { SALES_FAMILY_TYPES, PURCHASE_FAMILY_TYPES, invoiceFamily } from "@/lib/invoicing/family";
 import type {
   ExpenseRecord,
   ExpenseListFilter,
   ExpenseActionResult,
   InvoiceOption,
+  PartyInvoiceOption,
   ExpenseCustomCategoryOption,
+  ExpenseContactOption,
+  PaymentAccountOption,
   PaymentMethod,
 } from "@/types/expense";
 import type { DirectoryOption } from "@/types/invoicing";
@@ -64,9 +68,56 @@ async function buildExpenseData(ownerId: string, d: ExpenseFormValues) {
     expenseType: d.expenseType?.trim() || null,
     partyUserId: d.partyUserId || null,
     relatedInvoiceId: d.relatedInvoiceId || null,
+    buyerUserId: d.buyerUserId || null,
+    supplierUserId: d.supplierUserId || null,
+    relatedPurchaseInvoiceId: d.relatedPurchaseInvoiceId || null,
+    manualPartyName: d.manualPartyName?.trim() || null,
+    contactId: d.contactId || null,
+    manualContactName: d.manualContactName?.trim() || null,
+    manualContactPhone: d.manualContactPhone?.trim() || null,
+    manualContactCountryCode: d.manualContactCountryCode?.trim() || null,
+    paymentAccountId: d.paymentAccountId || null,
+    referenceNumber: d.referenceNumber?.trim() || null,
+    createVoucher: d.createVoucher ?? false,
+    voucherTemplate: d.createVoucher ? (d.voucherTemplate ?? "REGULAR") : null,
     attachmentFileName: d.attachmentFileName?.trim() || null,
     attachmentUrl: d.attachmentUrl?.trim() || null,
   };
+}
+
+/**
+ * Never trusts client-supplied relation IDs: re-checks each cross-party
+ * link against the live DB before it's allowed to be saved. Throws a
+ * user-facing Error on the first violation found; callers convert that into
+ * an ExpenseActionResult failure.
+ */
+async function validateLinks(ownerId: string, d: ExpenseFormValues): Promise<void> {
+  if (d.buyerUserId && d.relatedInvoiceId) {
+    const inv = await db.invoice.findUnique({
+      where: { id: d.relatedInvoiceId },
+      select: { ownerId: true, counterpartyUserId: true, type: true },
+    });
+    if (!inv || inv.ownerId !== ownerId || inv.counterpartyUserId !== d.buyerUserId || invoiceFamily(inv.type) !== "SALES") {
+      throw new Error("Selected invoice does not belong to the selected buyer.");
+    }
+  }
+  if (d.supplierUserId && d.relatedPurchaseInvoiceId) {
+    const inv = await db.invoice.findUnique({
+      where: { id: d.relatedPurchaseInvoiceId },
+      select: { ownerId: true, counterpartyUserId: true, type: true },
+    });
+    if (!inv || inv.ownerId !== ownerId || inv.counterpartyUserId !== d.supplierUserId || invoiceFamily(inv.type) !== "PURCHASE") {
+      throw new Error("Selected purchase does not belong to the selected supplier.");
+    }
+  }
+  if (d.contactId) {
+    const contact = await db.expenseContact.findUnique({ where: { id: d.contactId }, select: { ownerId: true } });
+    if (!contact || contact.ownerId !== ownerId) throw new Error("Invalid contact selected.");
+  }
+  if (d.paymentAccountId) {
+    const account = await db.paymentAccount.findUnique({ where: { id: d.paymentAccountId }, select: { ownerId: true } });
+    if (!account || account.ownerId !== ownerId) throw new Error("Invalid payment account selected.");
+  }
 }
 
 // ─── Reads ───────────────────────────────────────────────────────────────
@@ -111,6 +162,211 @@ export async function getExpensePartyOptionsAction(): Promise<ExpenseActionResul
       companyName: r.buyer?.companyName ?? r.supplier?.companyName ?? "",
     })),
   };
+}
+
+function directoryWhere(role: "BUYER" | "SUPPLIER", search: string) {
+  const trimmed = search.trim();
+  return {
+    role,
+    ...(trimmed
+      ? {
+          OR: [
+            { name: { contains: trimmed, mode: "insensitive" as const } },
+            { email: { contains: trimmed, mode: "insensitive" as const } },
+            { buyer: { companyName: { contains: trimmed, mode: "insensitive" as const } } },
+            { supplier: { companyName: { contains: trimmed, mode: "insensitive" as const } } },
+          ],
+        }
+      : {}),
+  };
+}
+
+/** Real Buyers only (role=BUYER) — used by the Basic Details "Company /
+ * Person" picker, distinct from the merged getExpensePartyOptionsAction. */
+export async function searchBuyersAction(search: string): Promise<ExpenseActionResult<DirectoryOption[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const rows = await db.user.findMany({
+    where: directoryWhere("BUYER", search),
+    select: { id: true, name: true, email: true, buyer: { select: { companyName: true } } },
+    orderBy: { name: "asc" },
+    take: 20,
+  });
+  return { success: true, data: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, companyName: r.buyer?.companyName ?? "" })) };
+}
+
+/** Real Suppliers only (role=SUPPLIER) — used by the Basic Details "Company
+ * / Supplier" picker. */
+export async function searchSuppliersAction(search: string): Promise<ExpenseActionResult<DirectoryOption[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const rows = await db.user.findMany({
+    where: directoryWhere("SUPPLIER", search),
+    select: { id: true, name: true, email: true, supplier: { select: { companyName: true } } },
+    orderBy: { name: "asc" },
+    take: 20,
+  });
+  return { success: true, data: rows.map((r) => ({ id: r.id, name: r.name, email: r.email, companyName: r.supplier?.companyName ?? "" })) };
+}
+
+/** Sales-family invoices belonging to a specific Buyer, scoped to the
+ * current owner — never shows another party's invoices. */
+export async function getBuyerInvoicesAction(
+  buyerUserId: string,
+  search = "",
+  limit = 5
+): Promise<ExpenseActionResult<PartyInvoiceOption[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+  if (!buyerUserId) return { success: true, data: [] };
+
+  const rows = await db.invoice.findMany({
+    where: {
+      ownerId: user.id,
+      counterpartyUserId: buyerUserId,
+      type: { in: SALES_FAMILY_TYPES },
+      archivedAt: null,
+      ...(search.trim() ? { invoiceNumber: { contains: search.trim(), mode: "insensitive" as const } } : {}),
+    },
+    select: { id: true, invoiceNumber: true, invoiceDate: true, grandTotal: true, currency: true, partyTaxId: true },
+    orderBy: { invoiceDate: "desc" },
+    take: limit,
+  });
+  return {
+    success: true,
+    data: rows.map((r) => ({
+      id: r.id,
+      invoiceNumber: r.invoiceNumber,
+      invoiceDate: r.invoiceDate.toISOString(),
+      grandTotal: r.grandTotal.toString(),
+      currency: r.currency,
+      partyTaxId: r.partyTaxId,
+    })),
+  };
+}
+
+/** Purchase-family invoices belonging to a specific Supplier, scoped to the
+ * current owner. */
+export async function getSupplierPurchasesAction(
+  supplierUserId: string,
+  search = "",
+  limit = 5
+): Promise<ExpenseActionResult<PartyInvoiceOption[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+  if (!supplierUserId) return { success: true, data: [] };
+
+  const rows = await db.invoice.findMany({
+    where: {
+      ownerId: user.id,
+      counterpartyUserId: supplierUserId,
+      type: { in: PURCHASE_FAMILY_TYPES },
+      archivedAt: null,
+      ...(search.trim() ? { invoiceNumber: { contains: search.trim(), mode: "insensitive" as const } } : {}),
+    },
+    select: { id: true, invoiceNumber: true, invoiceDate: true, grandTotal: true, currency: true, partyTaxId: true },
+    orderBy: { invoiceDate: "desc" },
+    take: limit,
+  });
+  return {
+    success: true,
+    data: rows.map((r) => ({
+      id: r.id,
+      invoiceNumber: r.invoiceNumber,
+      invoiceDate: r.invoiceDate.toISOString(),
+      grandTotal: r.grandTotal.toString(),
+      currency: r.currency,
+      partyTaxId: r.partyTaxId,
+    })),
+  };
+}
+
+/** Saved contacts for the current owner, optionally scoped to one Buyer/
+ * Supplier User. */
+export async function listExpenseContactsAction(partyUserId?: string | null): Promise<ExpenseActionResult<ExpenseContactOption[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const rows = await db.expenseContact.findMany({
+    where: { ownerId: user.id, ...(partyUserId ? { partyUserId } : {}) },
+    select: { id: true, partyUserId: true, name: true, email: true, phone: true, countryCode: true },
+    orderBy: { name: "asc" },
+  });
+  return { success: true, data: rows };
+}
+
+/** Only ever called when the user explicitly checks "Save to contacts" —
+ * never invoked automatically by createExpenseAction/updateExpenseAction. */
+export async function createExpenseContactAction(input: {
+  partyUserId?: string | null;
+  name: string;
+  email?: string;
+  phone?: string;
+  countryCode?: string;
+}): Promise<ExpenseActionResult<ExpenseContactOption>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const name = input.name.trim();
+  if (!name) return { success: false, error: "Contact name is required." };
+
+  const created = await db.expenseContact.create({
+    data: {
+      ownerId: user.id,
+      partyUserId: input.partyUserId || null,
+      name,
+      email: input.email?.trim() || null,
+      phone: input.phone?.trim() || null,
+      countryCode: input.countryCode?.trim() || "+91",
+    },
+    select: { id: true, partyUserId: true, name: true, email: true, phone: true, countryCode: true },
+  });
+  return { success: true, data: created };
+}
+
+export async function listPaymentAccountsAction(type?: PaymentMethod | null): Promise<ExpenseActionResult<PaymentAccountOption[]>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const rows = await db.paymentAccount.findMany({
+    where: { ownerId: user.id, ...(type ? { type } : {}) },
+    select: { id: true, label: true, type: true, provider: true, last4: true },
+    orderBy: [{ isDefault: "desc" }, { label: "asc" }],
+  });
+  return { success: true, data: rows };
+}
+
+export async function createPaymentAccountAction(input: {
+  label: string;
+  type: PaymentMethod;
+  provider?: string;
+  last4?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+}): Promise<ExpenseActionResult<PaymentAccountOption>> {
+  const user = await requireUser();
+  if (!user) return { success: false, error: "You must be signed in." };
+
+  const label = input.label.trim();
+  if (!label) return { success: false, error: "Account label is required." };
+
+  const created = await db.paymentAccount.create({
+    data: {
+      ownerId: user.id,
+      label,
+      type: input.type,
+      provider: input.provider?.trim() || null,
+      last4: input.last4?.trim() || null,
+      accountNumber: input.accountNumber?.trim() || null,
+      ifscCode: input.ifscCode?.trim() || null,
+      upiId: input.upiId?.trim() || null,
+    },
+    select: { id: true, label: true, type: true, provider: true, last4: true },
+  });
+  return { success: true, data: created };
 }
 
 export async function listExpenseCustomCategoriesAction(): Promise<ExpenseActionResult<ExpenseCustomCategoryOption[]>> {
@@ -184,6 +440,12 @@ export async function createExpenseAction(input: ExpenseFormValues): Promise<Exp
   const parsed = expenseFormSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
+  try {
+    await validateLinks(user.id, parsed.data);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Invalid linked record." };
+  }
+
   const created = await db.expense.create({
     data: { ...(await buildExpenseData(user.id, parsed.data)), ownerId: user.id },
     select: { id: true },
@@ -203,6 +465,12 @@ export async function updateExpenseAction(
 
   const parsed = expenseFormSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
+
+  try {
+    await validateLinks(user.id, parsed.data);
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Invalid linked record." };
+  }
 
   await db.expense.update({ where: { id }, data: await buildExpenseData(user.id, parsed.data) });
   return { success: true, data: { id } };

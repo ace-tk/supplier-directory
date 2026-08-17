@@ -6,5 +6,5 @@ export default async function FreelancerNewExpensePage() {
   const user = await getUser();
   if (!user) redirect("/login?from=/freelancer/invoices/expenses/new");
 
-  return <ExpenseForm basePath="/freelancer/invoices" expense={null} />;
+  return <ExpenseForm basePath="/freelancer/invoices" expense={null} ownerName={user.name} />;
 }

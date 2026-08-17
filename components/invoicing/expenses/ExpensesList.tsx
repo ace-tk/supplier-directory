@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Paperclip, Receipt, Upload, Download } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Paperclip, Receipt, Upload, Download, Eye } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,6 +135,15 @@ export function ExpensesList({ basePath }: { basePath: string }) {
       label: "",
       render: (e) => (
         <div className="flex items-center justify-end gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="View"
+            render={<Link href={`${basePath}/expenses/${e.id}`} />}
+            nativeButton={false}
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"
