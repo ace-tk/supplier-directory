@@ -19,7 +19,7 @@ export async function AppShell({ children, className, portal }: AppShellProps) {
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar user={user} portal={portal} />
         <div className="flex flex-1 flex-col overflow-hidden">
-          <TopNavbar user={user} />
+          <TopNavbar user={user} portal={portal} />
           <main
             className={cn(
               "flex-1 overflow-y-auto scrollbar-thin",

@@ -1,6 +1,8 @@
 "use client";
 
-import { Search, Menu, Settings, LogOut, User, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import Link from "next/link";
+import { Search, Menu, Settings, LogOut, User, ChevronDown, Building2, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -15,9 +17,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-session";
 import { initials } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { PORTAL_CONFIG, type PortalKey } from "@/lib/roles";
 import type { SessionUser } from "@/types/auth";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -29,30 +33,70 @@ const ROLE_COLORS: Record<string, string> = {
 
 interface TopNavbarProps {
   user?: SessionUser | null;
+  portal?: PortalKey;
 }
 
-export function TopNavbar({ user }: TopNavbarProps) {
+export function TopNavbar({ user, portal = "admin" }: TopNavbarProps) {
   const { logout, isLoggingOut } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const { navGroups } = PORTAL_CONFIG[portal];
 
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-40">
       {/* Mobile menu trigger */}
-      <Button variant="ghost" size="icon" className="md:hidden h-9 w-9">
+      <Button variant="ghost" size="icon" className="md:hidden h-9 w-9" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation menu">
         <Menu className="h-4 w-4" />
       </Button>
 
       {/* Search */}
-      <div className="hidden md:flex flex-1 max-w-md">
-        <SearchBar placeholder="Search suppliers, contacts, orders..." className="w-full" />
-      </div>
+      {mobileSearchOpen ? (
+        <div className="flex md:hidden flex-1 items-center gap-1.5">
+          <SearchBar placeholder="Search suppliers, contacts, orders..." className="w-full" />
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setMobileSearchOpen(false)} aria-label="Close search">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <div className="hidden md:flex flex-1 max-w-md">
+          <SearchBar placeholder="Search suppliers, contacts, orders..." className="w-full" />
+        </div>
+      )}
 
       {/* Mobile search icon */}
-      <Button variant="ghost" size="icon" className="md:hidden h-9 w-9">
-        <Search className="h-4 w-4" />
-      </Button>
+      {!mobileSearchOpen && (
+        <Button variant="ghost" size="icon" className="md:hidden h-9 w-9" onClick={() => setMobileSearchOpen(true)} aria-label="Search">
+          <Search className="h-4 w-4" />
+        </Button>
+      )}
 
       {/* Right actions */}
-      <div className="flex items-center gap-1">
+      <div className={cn("items-center gap-1", mobileSearchOpen ? "hidden md:flex" : "flex")}>
+        {/* Admin-only real quick links — no dead buttons, only routes that exist. */}
+        {user?.role === "ADMIN" && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              render={<Link href="/directory" aria-label="Supplier Directory" title="Supplier Directory" />}
+              nativeButton={false}
+            >
+              <Building2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              render={<Link href="/crm" aria-label="CRM Inbox" title="CRM Inbox" />}
+              nativeButton={false}
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Separator orientation="vertical" className="h-5 mx-1" />
+          </>
+        )}
+
         {/* Notifications */}
         <NotificationBell />
 
@@ -111,6 +155,46 @@ export function TopNavbar({ user }: TopNavbarProps) {
           </>
         )}
       </div>
+
+      {/* Mobile navigation drawer — mirrors the desktop sidebar's real routes. */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetHeader className="border-b border-border">
+            <SheetTitle>SupplyBase</SheetTitle>
+          </SheetHeader>
+          <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6">
+            {navGroups.map((group) => (
+              <div key={group.group}>
+                <p className="px-2 mb-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground">{group.group}</p>
+                <ul className="space-y-0.5">
+                  {group.items.map((item) =>
+                    item.comingSoon ? (
+                      <li key={item.label}>
+                        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-muted-foreground/50">
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1">{item.label}</span>
+                          <span className="text-[10px]">Soon</span>
+                        </div>
+                      </li>
+                    ) : (
+                      <li key={item.label}>
+                        <Link
+                          href={item.href}
+                          onClick={() => setMobileNavOpen(false)}
+                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          {item.label}
+                        </Link>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        </SheetContent>
+      </Sheet>
     </header>
   );
 }

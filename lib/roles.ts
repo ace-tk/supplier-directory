@@ -40,6 +40,8 @@ import {
   Table2,
   Receipt,
   BookOpen,
+  UserSearch,
+  Contact,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -48,6 +50,9 @@ export interface NavItem {
   href: string;
   icon: ComponentType<{ className?: string }>;
   badge?: string;
+  /** No real page exists yet — rendered as a disabled, non-navigating item
+   * instead of either a dead link or being silently omitted. */
+  comingSoon?: boolean;
 }
 
 export interface NavGroup {
@@ -87,12 +92,40 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
   },
   {
+    group: "Team",
+    items: [
+      { label: "Freelancers", href: "/freelancers", icon: Briefcase },
+      { label: "Team Management", href: "#", icon: Users, comingSoon: true },
+    ],
+  },
+  {
+    group: "Project Management",
+    items: [{ label: "Project Management", href: "#", icon: FolderKanban, comingSoon: true }],
+  },
+  {
+    group: "Supply Chain",
+    items: [{ label: "Supply Chain", href: "#", icon: Workflow, comingSoon: true }],
+  },
+  {
+    group: "Product",
+    items: [
+      { label: "Add Product", href: "/product/new", icon: PackagePlus },
+      { label: "Catalog Management", href: "/catalog", icon: Table2 },
+      { label: "Product", href: "/product", icon: Package },
+    ],
+  },
+  {
+    group: "Shop",
+    items: [{ label: "Shop", href: "/shop", icon: ShoppingBag }],
+  },
+  {
     group: "Commerce",
     items: [
       { label: "Supplier Directory", href: "/directory", icon: Building2 },
-      { label: "Supplier Portal", href: "/supplier-portal", icon: Sparkles, badge: "New" },
+      { label: "Buyer Directory", href: "#", icon: UserSearch, comingSoon: true },
+      { label: "Own Contacts", href: "#", icon: Contact, comingSoon: true },
       { label: "CRM Inbox", href: "/crm", icon: MessageSquare },
-      { label: "Shop", href: "/shop", icon: ShoppingBag },
+      { label: "Supplier Portal", href: "/supplier-portal", icon: Sparkles, badge: "New" },
       { label: "Buyer Leads", href: "/buyer-leads", icon: Users2 },
     ],
   },
@@ -117,28 +150,28 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    group: "Team",
-    items: [{ label: "Freelancers", href: "/freelancers", icon: Briefcase }],
-  },
-  {
-    group: "Workspace",
+    group: "Resources",
     items: [
       { label: "Content Management", href: "/content", icon: NotebookText },
-      { label: "Catalog Management", href: "/catalog", icon: Table2 },
-      { label: "Product", href: "/product", icon: Package },
-      { label: "Invoice Management", href: "/invoices", icon: Receipt },
       { label: "Articles", href: "/articles", icon: BookOpen },
     ],
   },
   {
+    group: "Commercials Management",
+    items: [
+      { label: "Invoice Management", href: "/invoices", icon: Receipt },
+      { label: "Expenses", href: "/invoices/expenses", icon: Receipt },
+    ],
+  },
+  {
     group: "Analytics",
-    items: [{ label: "Reports", href: "/reports", icon: BarChart3 }],
+    items: [{ label: "Reports", href: "/invoices/reports", icon: BarChart3 }],
   },
 ];
 
 export const ADMIN_BOTTOM_ITEMS: NavItem[] = [
-  { label: "Settings", href: "/settings", icon: Settings },
-  { label: "Help & Support", href: "/help", icon: HelpCircle },
+  { label: "Settings", href: "#", icon: Settings, comingSoon: true },
+  { label: "Help & Support", href: "#", icon: HelpCircle, comingSoon: true },
 ];
 
 // ---------------------------------------------------------------------------

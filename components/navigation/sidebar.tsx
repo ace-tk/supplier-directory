@@ -61,7 +61,35 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
             )}
             <ul className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const isActive = !item.comingSoon && (pathname === item.href || pathname.startsWith(item.href + "/"));
+
+                if (item.comingSoon) {
+                  const disabledItem = (
+                    <div
+                      className={cn(
+                        "relative flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/40 cursor-not-allowed select-none",
+                        collapsed ? "px-2.5 justify-center" : "px-2.5"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span className="flex-1">{item.label}</span>}
+                      {!collapsed && (
+                        <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-medium border-0">
+                          Soon
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                  return (
+                    <li key={item.label}>
+                      <Tooltip>
+                        <TooltipTrigger render={disabledItem} />
+                        <TooltipContent side="right">{item.label} — Coming soon</TooltipContent>
+                      </Tooltip>
+                    </li>
+                  );
+                }
+
                 const link = (
                   <Link
                     href={item.href}
@@ -99,7 +127,7 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
                   </Link>
                 );
                 return (
-                  <li key={item.href}>
+                  <li key={item.label}>
                     {collapsed ? (
                       <Tooltip>
                         <TooltipTrigger render={link} />
@@ -119,6 +147,33 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
       {/* Bottom items */}
       <div className={cn("py-4 border-t border-sidebar-border space-y-0.5 shrink-0", collapsed ? "px-2" : "px-3")}>
         {bottomItems.map((item) => {
+          if (item.comingSoon) {
+            const disabled = (
+              <div
+                className={cn(
+                  "flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/40 cursor-not-allowed select-none",
+                  collapsed ? "px-2.5 justify-center" : "px-2.5"
+                )}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="flex-1">{item.label}</span>}
+                {!collapsed && (
+                  <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-medium border-0">
+                    Soon
+                  </Badge>
+                )}
+              </div>
+            );
+            return (
+              <div key={item.label}>
+                <Tooltip>
+                  <TooltipTrigger render={disabled} />
+                  <TooltipContent side="right">{item.label} — Coming soon</TooltipContent>
+                </Tooltip>
+              </div>
+            );
+          }
+
           const link = (
             <Link
               href={item.href}
@@ -132,7 +187,7 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
             </Link>
           );
           return (
-            <div key={item.href}>
+            <div key={item.label}>
               {collapsed ? (
                 <Tooltip>
                   <TooltipTrigger render={link} />
