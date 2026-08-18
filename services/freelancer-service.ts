@@ -7,7 +7,7 @@
 
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
-import { getAllFreelancerProfiles, getAllProjects } from "@/lib/freelancer-queries";
+import { getAllFreelancerProfiles, getAllProjects, getPortfolioPreviewsForFreelancers } from "@/lib/freelancer-queries";
 import type { FreelancerRecord, PaymentStatus, Availability } from "@/types/freelancer";
 
 function mockLatency(ms = 400): Promise<void> {
@@ -28,6 +28,7 @@ const PAYMENT_STATUS_MAP: Record<string, PaymentStatus> = {
 
 export async function getFreelancers(): Promise<FreelancerRecord[]> {
   const [profiles, projects] = await Promise.all([getAllFreelancerProfiles(), getAllProjects()]);
+  const portfolioPreviews = await getPortfolioPreviewsForFreelancers(profiles.map((p) => p.id));
 
   return profiles.map((p) => {
     const ownProjects = projects.filter((pr) => pr.freelancerUserId === p.userId);
@@ -40,6 +41,9 @@ export async function getFreelancers(): Promise<FreelancerRecord[]> {
       email: p.email,
       avatar: p.avatar,
       location: p.location,
+      phone: p.phone,
+      linkedinUrl: p.linkedinUrl,
+      instagramUrl: p.instagramUrl,
       role: p.experience[0]?.role ?? null,
       bio: p.bio,
       skills: p.skills,
@@ -50,6 +54,7 @@ export async function getFreelancers(): Promise<FreelancerRecord[]> {
       performanceScore: p.performanceScore,
       availability: AVAILABILITY_MAP[p.availability] ?? "Available",
       status: p.status === "DEACTIVATED" ? "Deactivated" : "Active",
+      portfolioPreviewImages: portfolioPreviews.get(p.id) ?? [],
     };
   });
 }

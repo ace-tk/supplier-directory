@@ -76,6 +76,41 @@ export async function getAllFreelancerProfiles(): Promise<FreelancerProfile[]> {
   return rows.map(mapFreelancer);
 }
 
+/**
+ * Up to 3 real cover images per freelancer's *published* portfolio, for the
+ * Admin Freelancers grid's compact preview strip. One query for every
+ * freelancer on the page — Prisma's nested-relation `take` limits it to 3
+ * PortfolioProject rows per freelancer server-side, so this never fetches
+ * every project/board/pin and never turns into N+1 as the roster grows.
+ * Freelancers with no FreelancerPortfolio row, or one still in DRAFT,
+ * simply have no entry in the returned map.
+ */
+export async function getPortfolioPreviewsForFreelancers(
+  freelancerIds: string[]
+): Promise<Map<string, string[]>> {
+  if (freelancerIds.length === 0) return new Map();
+
+  const rows = await db.freelancerPortfolio.findMany({
+    where: { freelancerId: { in: freelancerIds }, status: "PUBLISHED" },
+    select: {
+      freelancerId: true,
+      projects: {
+        where: { coverImage: { not: null } },
+        orderBy: { position: "asc" },
+        take: 3,
+        select: { coverImage: true },
+      },
+    },
+  });
+
+  const map = new Map<string, string[]>();
+  for (const row of rows) {
+    const images = row.projects.map((p) => p.coverImage).filter((img): img is string => Boolean(img));
+    if (images.length > 0) map.set(row.freelancerId, images);
+  }
+  return map;
+}
+
 function mapProject(p: {
   id: string;
   name: string;

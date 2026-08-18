@@ -17,19 +17,34 @@ interface AddTaskDialogProps {
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
   onAssignSelected: (freelancer: FreelancerRecord) => void;
+  /** Skips the "choose" screen and opens straight into the proposal form —
+   * used by the card's direct "Send Proposal" button. Unset (default)
+   * preserves the original choose-first behavior used by the overflow
+   * menu's "Assign Task" entry. */
+  initialMode?: "proposal";
 }
 
 type Mode = "choose" | "proposal";
 
 const emptyProposal = { title: "", clientName: "", description: "", email: true, whatsapp: false };
 
-export function AddTaskDialog({ freelancer, open, onOpenChange, onCreated, onAssignSelected }: AddTaskDialogProps) {
-  const [mode, setMode] = useState<Mode>("choose");
+export function AddTaskDialog({ freelancer, open, onOpenChange, onCreated, onAssignSelected, initialMode }: AddTaskDialogProps) {
+  const [mode, setMode] = useState<Mode>(initialMode ?? "choose");
   const [submitting, setSubmitting] = useState(false);
   const [proposal, setProposal] = useState(emptyProposal);
 
+  // Adjusted during render (not in an effect) so reopening this
+  // already-mounted dialog with a different initialMode (choose vs.
+  // proposal, depending on which card button was clicked) always starts on
+  // the right screen.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setMode(initialMode ?? "choose");
+  }
+
   function reset() {
-    setMode("choose");
+    setMode(initialMode ?? "choose");
     setProposal(emptyProposal);
   }
 

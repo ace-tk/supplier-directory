@@ -10,6 +10,7 @@ import { FreelancerCard } from "@/components/admin/freelancers/freelancer-card";
 import { AddTaskDialog } from "@/components/admin/freelancers/add-task-dialog";
 import { CreateProjectDialog } from "@/components/admin/freelancers/create-project/create-project-dialog";
 import { FreelancerDetailDialog } from "@/components/admin/freelancers/freelancer-detail-dialog";
+import { SendMessageDialog } from "@/components/admin/freelancers/send-message-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,9 +34,13 @@ export default function FreelancersPage() {
 
   const [assignTarget, setAssignTarget] = useState<FreelancerRecord | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [assignInitialMode, setAssignInitialMode] = useState<"proposal" | undefined>(undefined);
 
   const [createProjectTarget, setCreateProjectTarget] = useState<FreelancerRecord | null>(null);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
+
+  const [messageTarget, setMessageTarget] = useState<FreelancerRecord | null>(null);
+  const [messageOpen, setMessageOpen] = useState(false);
 
   const [deactivateTarget, setDeactivateTarget] = useState<FreelancerRecord | null>(null);
 
@@ -66,6 +71,13 @@ export default function FreelancersPage() {
   }
 
   function handleAssignTask(freelancer: FreelancerRecord) {
+    setAssignInitialMode(undefined);
+    setAssignTarget(freelancer);
+    setAssignOpen(true);
+  }
+
+  function handleSendProposal(freelancer: FreelancerRecord) {
+    setAssignInitialMode("proposal");
     setAssignTarget(freelancer);
     setAssignOpen(true);
   }
@@ -73,6 +85,11 @@ export default function FreelancersPage() {
   function handleAssignSelected(freelancer: FreelancerRecord) {
     setCreateProjectTarget(freelancer);
     setCreateProjectOpen(true);
+  }
+
+  function handleDiscuss(freelancer: FreelancerRecord) {
+    setMessageTarget(freelancer);
+    setMessageOpen(true);
   }
 
   async function confirmDeactivate() {
@@ -117,7 +134,7 @@ export default function FreelancersPage() {
         ]}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
         {filtered.map((freelancer, index) => (
           <FreelancerCard
             key={freelancer.id}
@@ -127,6 +144,9 @@ export default function FreelancersPage() {
             onEdit={handleEdit}
             onAssignTask={handleAssignTask}
             onDeactivate={setDeactivateTarget}
+            onSendProposal={handleSendProposal}
+            onAssignWork={handleAssignSelected}
+            onDiscuss={handleDiscuss}
           />
         ))}
       </div>
@@ -143,6 +163,7 @@ export default function FreelancersPage() {
         onOpenChange={setAssignOpen}
         onCreated={refresh}
         onAssignSelected={handleAssignSelected}
+        initialMode={assignInitialMode}
       />
       <CreateProjectDialog
         freelancer={createProjectTarget}
@@ -150,6 +171,7 @@ export default function FreelancersPage() {
         onOpenChange={setCreateProjectOpen}
         onCreated={refresh}
       />
+      <SendMessageDialog freelancer={messageTarget} open={messageOpen} onOpenChange={setMessageOpen} />
 
       <AlertDialog open={!!deactivateTarget} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
         <AlertDialogContent>
