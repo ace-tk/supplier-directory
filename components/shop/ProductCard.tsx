@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Eye,
   Video,
+  Play,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -293,10 +294,14 @@ export function ProductCard({
           </button>
         </div>
 
-        {/* Front/Back/Side/Labels — real positional views only, never a fake Video tab */}
-        {media.length > 1 && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 rounded-full bg-black/55 px-1 py-0.5 backdrop-blur-md">
-            {media.map((option) => (
+        {/* Front/Back/Side/Labels — real positional views only, never a fake
+            Video tab — plus a real Request Video action alongside them.
+            No product has a real video field, so this is never a "Watch
+            Video" claim; it always opens the existing, honest Request
+            Video flow (see handleRequestVideoClick). */}
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 rounded-full bg-black/55 px-1 py-0.5 backdrop-blur-md max-w-[92%] overflow-x-auto">
+          {media.length > 1 &&
+            media.map((option) => (
               <button
                 key={option.kind}
                 type="button"
@@ -305,15 +310,29 @@ export function ProductCard({
                   setActiveKind(option.kind);
                 }}
                 className={cn(
-                  "px-2 py-1 rounded-full text-[10px] font-medium text-white/80",
+                  "shrink-0 whitespace-nowrap px-2 py-1 rounded-full text-[10px] font-medium text-white/80",
                   (activeMedia?.kind ?? media[0]?.kind) === option.kind && "bg-white text-neutral-900"
                 )}
               >
                 {option.label}
               </button>
             ))}
-          </div>
-        )}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={handleRequestVideoClick}
+                  className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap text-white/80 hover:text-white"
+                  aria-label="Request video"
+                />
+              }
+            >
+              <Play className="w-2.5 h-2.5" /> Video
+            </TooltipTrigger>
+            <TooltipContent>Request a video for this product</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Body */}
