@@ -77,9 +77,10 @@ export async function getAllFreelancerProfiles(): Promise<FreelancerProfile[]> {
 }
 
 /**
- * Up to 3 real cover images per freelancer's *published* portfolio, for the
- * Admin Freelancers grid's compact preview strip. One query for every
- * freelancer on the page — Prisma's nested-relation `take` limits it to 3
+ * Up to 6 real cover images per freelancer's *published* portfolio, for the
+ * Admin Freelancers grid's compact preview strip (rendered 3 at a time with
+ * real next/prev pagination when more than 3 exist). One query for every
+ * freelancer on the page — Prisma's nested-relation `take` limits it to 6
  * PortfolioProject rows per freelancer server-side, so this never fetches
  * every project/board/pin and never turns into N+1 as the roster grows.
  * Freelancers with no FreelancerPortfolio row, or one still in DRAFT,
@@ -97,7 +98,7 @@ export async function getPortfolioPreviewsForFreelancers(
       projects: {
         where: { coverImage: { not: null } },
         orderBy: { position: "asc" },
-        take: 3,
+        take: 6,
         select: { coverImage: true },
       },
     },
