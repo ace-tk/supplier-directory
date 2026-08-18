@@ -17,4 +17,8 @@ export type Product = {
   createdAt: Date;
   updatedAt: Date;
   supplier?: SupplierListing;
+  /** Distinct BUYER-role users who saved this product — computed at read
+   * time in app/api/products/route.ts from the real SavedProduct join
+   * table, not a stored column. */
+  globalBuyers: number;
 };

@@ -61,7 +61,23 @@ export async function GET(req: Request) {
       skip: (page - 1) * limit,
     });
 
-    return NextResponse.json(products);
+    // Real "Global Buyers" — distinct BUYER-role users who saved each
+    // product, derived from the persisted SavedProduct join table (unique
+    // per userId+productId). One grouped query for the whole page, not
+    // per-card, so this never becomes N+1 as the result set grows.
+    const buyerSaveCounts = await db.savedProduct.groupBy({
+      by: ["productId"],
+      where: { productId: { in: products.map((p) => p.id) }, user: { role: "BUYER" } },
+      _count: { _all: true },
+    });
+    const globalBuyersByProductId = new Map(buyerSaveCounts.map((r) => [r.productId, r._count._all]));
+
+    const productsWithGlobalBuyers = products.map((p) => ({
+      ...p,
+      globalBuyers: globalBuyersByProductId.get(p.id) ?? 0,
+    }));
+
+    return NextResponse.json(productsWithGlobalBuyers);
   } catch (err) {
     console.error("[GET /api/products]", err);
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });

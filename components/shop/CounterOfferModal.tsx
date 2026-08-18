@@ -10,9 +10,7 @@ import {
   Send,
   CheckCircle2,
   Package,
-  Truck,
   Clock,
-  CreditCard,
   MapPin,
   Wallet,
 } from "lucide-react";
@@ -29,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Product } from "@/types/product";
-import { getShippingTerms, getPaymentTerms } from "@/lib/product-engagement";
 import { submitCounterOffer } from "@/lib/product-requests";
 
 const counterOfferSchema = z.object({
@@ -155,9 +152,7 @@ export function CounterOfferModal({
                 label="Minimum Order Value"
                 value={supplier?.minimumOrder ?? "N/A"}
               />
-              <DetailRow icon={Truck} label="Shipping Terms" value={getShippingTerms(product)} />
               <DetailRow icon={Clock} label="Lead Time" value={product.leadTime ?? "N/A"} />
-              <DetailRow icon={CreditCard} label="Payment Terms" value={getPaymentTerms(product)} />
               <DetailRow
                 icon={MapPin}
                 label="Delivery Location"
