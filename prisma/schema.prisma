@@ -327,9 +327,13 @@ model CrmNote {
 }
 
 model Task {
-  id             String       @id @default(cuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+
+  // Optional — null means a global admin task (e.g. created from the
+  // Dashboard's Tasks panel), not tied to any one CRM conversation.
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
   title          String
   dueDate        DateTime?
   priority       String       @default("Medium") // Low, Medium, High

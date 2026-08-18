@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Menu, Settings, LogOut, User, ChevronDown, Building2, MessageSquare, X } from "lucide-react";
+import { Search, Menu, Settings, LogOut, User, ChevronDown, Building2, MessageSquare, UserSearch, Contact, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -72,28 +72,24 @@ export function TopNavbar({ user, portal = "admin" }: TopNavbarProps) {
 
       {/* Right actions */}
       <div className={cn("items-center gap-1", mobileSearchOpen ? "hidden md:flex" : "flex")}>
-        {/* Admin-only real quick links — no dead buttons, only routes that exist. */}
+        {/* Admin-only real quick links — no dead buttons, only routes that exist. Hidden below lg; reachable via the mobile drawer instead. */}
         {user?.role === "ADMIN" && (
           <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              render={<Link href="/directory" aria-label="Supplier Directory" title="Supplier Directory" />}
-              nativeButton={false}
-            >
-              <Building2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              render={<Link href="/crm" aria-label="CRM Inbox" title="CRM Inbox" />}
-              nativeButton={false}
-            >
-              <MessageSquare className="h-4 w-4" />
-            </Button>
-            <Separator orientation="vertical" className="h-5 mx-1" />
+            <div className="hidden lg:flex items-center gap-1">
+              <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/directory" />} nativeButton={false}>
+                <Building2 className="h-3.5 w-3.5" /> Supplier Directory
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/buyer-directory" />} nativeButton={false}>
+                <UserSearch className="h-3.5 w-3.5" /> Buyer Directory
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/crm" />} nativeButton={false}>
+                <Contact className="h-3.5 w-3.5" /> Own Contacts
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/crm" />} nativeButton={false}>
+                <MessageSquare className="h-3.5 w-3.5" /> CRM Inbox
+              </Button>
+            </div>
+            <Separator orientation="vertical" className="h-5 mx-1 hidden lg:block" />
           </>
         )}
 

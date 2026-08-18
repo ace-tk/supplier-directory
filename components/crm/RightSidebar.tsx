@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { 
-  X, ShieldCheck, MapPin, Calendar, Clock, 
+import { toast } from "sonner";
+import {
+  X, ShieldCheck, MapPin, Calendar, Clock,
   Package, TrendingUp, CheckSquare, Activity, FileText, Plus
 } from "lucide-react";
-import { Conversation } from "@/types/crm";
+import { Conversation, Task } from "@/types/crm";
 import { motion, AnimatePresence } from "framer-motion";
+import { createTaskAction, toggleTaskAction } from "@/services/tasks";
 
 type Tab = "overview" | "notes" | "activity" | "tasks";
 
@@ -20,10 +22,60 @@ export function RightSidebar({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [newNote, setNewNote] = useState("");
+  const [localTasks, setLocalTasks] = useState<Task[]>(conversation?.tasks ?? []);
+  const [addingTask, setAddingTask] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [savingTask, setSavingTask] = useState(false);
+
+  // Adjusted during render (not in an effect) so switching to a different
+  // conversation resets the visible task list to that conversation's own
+  // tasks instead of carrying over the previous one's local edits.
+  const [prevConversationId, setPrevConversationId] = useState(conversation?.id);
+  if (conversation?.id !== prevConversationId) {
+    setPrevConversationId(conversation?.id);
+    setLocalTasks(conversation?.tasks ?? []);
+  }
 
   if (!conversation) return null;
-  
+
   const supplier = conversation.supplier;
+
+  async function handleAddTask() {
+    const title = newTaskTitle.trim();
+    if (!title || !conversation) return;
+    setSavingTask(true);
+    try {
+      const result = await createTaskAction({ title, conversationId: conversation.id });
+      if (!result.success) return toast.error(result.error);
+      setLocalTasks((prev) => [
+        {
+          id: result.data.id,
+          title: result.data.title,
+          completed: result.data.completed,
+          dueDate: result.data.dueDate ? new Date(result.data.dueDate) : null,
+          priority: "Medium",
+          assignedTo: "Me",
+          conversationId: conversation.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        ...prev,
+      ]);
+      setNewTaskTitle("");
+      setAddingTask(false);
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  async function handleToggleTask(task: Task) {
+    setLocalTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t)));
+    const result = await toggleTaskAction(task.id);
+    if (!result.success) {
+      setLocalTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: task.completed } : t)));
+      toast.error(result.error);
+    }
+  }
 
   return (
     <div className="flex-1 flex flex-col h-full bg-white relative z-20">
@@ -169,22 +221,53 @@ export function RightSidebar({
               animate={{ opacity: 1 }}
               className="p-5"
             >
-              <button className="w-full py-2.5 mb-6 border-2 border-dashed border-slate-300 text-slate-600 font-medium rounded-xl hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" /> Add Task
-              </button>
+              {addingTask ? (
+                <div className="mb-6 p-3 border border-slate-200 rounded-xl bg-slate-50 space-y-2">
+                  <input
+                    autoFocus
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
+                    placeholder="Task title..."
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => { setAddingTask(false); setNewTaskTitle(""); }}
+                      className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAddTask}
+                      disabled={savingTask || !newTaskTitle.trim()}
+                      className="px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    >
+                      {savingTask ? "Adding..." : "Add"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAddingTask(true)}
+                  className="w-full py-2.5 mb-6 border-2 border-dashed border-slate-300 text-slate-600 font-medium rounded-xl hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Add Task
+                </button>
+              )}
 
               <div className="space-y-3">
-                {conversation.tasks && conversation.tasks.length > 0 ? (
-                  conversation.tasks.map(task => (
+                {localTasks.length > 0 ? (
+                  localTasks.map(task => (
                     <div key={task.id} className={`flex items-start gap-3 p-3 rounded-xl border ${task.completed ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 shadow-sm'}`}>
-                      <button className={`mt-0.5 shrink-0 ${task.completed ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}>
+                      <button onClick={() => handleToggleTask(task)} className={`mt-0.5 shrink-0 ${task.completed ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}>
                         <CheckSquare className="w-5 h-5" />
                       </button>
                       <div>
                         <p className={`text-sm font-medium ${task.completed ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{task.title}</p>
                         <div className="flex gap-2 mt-1">
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            task.priority === 'High' ? 'bg-rose-100 text-rose-700' : 
+                            task.priority === 'High' ? 'bg-rose-100 text-rose-700' :
                             task.priority === 'Low' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'
                           }`}>{task.priority}</span>
                           {task.dueDate && (

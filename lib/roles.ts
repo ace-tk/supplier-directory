@@ -122,8 +122,8 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     group: "Commerce",
     items: [
       { label: "Supplier Directory", href: "/directory", icon: Building2 },
-      { label: "Buyer Directory", href: "#", icon: UserSearch, comingSoon: true },
-      { label: "Own Contacts", href: "#", icon: Contact, comingSoon: true },
+      { label: "Buyer Directory", href: "/buyer-directory", icon: UserSearch },
+      { label: "Own Contacts", href: "/crm", icon: Contact },
       { label: "CRM Inbox", href: "/crm", icon: MessageSquare },
       { label: "Supplier Portal", href: "/supplier-portal", icon: Sparkles, badge: "New" },
       { label: "Buyer Leads", href: "/buyer-leads", icon: Users2 },
