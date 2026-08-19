@@ -74,6 +74,8 @@ model User {
 
   articles Article[] @relation("ArticleOwner")
 
+  productWishes ProductWish[] @relation("ProductWishOwner")
+
   @@index([email])
 }
 
@@ -1152,6 +1154,12 @@ model CatalogRow {
   // creating duplicates. Never surfaced in the Product Management UI.
   sourceShopProductId String?
 
+  // Same bridge pattern as sourceShopProductId above, but for "Manufacture
+  // This Wish" (services/wishes.ts) — set when this row was auto-seeded
+  // from a ProductWish so a ManufacturingRequest (which requires a real
+  // CatalogRow) can be created against it.
+  sourceWishId String?
+
   // Real, persisted Warehouse-vs-Retail-Store bifurcation for the Product
   // module. Nullable/unset (locationType = null) is the honest
   // "Unassigned" state for old rows — never backfilled automatically.
@@ -1181,6 +1189,7 @@ model CatalogRow {
   @@index([retailStoreId])
   @@index([locationType])
   @@index([sourceShopProductId])
+  @@index([sourceWishId])
 }
 
 enum ProductLocationType {
@@ -1918,4 +1927,61 @@ model PaymentAccount {
   createdAt DateTime  @default(now())
 
   @@index([ownerId])
+}
+
+// ─── Module: Add Your Wish ──────────────────────────────────────────────
+// A buyer's saved "product I wish existed" — separate from CatalogRow
+// (which represents a real product a workspace already owns/sells).
+// Mirrors the ProductDesign/ManufacturingRequestAttachment pattern
+// (owner-scoped, dataUrl-based image storage) rather than inventing a new
+// upload mechanism. DRAFT is fully owner-editable/deletable; SUBMITTED is
+// read-only for the buyer by design — only an admin can advance it via
+// updateWishStatusAction (SUBMITTED -> IN_PROGRESS -> COMPLETED).
+enum ProductWishStatus {
+  DRAFT
+  SUBMITTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model ProductWish {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("ProductWishOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name        String
+  category    String
+  description String
+
+  targetQuantity Int?
+  targetMoq      Int?
+  targetPrice    Float?
+  currency       String    @default("INR")
+  material       String?
+  colors         String[]  @default([])
+  sizes          String[]  @default([])
+  targetLocation String?
+  requiredBy     DateTime?
+  notes          String?
+  referenceUrl   String?
+
+  status ProductWishStatus @default(DRAFT)
+
+  images WishImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model WishImage {
+  id      String      @id @default(cuid())
+  wishId  String
+  wish    ProductWish @relation(fields: [wishId], references: [id], onDelete: Cascade)
+  dataUrl String      @db.Text
+  order   Int         @default(0)
+
+  @@index([wishId])
 }

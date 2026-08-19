@@ -116,7 +116,10 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   },
   {
     group: "Shop",
-    items: [{ label: "Shop", href: "/shop", icon: ShoppingBag }],
+    items: [
+      { label: "Shop", href: "/shop", icon: ShoppingBag },
+      { label: "Wish Board", href: "/wishes", icon: Sparkles },
+    ],
   },
   {
     group: "Commerce",
@@ -196,6 +199,7 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
     group: "My Activity",
     items: [
       { label: "Saved Suppliers", href: "/buyer/saved", icon: Bookmark },
+      { label: "My Wishes", href: "/buyer/wishes", icon: Sparkles },
       { label: "Counter Offers", href: "/buyer/counter-offers", icon: Handshake },
       { label: "Video Requests", href: "/buyer/video-requests", icon: Video },
       { label: "Messages", href: "/buyer/messages", icon: MessageSquare },
