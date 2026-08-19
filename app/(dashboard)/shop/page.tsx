@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PackageSearch, Loader2 } from "lucide-react";
 import { FeaturedSlider } from "@/components/shop/FeaturedSlider";
 import { ShopCategories } from "@/components/shop/ShopCategories";
-import { FilterBar, type ShopFilters, DEFAULT_FILTERS } from "@/components/shop/FilterBar";
+import { FilterBar, type ShopFilters, DEFAULT_FILTERS, countActiveFilters } from "@/components/shop/FilterBar";
+import { FilterDrawer } from "@/components/shop/FilterDrawer";
+import { FloatingFilterButton } from "@/components/shop/FloatingFilterButton";
 import { MasonryGrid } from "@/components/shop/MasonryGrid";
 import { ProductDrawer } from "@/components/shop/ProductDrawer";
 import { ProductVideoModal } from "@/components/shop/ProductVideoModal";
@@ -50,6 +52,20 @@ function ShopPageContent() {
   const [savedProductIds, setSavedProductIds] = useState<Set<string>>(new Set());
 
   const gridRef = useRef<HTMLDivElement>(null);
+  const filterBarRef = useRef<HTMLDivElement>(null);
+  const [filterBarVisible, setFilterBarVisible] = useState(true);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+  // The floating Filters button only appears once the in-page filter bar
+  // has scrolled out of view — an IntersectionObserver toggles one boolean
+  // instead of a scroll listener re-computing on every pixel of scroll.
+  useEffect(() => {
+    const el = filterBarRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => setFilterBarVisible(entry.isIntersecting), { threshold: 0 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   function buildUrl(pageNum: number) {
     const url = new URL("/api/products", window.location.origin);
@@ -246,15 +262,17 @@ function ShopPageContent() {
       </div>
 
       <div ref={gridRef} className="pt-4 scroll-mt-4">
-        <FilterBar
-          resultCount={loading ? undefined : visibleProducts.length}
-          activeCategory={activeCategory}
-          setActiveCategory={setActiveCategory}
-          activeSort={activeSort}
-          setActiveSort={setActiveSort}
-          filters={filters}
-          setFilters={setFilters}
-        />
+        <div ref={filterBarRef}>
+          <FilterBar
+            resultCount={loading ? undefined : visibleProducts.length}
+            activeCategory={activeCategory}
+            setActiveCategory={setActiveCategory}
+            activeSort={activeSort}
+            setActiveSort={setActiveSort}
+            filters={filters}
+            setFilters={setFilters}
+          />
+        </div>
 
         <div className="pt-6 pb-20">
           {loading ? (
@@ -339,6 +357,23 @@ function ShopPageContent() {
         open={counterOfferModalOpen}
         onOpenChange={setCounterOfferModalOpen}
         initialStep={counterOfferInitialStep}
+      />
+
+      <FloatingFilterButton
+        visible={!filterBarVisible && !loading}
+        activeCount={countActiveFilters(filters)}
+        onClick={() => setFilterDrawerOpen(true)}
+      />
+      <FilterDrawer
+        open={filterDrawerOpen}
+        onOpenChange={setFilterDrawerOpen}
+        activeCategory={activeCategory}
+        setActiveCategory={setActiveCategory}
+        activeSort={activeSort}
+        setActiveSort={setActiveSort}
+        filters={filters}
+        setFilters={setFilters}
+        resultCount={loading ? undefined : visibleProducts.length}
       />
     </div>
   );

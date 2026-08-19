@@ -49,7 +49,7 @@ function countActiveFilters(f: ShopFilters): number {
   return n;
 }
 
-function Chip({
+export function Chip({
   active,
   onClick,
   children,
@@ -84,6 +84,129 @@ function FilterGroup({ label, children }: { label: string; children: React.React
   );
 }
 
+export { countActiveFilters };
+
+/** The Location/MOQ/Price/Material/Country/Supplier-Type/checkbox block —
+ * shared by FilterBar's own popover and FilterDrawer (the floating-button
+ * fallback once the bar has scrolled away), so there is exactly one real
+ * implementation of "the advanced Shop filters" rather than two. */
+export function AdvancedFilterFields({ filters, setFilters }: { filters: ShopFilters; setFilters: (f: ShopFilters) => void }) {
+  function toggleProductionType(type: string) {
+    setFilters({
+      ...filters,
+      productionTypes: filters.productionTypes.includes(type)
+        ? filters.productionTypes.filter((t) => t !== type)
+        : [...filters.productionTypes, type],
+    });
+  }
+
+  return (
+    <>
+      <FilterGroup label="Location">
+        <Chip active={filters.city === "All Cities"} onClick={() => setFilters({ ...filters, city: "All Cities" })}>
+          All Cities
+        </Chip>
+        {SHOP_CITIES.map((city) => (
+          <Chip key={city} active={filters.city === city} onClick={() => setFilters({ ...filters, city })}>
+            📍 {city}
+          </Chip>
+        ))}
+      </FilterGroup>
+
+      <FilterGroup label="MOQ">
+        {MOQ_BUCKETS.map((m) => (
+          <Chip key={m} active={filters.moqBucket === m} onClick={() => setFilters({ ...filters, moqBucket: m })}>
+            {m}
+          </Chip>
+        ))}
+      </FilterGroup>
+
+      <FilterGroup label="Price">
+        {PRICE_BUCKETS.map((p) => (
+          <Chip key={p} active={filters.priceBucket === p} onClick={() => setFilters({ ...filters, priceBucket: p })}>
+            {p}
+          </Chip>
+        ))}
+      </FilterGroup>
+
+      <FilterGroup label="Material / Fabric">
+        <Chip
+          active={filters.material === "All Materials"}
+          onClick={() => setFilters({ ...filters, material: "All Materials" })}
+        >
+          All
+        </Chip>
+        {MATERIALS.map((m) => (
+          <Chip key={m} active={filters.material === m} onClick={() => setFilters({ ...filters, material: m })}>
+            {m}
+          </Chip>
+        ))}
+      </FilterGroup>
+
+      <FilterGroup label="Country">
+        <Chip
+          active={filters.country === "All Countries"}
+          onClick={() => setFilters({ ...filters, country: "All Countries" })}
+        >
+          All
+        </Chip>
+        {COUNTRIES.map((c) => (
+          <Chip key={c} active={filters.country === c} onClick={() => setFilters({ ...filters, country: c })}>
+            {c}
+          </Chip>
+        ))}
+      </FilterGroup>
+
+      <FilterGroup label="Supplier Type">
+        {PRODUCTION_TYPES.map((t) => (
+          <Chip key={t} active={filters.productionTypes.includes(t)} onClick={() => toggleProductionType(t)}>
+            {t}
+          </Chip>
+        ))}
+      </FilterGroup>
+
+      <div className="flex flex-col gap-1 pt-1 border-t border-border">
+        <label className="flex items-center justify-between py-1.5 cursor-pointer">
+          <span className="text-sm text-foreground">Verified suppliers only</span>
+          <input
+            type="checkbox"
+            checked={filters.verifiedOnly}
+            onChange={(e) => setFilters({ ...filters, verifiedOnly: e.target.checked })}
+            className="w-4 h-4 accent-primary"
+          />
+        </label>
+        <label className="flex items-center justify-between py-1.5 cursor-pointer">
+          <span className="text-sm text-foreground">Ready stock</span>
+          <input
+            type="checkbox"
+            checked={filters.readyStockOnly}
+            onChange={(e) => setFilters({ ...filters, readyStockOnly: e.target.checked })}
+            className="w-4 h-4 accent-primary"
+          />
+        </label>
+        <label className="flex items-center justify-between py-1.5 cursor-pointer">
+          <span className="text-sm text-foreground">Export quality</span>
+          <input
+            type="checkbox"
+            checked={filters.exportOnly}
+            onChange={(e) => setFilters({ ...filters, exportOnly: e.target.checked })}
+            className="w-4 h-4 accent-primary"
+          />
+        </label>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Normal in-flow page content now — deliberately NOT sticky. It used to be
+ * `sticky top-0 z-30`, which floated this whole bar over the masonry feed
+ * while scrolling and clipped product cards underneath it. Once this
+ * scrolls out of view, the Shop page shows a small floating Filters
+ * button instead (see FloatingFilterButton.tsx + FilterDrawer.tsx), which
+ * reuses the exact same activeCategory/activeSort/filters state — there is
+ * only ever one source of truth for Shop filtering.
+ */
 export function FilterBar({
   resultCount,
   activeCategory,
@@ -104,17 +227,8 @@ export function FilterBar({
   const sorts = ["Trending", "Newest", "MOQ", "Price"];
   const activeCount = countActiveFilters(filters);
 
-  function toggleProductionType(type: string) {
-    setFilters({
-      ...filters,
-      productionTypes: filters.productionTypes.includes(type)
-        ? filters.productionTypes.filter((t) => t !== type)
-        : [...filters.productionTypes, type],
-    });
-  }
-
   return (
-    <div className="sticky top-0 z-30 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3 bg-background/85 backdrop-blur-xl border-b border-border">
+    <div className="py-3 border-b border-border">
       <div className="flex items-center gap-3">
         {/* Category pills */}
         <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1">
@@ -171,99 +285,7 @@ export function FilterBar({
                 Clear all
               </button>
             </div>
-
-            <FilterGroup label="Location">
-              <Chip active={filters.city === "All Cities"} onClick={() => setFilters({ ...filters, city: "All Cities" })}>
-                All Cities
-              </Chip>
-              {SHOP_CITIES.map((city) => (
-                <Chip key={city} active={filters.city === city} onClick={() => setFilters({ ...filters, city })}>
-                  📍 {city}
-                </Chip>
-              ))}
-            </FilterGroup>
-
-            <FilterGroup label="MOQ">
-              {MOQ_BUCKETS.map((m) => (
-                <Chip key={m} active={filters.moqBucket === m} onClick={() => setFilters({ ...filters, moqBucket: m })}>
-                  {m}
-                </Chip>
-              ))}
-            </FilterGroup>
-
-            <FilterGroup label="Price">
-              {PRICE_BUCKETS.map((p) => (
-                <Chip key={p} active={filters.priceBucket === p} onClick={() => setFilters({ ...filters, priceBucket: p })}>
-                  {p}
-                </Chip>
-              ))}
-            </FilterGroup>
-
-            <FilterGroup label="Material / Fabric">
-              <Chip
-                active={filters.material === "All Materials"}
-                onClick={() => setFilters({ ...filters, material: "All Materials" })}
-              >
-                All
-              </Chip>
-              {MATERIALS.map((m) => (
-                <Chip key={m} active={filters.material === m} onClick={() => setFilters({ ...filters, material: m })}>
-                  {m}
-                </Chip>
-              ))}
-            </FilterGroup>
-
-            <FilterGroup label="Country">
-              <Chip
-                active={filters.country === "All Countries"}
-                onClick={() => setFilters({ ...filters, country: "All Countries" })}
-              >
-                All
-              </Chip>
-              {COUNTRIES.map((c) => (
-                <Chip key={c} active={filters.country === c} onClick={() => setFilters({ ...filters, country: c })}>
-                  {c}
-                </Chip>
-              ))}
-            </FilterGroup>
-
-            <FilterGroup label="Supplier Type">
-              {PRODUCTION_TYPES.map((t) => (
-                <Chip key={t} active={filters.productionTypes.includes(t)} onClick={() => toggleProductionType(t)}>
-                  {t}
-                </Chip>
-              ))}
-            </FilterGroup>
-
-            <div className="flex flex-col gap-1 pt-1 border-t border-border">
-              <label className="flex items-center justify-between py-1.5 cursor-pointer">
-                <span className="text-sm text-foreground">Verified suppliers only</span>
-                <input
-                  type="checkbox"
-                  checked={filters.verifiedOnly}
-                  onChange={(e) => setFilters({ ...filters, verifiedOnly: e.target.checked })}
-                  className="w-4 h-4 accent-primary"
-                />
-              </label>
-              <label className="flex items-center justify-between py-1.5 cursor-pointer">
-                <span className="text-sm text-foreground">Ready stock</span>
-                <input
-                  type="checkbox"
-                  checked={filters.readyStockOnly}
-                  onChange={(e) => setFilters({ ...filters, readyStockOnly: e.target.checked })}
-                  className="w-4 h-4 accent-primary"
-                />
-              </label>
-              <label className="flex items-center justify-between py-1.5 cursor-pointer">
-                <span className="text-sm text-foreground">Export quality</span>
-                <input
-                  type="checkbox"
-                  checked={filters.exportOnly}
-                  onChange={(e) => setFilters({ ...filters, exportOnly: e.target.checked })}
-                  className="w-4 h-4 accent-primary"
-                />
-              </label>
-            </div>
+            <AdvancedFilterFields filters={filters} setFilters={setFilters} />
           </PopoverContent>
         </Popover>
       </div>
