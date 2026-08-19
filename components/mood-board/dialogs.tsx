@@ -250,7 +250,16 @@ export function AiRemixDialog({
 }
 
 // ─── Send DM ──────────────────────────────────────────────────────────
-export function SendDmDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function SendDmDialog({
+  open,
+  onOpenChange,
+  messagesBasePath,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  /** e.g. "/buyer/messages" or "/crm" — the real CRM conversation route for the current portal. */
+  messagesBasePath: string;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SupplierOption[]>([]);
@@ -272,7 +281,7 @@ export function SendDmDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 
   function handlePick(supplierId: string) {
     onOpenChange(false);
-    router.push(`/buyer/messages?supplierId=${supplierId}`);
+    router.push(`${messagesBasePath}?supplierId=${supplierId}`);
   }
 
   return (

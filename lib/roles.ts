@@ -117,7 +117,10 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   },
   {
     group: "Shop",
-    items: [{ label: "Shop", href: "/shop", icon: ShoppingBag }],
+    items: [
+      { label: "Shop", href: "/shop", icon: ShoppingBag },
+      { label: "Mood Board", href: "/mood-board", icon: Palette },
+    ],
   },
   {
     group: "Commerce",

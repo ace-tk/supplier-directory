@@ -47,8 +47,16 @@ import {
 import { askMoodBoardAiAction, type RemixProposal, type AiSuggestion } from "@/services/mood-board-ai";
 import { sendMoodBoardToShopAction, sendMoodBoardToManufacturerAction } from "@/services/mood-board-bridge";
 import { applyLayoutPreset, type LayoutPreset } from "@/lib/mood-board-layouts";
-import type { MoodBoardRecord, MoodBoardSummary, MoodBoardItemRecord, MoodBoardItemContent, SizeChartRow } from "@/types/mood-board";
+import type { MoodBoardRecord, MoodBoardSummary, MoodBoardItemRecord, MoodBoardItemContent, SizeChartRow, MoodBoardBasePaths } from "@/types/mood-board";
 import type { MoodBoardItemType } from "@/lib/generated/prisma/enums";
+
+const DEFAULT_BASE_PATHS: MoodBoardBasePaths = {
+  moodBoard: "/buyer/mood-board",
+  catalogEdit: "/buyer/catalog",
+  manufacture: "/buyer/product",
+  messages: "/buyer/messages",
+  close: "/buyer",
+};
 
 const LEFT_TOOLS: { id: LeftTool; label: string; icon: ComponentType<{ className?: string }> }[] = [
   { id: "library", label: "Library", icon: Library },
@@ -65,7 +73,17 @@ type HistoryAction =
   | { kind: "delete"; item: MoodBoardItemRecord }
   | { kind: "update"; itemId: string; before: Partial<MoodBoardItemRecord>; after: Partial<MoodBoardItemRecord> };
 
-export function MoodBoardStudio({ initialBoard, initialBoards }: { initialBoard: MoodBoardRecord; initialBoards: MoodBoardSummary[] }) {
+export function MoodBoardStudio({
+  initialBoard,
+  initialBoards,
+  basePaths = DEFAULT_BASE_PATHS,
+}: {
+  initialBoard: MoodBoardRecord;
+  initialBoards: MoodBoardSummary[];
+  /** Defaults to the Buyer portal's routes so existing Buyer pages don't
+   * need to change — Admin's page passes its own. */
+  basePaths?: MoodBoardBasePaths;
+}) {
   const router = useRouter();
   const canvasWrapRef = useRef<HTMLDivElement>(null);
 
@@ -285,12 +303,18 @@ export function MoodBoardStudio({ initialBoard, initialBoards }: { initialBoard:
   async function handleSendToShop() {
     const result = await sendMoodBoardToShopAction(board.id);
     if (!result.success) return toast.error(result.error);
-    router.push(`/buyer/catalog/${result.data.rowId}/edit`);
+    router.push(`${basePaths.catalogEdit}/${result.data.rowId}/edit`);
   }
   async function handleSendToManufacturer() {
+    // Not every portal has a real Manufacture Your Own route (Admin
+    // currently doesn't) — say so honestly rather than link to a 404.
+    if (!basePaths.manufacture) {
+      toast.error("Manufacture Your Own isn't available for this portal yet.");
+      return;
+    }
     const result = await sendMoodBoardToManufacturerAction(board.id);
     if (!result.success) return toast.error(result.error);
-    router.push(`/buyer/product/${result.data.rowId}/manufacture`);
+    router.push(`${basePaths.manufacture}/${result.data.rowId}/manufacture`);
   }
 
   async function handleCreateBoard(name: string): Promise<void> {
@@ -299,11 +323,11 @@ export function MoodBoardStudio({ initialBoard, initialBoards }: { initialBoard:
       toast.error(result.error);
       return;
     }
-    router.push(`/buyer/mood-board/${result.data.id}`);
+    router.push(`${basePaths.moodBoard}/${result.data.id}`);
   }
   function handleSwitchBoard(id: string) {
     if (id === board.id) return;
-    router.push(`/buyer/mood-board/${id}`);
+    router.push(`${basePaths.moodBoard}/${id}`);
   }
 
   async function handleExport() {
@@ -382,10 +406,10 @@ export function MoodBoardStudio({ initialBoard, initialBoards }: { initialBoard:
               <Input key={board.name} defaultValue={board.name} onBlur={(e) => handleRenameBoard(e.target.value)} className="h-8 text-sm" />
             </PopoverContent>
           </Popover>
-          {/* /buyer/mood-board now redirects straight back into a Studio
-              (see app/(buyer)/buyer/mood-board/page.tsx), so Close leaves
-              the workspace entirely rather than looping back in. */}
-          <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={() => router.push("/buyer")}>
+          {/* The module root (basePaths.moodBoard) redirects straight back
+              into a Studio, so Close leaves the workspace entirely rather
+              than looping back in. */}
+          <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={() => router.push(basePaths.close)}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -531,7 +555,7 @@ export function MoodBoardStudio({ initialBoard, initialBoards }: { initialBoard:
       <NewBoardDialog open={newBoardOpen} onOpenChange={setNewBoardOpen} onCreate={handleCreateBoard} />
       <SizeChartDialog open={sizeChartOpen} onOpenChange={setSizeChartOpen} initialRows={board.sizeChart} onSave={handleSaveSizeChart} />
       <AiRemixDialog open={remixOpen} onOpenChange={setRemixOpen} boardId={board.id} onApply={handleApplyRemix} />
-      <SendDmDialog open={sendDmOpen} onOpenChange={setSendDmOpen} />
+      <SendDmDialog open={sendDmOpen} onOpenChange={setSendDmOpen} messagesBasePath={basePaths.messages} />
     </div>
   );
 }

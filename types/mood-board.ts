@@ -2,6 +2,26 @@ import type { MoodBoardItemType, MoodBoardAssetKind } from "@/lib/generated/pris
 
 export type { MoodBoardItemType, MoodBoardAssetKind };
 
+/**
+ * The one shared MoodBoardStudio component is rendered from both the
+ * Buyer and Admin portals — everything about its UI stays identical, only
+ * where its business-workflow buttons navigate differs per role/portal,
+ * since each portal has its own route prefix (and Admin currently has no
+ * real Manufacture Your Own workflow at all — see `manufacture: null`).
+ */
+export interface MoodBoardBasePaths {
+  /** e.g. "/buyer/mood-board" or "/mood-board" — this board's own module root. */
+  moodBoard: string;
+  /** e.g. "/buyer/catalog" or "/catalog" — Send to Shop Page target (real Catalog editor). */
+  catalogEdit: string;
+  /** e.g. "/buyer/product" or null if this role has no real Manufacture Your Own route. */
+  manufacture: string | null;
+  /** e.g. "/buyer/messages" or "/crm" — real CRM conversation route for this role. */
+  messages: string;
+  /** Where "Close" leaves the workspace to, e.g. "/buyer" or "/dashboard". */
+  close: string;
+}
+
 /** Every canvas object shares position/size/rotation/layer — `content`'s
  * shape depends on `type`, interpreted client-side (CanvasItem.tsx). Kept
  * as one flexible item model rather than five near-identical tables. */
