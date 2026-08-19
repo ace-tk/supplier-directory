@@ -76,6 +76,10 @@ model User {
 
   productWishes ProductWish[] @relation("ProductWishOwner")
 
+  moodBoards        MoodBoard[]        @relation("MoodBoardOwner")
+  moodBoardAssets   MoodBoardAsset[]   @relation("MoodBoardAssetOwner")
+  moodBoardComments MoodBoardComment[] @relation("MoodBoardCommentAuthor")
+
   @@index([email])
 }
 
@@ -1160,6 +1164,10 @@ model CatalogRow {
   // CatalogRow) can be created against it.
   sourceWishId String?
 
+  // Same bridge pattern again, for Mood Board's "Send to Shop Page" /
+  // "Send to Manufacturer" (services/mood-board-bridge.ts).
+  sourceMoodBoardId String?
+
   // Real, persisted Warehouse-vs-Retail-Store bifurcation for the Product
   // module. Nullable/unset (locationType = null) is the honest
   // "Unassigned" state for old rows — never backfilled automatically.
@@ -1190,6 +1198,7 @@ model CatalogRow {
   @@index([locationType])
   @@index([sourceShopProductId])
   @@index([sourceWishId])
+  @@index([sourceMoodBoardId])
 }
 
 enum ProductLocationType {
@@ -1984,4 +1993,110 @@ model WishImage {
   order   Int         @default(0)
 
   @@index([wishId])
+}
+
+// ─── Module: AI Mood Board Studio ───────────────────────────────────────
+// A real editable design canvas. One flexible MoodBoardItem model (type +
+// positionX/Y/width/height/rotation/zIndex + a type-specific `content`
+// JSON payload) covers images/text/notes/annotations/materials/swatches,
+// rather than five separate near-identical tables — the schema itself
+// stays small; the meaning of `content` is interpreted client-side per
+// `type`. MoodBoardAsset is the real, DB-backed, per-user asset library
+// behind Uploads/Prints/Embroidery/reference-model panels (no fabricated
+// stock gallery exists anywhere in this app, so these are genuinely
+// user-uploaded, reusing the same dataUrl/validateImage pipeline as
+// CatalogRowImage/WishImage). Palette and size chart are simple enough to
+// live directly on MoodBoard rather than as separate tables.
+enum MoodBoardItemType {
+  IMAGE
+  TEXT
+  NOTE
+  ANNOTATION
+  MATERIAL
+  COLOR_SWATCH
+}
+
+enum MoodBoardAssetKind {
+  UPLOAD
+  PRINT
+  EMBROIDERY
+  REFERENCE
+}
+
+model MoodBoard {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("MoodBoardOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Board")
+
+  // Board color palette — real hex strings, persisted (not React-state-only).
+  palette String[] @default([])
+
+  // [{ size, bust, waist, hip }] — no existing Size & Fit model to
+  // integrate with (confirmed by audit), so this is the minimal real
+  // representation, editable via the Design Size Chart dialog.
+  sizeChart Json?
+
+  items    MoodBoardItem[]
+  comments MoodBoardComment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model MoodBoardItem {
+  id      String    @id @default(cuid())
+  boardId String
+  board   MoodBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  type MoodBoardItemType
+
+  positionX Float @default(0)
+  positionY Float @default(0)
+  width     Float @default(220)
+  height    Float @default(220)
+  rotation  Float @default(0)
+  zIndex    Int   @default(0)
+
+  content Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([boardId])
+}
+
+model MoodBoardAsset {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("MoodBoardAssetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  kind      MoodBoardAssetKind
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  dataUrl   String @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([kind])
+}
+
+model MoodBoardComment {
+  id      String    @id @default(cuid())
+  boardId String
+  board   MoodBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("MoodBoardCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  content String
+
+  createdAt DateTime @default(now())
+
+  @@index([boardId])
 }

@@ -42,6 +42,7 @@ import {
   BookOpen,
   UserSearch,
   Contact,
+  Palette,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -193,6 +194,7 @@ export const BUYER_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Browse Suppliers", href: "/buyer/suppliers", icon: Building2 },
       { label: "Shop", href: "/buyer/shop", icon: ShoppingBag },
+      { label: "Mood Board", href: "/buyer/mood-board", icon: Palette },
     ],
   },
   {
