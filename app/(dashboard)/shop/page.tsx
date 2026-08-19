@@ -2,10 +2,7 @@
 
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { PackageSearch, Loader2, Sparkles } from "lucide-react";
-import { useSession } from "@/hooks/use-session";
-import { Button } from "@/components/ui/button";
+import { PackageSearch, Loader2 } from "lucide-react";
 import { FeaturedSlider } from "@/components/shop/FeaturedSlider";
 import { ShopCategories } from "@/components/shop/ShopCategories";
 import { FilterBar, type ShopFilters, DEFAULT_FILTERS } from "@/components/shop/FilterBar";
@@ -26,7 +23,6 @@ const PAGE_SIZE = 24;
 function ShopPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const session = useSession();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -250,13 +246,6 @@ function ShopPageContent() {
       </div>
 
       <div ref={gridRef} className="pt-4 scroll-mt-4">
-        {session?.role === "BUYER" && (
-          <div className="flex justify-end mb-3">
-            <Button render={<Link href="/buyer/wishes/new" />} nativeButton={false} variant="outline" className="gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> Add Your Wish
-            </Button>
-          </div>
-        )}
         <FilterBar
           resultCount={loading ? undefined : visibleProducts.length}
           activeCategory={activeCategory}

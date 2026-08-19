@@ -382,7 +382,10 @@ export function MoodBoardStudio({ initialBoard, initialBoards }: { initialBoard:
               <Input key={board.name} defaultValue={board.name} onBlur={(e) => handleRenameBoard(e.target.value)} className="h-8 text-sm" />
             </PopoverContent>
           </Popover>
-          <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={() => router.push("/buyer/mood-board")}>
+          {/* /buyer/mood-board now redirects straight back into a Studio
+              (see app/(buyer)/buyer/mood-board/page.tsx), so Close leaves
+              the workspace entirely rather than looping back in. */}
+          <Button variant="ghost" size="icon-sm" aria-label="Close" onClick={() => router.push("/buyer")}>
             <X className="h-4 w-4" />
           </Button>
         </div>
