@@ -11,5 +11,5 @@ export default async function AdminSupplyChainWorkspacePage({ params }: { params
   const result = await getSupplyChainWithAccess(id, user.id, user.role);
   if (!result) notFound();
 
-  return <SupplyChainWorkspace chain={result.chain} access={result.access} basePath="/dashboard" />;
+  return <SupplyChainWorkspace chain={result.chain} access={result.access} basePath="/supply-chain" />;
 }

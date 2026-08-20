@@ -105,7 +105,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   },
   {
     group: "Supply Chain",
-    items: [{ label: "Supply Chain", href: "#", icon: Workflow, comingSoon: true }],
+    items: [{ label: "Supply Chain", href: "/supply-chain", icon: Workflow, badge: "New" }],
   },
   {
     group: "Product",
