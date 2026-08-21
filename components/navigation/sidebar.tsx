@@ -31,22 +31,59 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
         collapsed ? "w-[68px]" : "w-60"
       )}
     >
-      {/* Logo */}
-      <div className={cn("flex items-center gap-2.5 h-16 border-b border-sidebar-border shrink-0", collapsed ? "justify-center px-2" : "px-5")}>
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">S</span>
-        </div>
-        {!collapsed && (
-          <div className="min-w-0">
-            <span className="block font-semibold text-sidebar-foreground tracking-tight leading-tight">
-              SupplyBase
-            </span>
-            {portalLabel && (
-              <span className="block text-[10px] text-muted-foreground leading-tight truncate">
-                {portalLabel}
-              </span>
-            )}
+      {/* Logo + collapse toggle — the toggle visually belongs to the header,
+          beside the wordmark when expanded, stacked under the mark when
+          collapsed (there's no room beside it at 68px wide). */}
+      <div
+        className={cn(
+          "flex h-16 border-b border-sidebar-border shrink-0",
+          collapsed ? "flex-col items-center justify-center gap-1 px-2 py-2" : "items-center justify-between px-5"
+        )}
+      >
+        <div className={cn("flex items-center gap-2.5 min-w-0", collapsed && "justify-center")}>
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
+            <span className="text-primary-foreground font-bold text-sm">S</span>
           </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <span className="block font-semibold text-sidebar-foreground tracking-tight leading-tight">
+                SupplyBase
+              </span>
+              {portalLabel && (
+                <span className="block text-[10px] text-muted-foreground leading-tight truncate">
+                  {portalLabel}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={() => setCollapsed(!collapsed)}
+                  aria-label="Expand sidebar"
+                  className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/50 transition-all duration-150"
+                />
+              }
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent side="right">Expand sidebar</TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/50 transition-all duration-150"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
         )}
       </div>
 
@@ -255,21 +292,6 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
             {isLoggingOut ? "Signing out…" : "Logout"}
           </button>
         )}
-
-        {/* Collapse / expand toggle — deliberately small and subtle, not a
-            normal nav item, per the "swipe-style" collapse spec. */}
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className={cn(
-            "flex items-center gap-2 py-1.5 mt-2 rounded-lg text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/50 transition-all duration-150 text-xs",
-            collapsed ? "justify-center px-2.5" : "px-2.5"
-          )}
-        >
-          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-          {!collapsed && <span>Collapse</span>}
-        </button>
       </div>
     </aside>
   );

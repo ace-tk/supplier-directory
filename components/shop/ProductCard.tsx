@@ -13,13 +13,13 @@ import {
   Pencil,
   Factory,
   Loader2,
-  MoreHorizontal,
+  MoreVertical,
   ShoppingCart,
   Eye,
   Video,
   Play,
   TrendingUp,
-  Users,
+  BarChart3,
 } from "lucide-react";
 import { Product } from "@/types/product";
 import { Supplier } from "@/types/supplier";
@@ -165,10 +165,11 @@ export function ProductCard({
       transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
       className="group relative break-inside-avoid mb-6 rounded-2xl overflow-hidden bg-[#f7f6f3] border border-black/8 shadow-sm hover:shadow-md transition-shadow duration-300 text-neutral-900"
     >
-      {/* Header: product name + Add to Cart + 3-dot menu */}
-      <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-1">
+      {/* Header: product name + Add to Cart + overflow menu */}
+      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-1">
         <h3
-          className="font-bold text-[17px] leading-snug line-clamp-2 cursor-pointer min-w-0"
+          title={product.name}
+          className="font-bold text-[17px] leading-snug truncate cursor-pointer min-w-0"
           onClick={() => onClick(product)}
         >
           {product.name}
@@ -180,13 +181,12 @@ export function ProductCard({
                 <button
                   type="button"
                   disabled
-                  className="inline-flex items-center gap-1 rounded-full bg-neutral-900 px-2.5 py-1.5 text-[10px] font-semibold text-white opacity-40 cursor-not-allowed"
-                  aria-label="Add to cart unavailable"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-neutral-900 text-white opacity-40 cursor-not-allowed"
+                  aria-label="Add to cart"
                 />
               }
             >
               <ShoppingCart className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Add to Cart</span>
             </TooltipTrigger>
             <TooltipContent>Cart is not available in SupplyBase yet</TooltipContent>
           </Tooltip>
@@ -195,7 +195,7 @@ export function ProductCard({
             <DropdownMenuTrigger
               render={<Button variant="ghost" size="icon-sm" aria-label="Product actions" onClick={(e) => e.stopPropagation()} />}
             >
-              <MoreHorizontal className="w-4 h-4" />
+              <MoreVertical className="w-4 h-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-44" onClick={(e) => e.stopPropagation()}>
               <DropdownMenuItem onClick={() => onClick(product)}>
@@ -273,64 +273,66 @@ export function ProductCard({
           Save
         </button>
 
-        {/* Share + wish count — top-right overlay, stacked */}
-        <div className="absolute top-2.5 right-2.5 z-10 flex flex-col items-end gap-1.5">
-          <button
-            type="button"
-            onClick={handleShare}
-            className="inline-flex items-center justify-center rounded-full p-1.5 bg-white/90 text-neutral-900 backdrop-blur-md"
-            aria-label="Share"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveClick}
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold bg-white/90 text-neutral-900 backdrop-blur-md"
-            aria-label="Wish count"
-          >
-            <Heart className={cn("w-3 h-3", isSaved && "fill-rose-500 text-rose-500")} />
-            {formatCompactCount(product.savedCount)}
-          </button>
-        </div>
-
         {/* Front/Back/Side/Labels — real positional views only, never a fake
             Video tab — plus a real Request Video action alongside them.
             No product has a real video field, so this is never a "Watch
             Video" claim; it always opens the existing, honest Request
-            Video flow (see handleRequestVideoClick). */}
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 rounded-full bg-black/55 px-1 py-0.5 backdrop-blur-md max-w-[92%] overflow-x-auto">
-          {media.length > 1 &&
-            media.map((option) => (
-              <button
-                key={option.kind}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveKind(option.kind);
-                }}
-                className={cn(
-                  "shrink-0 whitespace-nowrap px-2 py-1 rounded-full text-[10px] font-medium text-white/80",
-                  (activeMedia?.kind ?? media[0]?.kind) === option.kind && "bg-white text-neutral-900"
-                )}
+            Video flow (see handleRequestVideoClick). The heart/wish toggle
+            sits beside this group (not floating over the image) — same
+            isSaved/onToggleSave state as the Save button above, just a
+            second real affordance for it, with its own stopPropagation so
+            it never fires the media-switch or vice versa. */}
+        <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center gap-1.5">
+          <div className="flex items-center gap-0.5 rounded-full bg-black/55 px-1 py-0.5 backdrop-blur-md min-w-0 flex-1 overflow-x-auto">
+            {media.length > 1 &&
+              media.map((option) => (
+                <button
+                  key={option.kind}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveKind(option.kind);
+                  }}
+                  className={cn(
+                    "shrink-0 whitespace-nowrap px-2 py-1 rounded-full text-[10px] font-medium text-white/80",
+                    (activeMedia?.kind ?? media[0]?.kind) === option.kind && "bg-white text-neutral-900"
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    onClick={handleRequestVideoClick}
+                    className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap text-white/80 hover:text-white"
+                    aria-label="Request video"
+                  />
+                }
               >
-                {option.label}
-              </button>
-            ))}
+                <Play className="w-2.5 h-2.5" /> Video
+              </TooltipTrigger>
+              <TooltipContent>Request a video for this product</TooltipContent>
+            </Tooltip>
+          </div>
+
           <Tooltip>
             <TooltipTrigger
               render={
                 <button
                   type="button"
-                  onClick={handleRequestVideoClick}
-                  className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap text-white/80 hover:text-white"
-                  aria-label="Request video"
+                  onClick={handleSaveClick}
+                  className="shrink-0 flex items-center gap-1 rounded-full bg-black/55 backdrop-blur-md px-2 py-1.5 text-white/90 hover:text-white"
+                  aria-label={isSaved ? "Remove from wishlist" : "Add to wishlist"}
                 />
               }
             >
-              <Play className="w-2.5 h-2.5" /> Video
+              <Heart className={cn("w-3.5 h-3.5", isSaved && "fill-rose-500 text-rose-500")} />
+              <span className="text-[10px] font-medium tabular-nums">{formatCompactCount(product.savedCount)}</span>
             </TooltipTrigger>
-            <TooltipContent>Request a video for this product</TooltipContent>
+            <TooltipContent>{isSaved ? "Remove from wishlist" : "Add to wishlist"}</TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -347,19 +349,35 @@ export function ProductCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-3 text-[11px] border-t border-black/8 pt-3">
-          <div>
-            <p className="text-[9px] uppercase tracking-wide text-neutral-500">Interest Received</p>
+        {/* Global Buyers → Interest Received → Download, in one compact row */}
+        <div className="flex items-center justify-between gap-2 text-[11px] border-t border-black/8 pt-3">
+          <div className="min-w-0">
+            <p className="text-[9px] uppercase tracking-wide text-neutral-500 truncate">Global Buyers</p>
+            <p className="font-bold text-[14px] tabular-nums flex items-center gap-1">
+              <BarChart3 className="w-3 h-3 shrink-0" /> {formatCompactCount(product.globalBuyers)}
+            </p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9px] uppercase tracking-wide text-neutral-500 truncate">Interest Received</p>
             <p className="font-bold text-[14px] tabular-nums flex items-center gap-1 text-emerald-700">
-              <TrendingUp className="w-3 h-3" /> {formatCompactCount(product.savedCount)}
+              <TrendingUp className="w-3 h-3 shrink-0" /> {formatCompactCount(product.savedCount)}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-[9px] uppercase tracking-wide text-neutral-500">Global Buyers</p>
-            <p className="font-bold text-[14px] tabular-nums flex items-center justify-end gap-1">
-              <Users className="w-3 h-3" /> {formatCompactCount(product.globalBuyers)}
-            </p>
-          </div>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full border border-neutral-300 hover:bg-neutral-50"
+                  aria-label="Download"
+                />
+              }
+            >
+              <Download className="w-3.5 h-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Download</TooltipContent>
+          </Tooltip>
         </div>
 
         {(sizes.length > 0 || colors.length > 0) && (
@@ -397,32 +415,36 @@ export function ProductCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 text-[10px] text-neutral-600 border-t border-black/8 pt-3">
-          <div className="flex items-center gap-3 min-w-0">
-            {supplier && (
-              <Link
-                href={`/crm?supplierId=${supplier.id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 font-medium hover:text-black"
-              >
-                <MessageCircle className="w-3 h-3" /> Message
-              </Link>
-            )}
-            {supplier?.whatsapp && (
-              <a
-                href={whatsappHref(supplier.whatsapp)}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 font-medium text-[#128C7E] hover:underline"
-              >
-                WhatsApp
-              </a>
-            )}
-          </div>
-          <span className="inline-flex items-center gap-1 tabular-nums shrink-0">
-            <Heart className="w-3 h-3" /> {formatCompactCount(product.savedCount)}
-          </span>
+        {/* Message → WhatsApp → Share, one communication row */}
+        <div className="flex items-center flex-wrap gap-3 text-[10px] text-neutral-600 border-t border-black/8 pt-3">
+          {supplier && (
+            <Link
+              href={`/crm?supplierId=${supplier.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 font-medium hover:text-black"
+            >
+              <MessageCircle className="w-3 h-3" /> Message
+            </Link>
+          )}
+          {supplier?.whatsapp && (
+            <a
+              href={whatsappHref(supplier.whatsapp)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 font-medium text-[#128C7E] hover:underline"
+            >
+              WhatsApp
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label="Share"
+            className="inline-flex items-center gap-1 font-medium hover:text-black"
+          >
+            <Share2 className="w-3 h-3" /> Share
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2 rounded-xl bg-white/70 border border-black/8 px-2.5 py-2">
