@@ -7,7 +7,6 @@ import {
   Users,
   Receipt,
   TrendingUp,
-  Plus,
   ChevronDown,
   ChevronRight,
   CheckCircle2,
@@ -58,12 +57,12 @@ const QUICK_ACTIONS = [
 ];
 
 const QUICK_ADD_ITEMS = [
-  { label: "Add Supplier", href: "/directory", icon: Building2 },
-  { label: "New Contact", href: "/crm", icon: Users },
-  { label: "Create Invoice", href: "/invoices/new", icon: Receipt },
-  { label: "Add Product", href: "/catalog/new", icon: ShoppingBag },
-  { label: "Add Expense", href: "/invoices/expenses/new", icon: Receipt },
-  { label: "Create Content", href: "/content/new", icon: NotebookText },
+  { label: "Add Supplier", href: "/directory", icon: Building2, color: "text-blue-500", bg: "bg-blue-500/10" },
+  { label: "New Contact", href: "/crm", icon: Users, color: "text-violet-500", bg: "bg-violet-500/10" },
+  { label: "Create Invoice", href: "/invoices/new", icon: Receipt, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  { label: "Add Product", href: "/catalog/new", icon: ShoppingBag, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+  { label: "Add Expense", href: "/invoices/expenses/new", icon: Wallet, color: "text-orange-500", bg: "bg-orange-500/10" },
+  { label: "Create Content", href: "/content/new", icon: NotebookText, color: "text-pink-500", bg: "bg-pink-500/10" },
 ];
 
 const CAMPAIGN_LINKS = [
@@ -180,23 +179,38 @@ export function DashboardOverview({ user, stats, gettingStarted, tasksState, act
       <PageHeader
         title={`${greetingByHour()}, ${user.name.split(" ")[0]}`}
         description="Here's what's happening across your workspace today."
-        actions={
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button size="sm" className="gap-1.5" />}>
-              <Plus className="h-3.5 w-3.5" />
-              Quick add
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {QUICK_ADD_ITEMS.map((item) => (
-                <DropdownMenuItem key={item.href} render={<Link href={item.href} />} className="gap-2">
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        }
+        className="mb-0"
       />
+
+      {/* Quick add stays visible as compact tiles instead of hiding actions
+          in a dropdown. Each tile is a real route link. */}
+      <div className="space-y-2.5">
+        <p className="text-sm font-semibold text-foreground">Quick add</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
+          {QUICK_ADD_ITEMS.map((item, index) => (
+            <motion.div
+              key={item.href}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: index * 0.025 }}
+              whileHover={{ y: -2 }}
+            >
+              <Link
+                href={item.href}
+                className="group flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2 shadow-sm transition-all hover:border-primary/30 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", item.bg, item.color)}>
+                  <item.icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 text-xs font-medium leading-tight text-foreground">
+                  {item.label}
+                </span>
+                <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      </div>
 
       {/* Role badge */}
       <motion.div
