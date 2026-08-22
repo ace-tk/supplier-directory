@@ -10,6 +10,7 @@ import { Eye, EyeOff, Loader2, ArrowLeft, CheckCircle2, KeyRound } from "lucide-
 import { toast } from "sonner";
 
 import { resetPasswordSchema, type ResetPasswordFormValues } from "@/lib/validations/auth";
+import { resetPasswordAction } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,11 +33,14 @@ function ResetPasswordContent() {
     resolver: zodResolver(resetPasswordSchema) as any,
   });
 
-  // Mock submit — no reset-token verification backend exists yet. Swap this
-  // for a real `resetPasswordAction(token, values)` server action later;
-  // the form and validation are already shaped for it.
-  async function onSubmit(_values: ResetPasswordFormValues) {
-    await new Promise((r) => setTimeout(r, 1000));
+  // Real: verifies the token against the hashed record in the database
+  // (single-use, expiring) and updates the account's actual password.
+  async function onSubmit(values: ResetPasswordFormValues) {
+    const result = await resetPasswordAction(token ?? "", values);
+    if (!result.success) {
+      toast.error(result.error);
+      return;
+    }
     toast.success("Password updated. Please sign in with your new password.");
     setDone(true);
   }

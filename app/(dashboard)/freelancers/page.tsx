@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Users, Briefcase, UserCheck, TrendingUp } from "lucide-react";
+import { Users, Briefcase, UserCheck, TrendingUp, Plus } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import { StatWidget } from "@/components/portal/stat-widget";
 import { ListToolbar } from "@/components/admin/list-toolbar";
 import { FreelancerCard } from "@/components/admin/freelancers/freelancer-card";
@@ -26,6 +28,7 @@ import { getFreelancers, deactivateFreelancer } from "@/services/freelancer-serv
 import type { FreelancerRecord } from "@/types/freelancer";
 
 export default function FreelancersPage() {
+  const router = useRouter();
   const [freelancers, setFreelancers] = useState<FreelancerRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -111,7 +114,15 @@ export default function FreelancersPage() {
 
   return (
     <div>
-      <PageHeader title="Freelancers" description="Manage freelancers associated with the platform." />
+      <PageHeader
+        title="Freelancers"
+        description="Manage freelancers associated with the platform."
+        actions={
+          <Button onClick={() => router.push("/freelancers/new")} className="gap-1.5">
+            <Plus className="h-4 w-4" /> Add Freelancer
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatWidget icon={Users} label="Total Freelancers" value={activeCount} />

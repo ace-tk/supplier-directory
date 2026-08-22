@@ -9,6 +9,7 @@ import { Loader2, ArrowLeft, CheckCircle2, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 import { forgotPasswordSchema, type ForgotPasswordFormValues } from "@/lib/validations/auth";
+import { requestPasswordResetAction } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,10 +27,16 @@ export default function ForgotPasswordPage() {
     resolver: zodResolver(forgotPasswordSchema),
   });
 
-  async function onSubmit(_values: ForgotPasswordFormValues) {
-    // UI-only placeholder — no backend implementation yet
-    await new Promise((r) => setTimeout(r, 1200));
-    toast.success("If that email exists, a reset link has been sent.");
+  // Real: a single-use reset token is genuinely created and stored (hashed)
+  // server-side. There is no email provider configured in this app, so
+  // nothing is actually dispatched — the copy below says so honestly
+  // instead of claiming an email was sent.
+  async function onSubmit(values: ForgotPasswordFormValues) {
+    const result = await requestPasswordResetAction(values);
+    if (!result.success) {
+      toast.error(result.error);
+      return;
+    }
     setSubmitted(true);
   }
 
@@ -61,14 +68,13 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2 className="h-7 w-7 text-primary" />
               </div>
             </div>
-            <h2 className="text-base font-semibold text-foreground">Check your email</h2>
+            <h2 className="text-base font-semibold text-foreground">Request received</h2>
             <p className="text-sm text-muted-foreground">
-              We sent a password reset link to{" "}
-              <span className="font-medium text-foreground">{getValues("email")}</span>
+              If an account exists for{" "}
+              <span className="font-medium text-foreground">{getValues("email")}</span>, a reset link
+              has been generated. This environment doesn&apos;t have live email delivery configured yet,
+              so it wasn&apos;t emailed — contact your administrator to have it sent to you directly.
             </p>
-            <Link href={`/reset-password?token=demo-token&email=${encodeURIComponent(getValues("email"))}`}>
-              <Button className="mt-4 w-full gap-2">Continue to reset password</Button>
-            </Link>
             <Link href="/login">
               <Button variant="outline" className="w-full gap-2">
                 <ArrowLeft className="h-4 w-4" />

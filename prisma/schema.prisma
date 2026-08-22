@@ -80,7 +80,28 @@ model User {
   moodBoardAssets   MoodBoardAsset[]   @relation("MoodBoardAssetOwner")
   moodBoardComments MoodBoardComment[] @relation("MoodBoardCommentAuthor")
 
+  passwordResetTokens PasswordResetToken[]
+
   @@index([email])
+}
+
+/// Real, single-use account-activation / password-reset tokens. Only the
+/// SHA-256 hash of the raw token is ever persisted — a DB read can never
+/// yield a usable token, mirroring how the bcrypt password hash itself is
+/// stored. Used both for genuine self-service "forgot password" requests
+/// and as the activation mechanism for Admin-created accounts (e.g. Add
+/// Freelancer), which are created with a random password nobody — including
+/// the Admin who created them — ever knows.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Supplier {
