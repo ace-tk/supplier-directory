@@ -28,6 +28,7 @@ export const PROJECT_PRIORITY_LABELS: Record<ProjectPriority, string> = {
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   NOT_STARTED: "Not Started",
   IN_PROGRESS: "In Progress",
+  REVIEW: "Review",
   COMPLETED: "Completed",
   OVERDUE: "Overdue",
 };

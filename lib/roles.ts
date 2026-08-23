@@ -101,7 +101,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   },
   {
     group: "Project Management",
-    items: [{ label: "Project Management", href: "#", icon: FolderKanban, comingSoon: true }],
+    items: [{ label: "Project Management", href: "/projects", icon: FolderKanban, badge: "New" }],
   },
   {
     group: "Supply Chain",

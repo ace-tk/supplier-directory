@@ -38,7 +38,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { DashboardTasksPanel } from "@/components/dashboard/DashboardTasksPanel";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/invoicing/ui";
@@ -138,17 +137,9 @@ export function DashboardOverview({ user, stats, gettingStarted, tasksState, act
         <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/content" />} nativeButton={false}>
           <NotebookText className="h-3.5 w-3.5" /> Content Management
         </Button>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button variant="outline" size="sm" className="gap-1.5 opacity-50 cursor-not-allowed" disabled>
-                <FolderKanban className="h-3.5 w-3.5" /> Project Management
-                <Badge variant="secondary" className="h-4 px-1 text-[9px]">Soon</Badge>
-              </Button>
-            }
-          />
-          <TooltipContent>Coming soon</TooltipContent>
-        </Tooltip>
+        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/projects" />} nativeButton={false}>
+          <FolderKanban className="h-3.5 w-3.5" /> Project Management
+        </Button>
         <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/shop" />} nativeButton={false}>
           <ShoppingBag className="h-3.5 w-3.5" /> Shop
         </Button>

@@ -42,11 +42,20 @@ model User {
   sharesGiven             SupplyChainShare[]     @relation("SharedByUser")
   notifications           Notification[]
 
-  assignedProjects  Project[]        @relation("ProjectFreelancer")
-  createdProjects   Project[]        @relation("ProjectCreatedBy")
-  receivedProposals Proposal[]       @relation("ProposalFreelancer")
-  sentProposals     Proposal[]       @relation("ProposalCreatedBy")
-  assignedTasks     FreelancerTask[] @relation("TaskFreelancer")
+  assignedProjects                  Project[]                        @relation("ProjectFreelancer")
+  createdProjects                   Project[]                        @relation("ProjectCreatedBy")
+  headedProjects                    Project[]                        @relation("ProjectHead")
+  projectMemberships                ProjectMember[]
+  projectTaskAssignments            ProjectTaskAssignee[]
+  ownedProjectMilestones            ProjectTimelineEntry[]           @relation("ProjectMilestoneOwner")
+  addedProjectResources             ProjectResource[]
+  projectNotes                      ProjectNote[]
+  projectConversationParticipations ProjectConversationParticipant[]
+  projectMessages                   ProjectMessage[]
+  projectActivities                 ProjectActivity[]
+  receivedProposals                 Proposal[]                       @relation("ProposalFreelancer")
+  sentProposals                     Proposal[]                       @relation("ProposalCreatedBy")
+  assignedTasks                     FreelancerTask[]                 @relation("TaskFreelancer")
 
   contentItems ContentItem[]
   catalogs     Catalog[]
@@ -361,13 +370,13 @@ model Task {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  title          String
-  dueDate        DateTime?
-  priority       String       @default("Medium") // Low, Medium, High
-  assignedTo     String       @default("Me")
-  completed      Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  title      String
+  dueDate    DateTime?
+  priority   String    @default("Medium") // Low, Medium, High
+  assignedTo String    @default("Me")
+  completed  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([conversationId])
 }
@@ -666,6 +675,7 @@ enum ProjectPriority {
 enum TaskStatus {
   NOT_STARTED
   IN_PROGRESS
+  REVIEW
   COMPLETED
   OVERDUE
 }
@@ -747,8 +757,8 @@ enum PortfolioStatus {
 // canonical on Freelancer/User and are read from there at render time
 // rather than duplicated here (see lib/portfolio-queries.ts).
 model FreelancerPortfolio {
-  id           String @id @default(cuid())
-  freelancerId String @unique
+  id           String     @id @default(cuid())
+  freelancerId String     @unique
   freelancer   Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
 
   templateKey String          @default("editorial01")
@@ -878,6 +888,12 @@ model Project {
   linkedinUrl    String?
   notes          String? @db.Text
 
+  clientId String?
+  client   ProjectClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  headUserId String?
+  head       User?   @relation("ProjectHead", fields: [headUserId], references: [id], onDelete: SetNull)
+
   // Section 6 — optional link to an existing Supply Chain. SetNull so
   // deleting a chain never cascades into (or is blocked by) a Project.
   supplyChainId String?
@@ -898,9 +914,44 @@ model Project {
   referenceImages ProjectReferenceImage[]
   documents       ProjectDocument[]
   items           ProjectItem[]
+  members         ProjectMember[]
+  resources       ProjectResource[]
+  projectNotes    ProjectNote[]
+  conversations   ProjectConversation[]
+  activities      ProjectActivity[]
 
   @@index([freelancerUserId])
   @@index([supplyChainId])
+  @@index([clientId])
+  @@index([headUserId])
+}
+
+model ProjectClient {
+  id            String    @id @default(cuid())
+  companyName   String
+  contactPerson String?
+  email         String?
+  phone         String?
+  whatsapp      String?
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  projects      Project[]
+
+  @@index([companyName])
+  @@index([email])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt   DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
 }
 
 enum ProjectTimelineStatus {
@@ -917,11 +968,16 @@ model ProjectTimelineEntry {
   title       String
   description String?
   date        DateTime
+  startDate   DateTime?
+  dueDate     DateTime?
+  ownerId     String?
+  owner       User?                 @relation("ProjectMilestoneOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   status      ProjectTimelineStatus @default(NOT_STARTED)
   order       Int                   @default(0)
   createdAt   DateTime              @default(now())
 
   @@index([projectId])
+  @@index([ownerId])
 }
 
 enum ReferenceLinkPlatform {
@@ -994,10 +1050,11 @@ model ProjectItem {
 model FreelancerTask {
   id String @id @default(cuid())
 
-  title    String
-  dueDate  DateTime
-  priority TaskPriority @default(MEDIUM)
-  status   TaskStatus   @default(NOT_STARTED)
+  title       String
+  description String?      @db.Text
+  dueDate     DateTime
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(NOT_STARTED)
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1005,10 +1062,146 @@ model FreelancerTask {
   freelancerUserId String
   freelancer       User   @relation("TaskFreelancer", fields: [freelancerUserId], references: [id], onDelete: Cascade)
 
+  archived      Boolean                    @default(false)
+  assignees     ProjectTaskAssignee[]
+  checklist     ProjectTaskChecklistItem[]
+  conversations ProjectConversation[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([freelancerUserId])
+}
+
+model ProjectTaskAssignee {
+  id     String         @id @default(cuid())
+  taskId String
+  task   FreelancerTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
+}
+
+model ProjectTaskChecklistItem {
+  id        String         @id @default(cuid())
+  taskId    String
+  task      FreelancerTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title     String
+  completed Boolean        @default(false)
+  order     Int            @default(0)
+
+  @@index([taskId])
+}
+
+enum ProjectResourceType {
+  FILE
+  LINK
+}
+
+model ProjectResource {
+  id        String              @id @default(cuid())
+  projectId String
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  type      ProjectResourceType
+  url       String?
+  fileName  String?
+  mimeType  String?
+  sizeBytes Int?
+  dataUrl   String?             @db.Text
+  note      String?
+  addedById String
+  addedBy   User                @relation(fields: [addedById], references: [id], onDelete: Cascade)
+  createdAt DateTime            @default(now())
+
+  @@index([projectId])
+  @@index([addedById])
+}
+
+model ProjectNote {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  content   String   @db.Text
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([authorId])
+}
+
+model ProjectConversation {
+  id           String                           @id @default(cuid())
+  projectId    String
+  project      Project                          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId       String?
+  task         FreelancerTask?                  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  name         String?
+  createdById  String
+  createdAt    DateTime                         @default(now())
+  updatedAt    DateTime                         @updatedAt
+  participants ProjectConversationParticipant[]
+  messages     ProjectMessage[]
+
+  @@index([projectId])
+  @@index([taskId])
+}
+
+model ProjectConversationParticipant {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   ProjectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime            @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model ProjectMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   ProjectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String              @db.Text
+  createdAt      DateTime            @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+enum ProjectActivityType {
+  PROJECT_CREATED
+  MEMBER_ADDED
+  TASK_CREATED
+  TASK_COMPLETED
+  MILESTONE_CREATED
+  MILESTONE_COMPLETED
+  RESOURCE_ADDED
+  NOTE_ADDED
+  MESSAGE_SENT
+}
+
+model ProjectActivity {
+  id        String              @id @default(cuid())
+  projectId String
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User                @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  type      ProjectActivityType
+  detail    String
+  createdAt DateTime            @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([actorId])
 }
 
 // ─── Module 1: Content Management ──────────────────────────────────────────
@@ -1865,11 +2058,11 @@ model Expense {
 
   // Optional saved contact, or a manually-entered one-off contact (never
   // auto-saved to ExpenseContact unless the user explicitly opts in).
-  contactId                 String?
-  contact                   ExpenseContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  manualContactName         String?
-  manualContactPhone        String?
-  manualContactCountryCode  String?
+  contactId                String?
+  contact                  ExpenseContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  manualContactName        String?
+  manualContactPhone       String?
+  manualContactCountryCode String?
 
   // Optional saved payment account ("Paid By"), plus a reference number
   // whose meaning depends on paymentMethod (cheque number / bank ref / UPI
@@ -2099,7 +2292,7 @@ model MoodBoardAsset {
   fileName  String
   mimeType  String
   sizeBytes Int
-  dataUrl   String @db.Text
+  dataUrl   String             @db.Text
 
   createdAt DateTime @default(now())
 

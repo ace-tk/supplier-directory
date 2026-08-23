@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { FolderKanban, Calendar, Building2 } from "lucide-react";
 import { getUser } from "@/lib/session";
 import { PageHeader } from "@/components/layout/page-header";
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 function ProjectCard({ project }: { project: ProjectRecord }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3 hover:shadow-card hover:border-border/80 transition-all">
+    <Link href={`/freelancer/projects/${project.id}`} className="block rounded-xl border border-border bg-card p-4 space-y-3 hover:shadow-card hover:border-primary/25 transition-all">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold text-foreground">{project.name}</p>
         <StatusBadge status={PROJECT_STATUS_LABELS[project.status]} />
@@ -37,7 +38,7 @@ function ProjectCard({ project }: { project: ProjectRecord }) {
           <span className="text-[11px] text-muted-foreground">{PROJECT_PRIORITY_LABELS[project.priority]}</span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
