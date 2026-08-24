@@ -8,7 +8,6 @@ import {
   ArrowUpRight,
   Send,
   Briefcase,
-  MessageSquare,
   MessageCircle,
   Share2,
   Mail,
@@ -122,13 +121,18 @@ export function FreelancerCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden flex flex-col text-sm">
+    <div className="relative isolate rounded-xl border border-border bg-card overflow-hidden flex flex-col text-sm">
+      {/* Decorative display-order watermark — never persisted as profile identity. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute right-3 top-7 z-0 select-none font-mono text-6xl font-bold leading-none tracking-[-0.08em] text-foreground/[0.035] sm:text-7xl dark:text-foreground/[0.045]"
+      >
+        {seq}
+      </span>
+
       {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-3.5">
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-[9px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">Profile</span>
-          <span className="text-[9px] font-medium text-muted-foreground/70 tabular-nums">{seq}</span>
-        </div>
+      <div className="relative z-10 flex items-center justify-between px-4 pt-3.5">
+        <span className="text-[9px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">Profile</span>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
             <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", status.dot)} />
@@ -156,7 +160,7 @@ export function FreelancerCard({
       </div>
 
       {/* Hero: photo beside About — matches the reference layout */}
-      <div className="px-4 pt-3 flex gap-3">
+      <div className="relative z-10 px-4 pt-3 flex gap-3">
         <div className="w-24 h-24 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
           {freelancer.avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -178,13 +182,13 @@ export function FreelancerCard({
       </div>
 
       {/* Name + role */}
-      <div className="px-4 pt-3">
-        <h3 className="text-base font-semibold text-foreground truncate">{freelancer.name}</h3>
+      <div className="relative z-10 px-4 pt-3">
+        <h3 className="truncate font-mono text-base font-bold uppercase tracking-[0.06em] text-foreground">{freelancer.name}</h3>
         {freelancer.role && <p className="text-xs text-muted-foreground truncate mt-0.5">{freelancer.role}</p>}
       </div>
 
       {/* Skills */}
-      <div className="px-4 pt-3 space-y-1.5">
+      <div className="relative z-10 px-4 pt-3 space-y-1.5">
         <p className="text-[9px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">Skills</p>
         {freelancer.skills.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
@@ -202,10 +206,10 @@ export function FreelancerCard({
         )}
       </div>
 
-      <div className="mx-4 mt-3 border-t border-border" />
+      <div className="relative z-10 mx-4 mt-3 border-t border-border" />
 
       {/* Portfolio preview — real cover images from the freelancer's published portfolio */}
-      <div className="px-4 pt-3">
+      <div className="relative z-10 px-4 pt-3">
         <div className="flex items-center justify-between">
           <Link href={portfolioHref} target="_blank" className="flex items-center gap-1 group">
             <p className="text-[9px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">Portfolio</p>
@@ -269,7 +273,7 @@ export function FreelancerCard({
       </div>
 
       {/* Stats — real values only */}
-      <div className="mt-3 border-t border-border grid grid-cols-4 divide-x divide-border">
+      <div className="relative z-10 mt-3 border-t border-border grid grid-cols-4 divide-x divide-border">
         <div className="px-2.5 py-3 min-w-0">
           <p className="text-[9px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">Projects</p>
           <p className="text-base font-semibold text-foreground tabular-nums mt-0.5">{freelancer.activeProjects}</p>
@@ -291,7 +295,7 @@ export function FreelancerCard({
       </div>
 
       {/* Actions */}
-      <div className="mt-auto border-t border-border p-3 grid grid-cols-2 gap-2">
+      <div className="relative z-10 mt-auto border-t border-border p-3 grid grid-cols-2 gap-2">
         <Button variant="outline" size="sm" className="gap-1.5" disabled={isDeactivated} onClick={() => onSendProposal(freelancer)}>
           <Send className="h-3.5 w-3.5" /> Send Proposal
         </Button>
@@ -299,34 +303,10 @@ export function FreelancerCard({
           <Briefcase className="h-3.5 w-3.5" /> Assign Work
         </Button>
       </div>
-      <div className="px-3 pb-3 flex items-center gap-2">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button variant="ghost" size="icon-sm" aria-label="Discuss" disabled={isDeactivated} onClick={() => onDiscuss(freelancer)} />
-            }
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-          </TooltipTrigger>
-          <TooltipContent>Send a message</TooltipContent>
-        </Tooltip>
-
-        {freelancer.phone && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button variant="ghost" size="icon-sm" aria-label="WhatsApp" disabled={isDeactivated} onClick={handleWhatsApp} />
-              }
-            >
-              <MessageCircle className="h-3.5 w-3.5" />
-            </TooltipTrigger>
-            <TooltipContent>Message on WhatsApp</TooltipContent>
-          </Tooltip>
-        )}
-
+      <div className="relative z-10 px-3 pb-3 flex items-center gap-2">
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Share" />}>
-            <Share2 className="h-3.5 w-3.5" />
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="flex-1 gap-1.5" aria-label="Share freelancer profile" />}>
+            <Share2 className="h-3.5 w-3.5" /> Share
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={handleEmail}>
@@ -347,6 +327,31 @@ export function FreelancerCard({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 gap-1.5"
+          aria-label={`Send message to ${freelancer.name}`}
+          disabled={isDeactivated}
+          onClick={() => onDiscuss(freelancer)}
+        >
+          <Send className="h-3.5 w-3.5" /> Send Message
+        </Button>
+
+        {freelancer.phone && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" aria-label="WhatsApp" disabled={isDeactivated} onClick={handleWhatsApp} />
+              }
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Message on WhatsApp</TooltipContent>
+          </Tooltip>
+        )}
+
       </div>
     </div>
   );
