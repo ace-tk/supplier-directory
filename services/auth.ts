@@ -7,7 +7,8 @@ import { createSession, destroySession } from "@/lib/session";
 import { loginSchema, signupSchema, forgotPasswordSchema, resetPasswordSchema } from "@/lib/validations/auth";
 import type { LoginFormValues, SignupFormValues, ForgotPasswordFormValues, ResetPasswordFormValues } from "@/lib/validations/auth";
 import { ensureDemoUsersSeeded } from "@/lib/seed";
-import { createPasswordResetToken, consumePasswordResetToken, markPasswordResetTokenUsed } from "@/lib/password-reset";
+import { createPasswordResetToken, consumePasswordResetToken, hashToken, markPasswordResetTokenUsed } from "@/lib/password-reset";
+import { activateWorkspaceInvite } from "@/lib/team-invitations";
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -34,6 +35,11 @@ export async function loginAction(
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
       return { success: false, error: "Invalid email or password" };
+    }
+
+    if (user.role === "TEAM_MEMBER") {
+      const activeMembership = await db.workspaceMember.findFirst({ where: { userId: user.id, status: "ACTIVE" }, select: { id: true } });
+      if (!activeMembership) return { success: false, error: "Your workspace access is inactive. Contact your administrator." };
     }
 
     await createSession(
@@ -160,6 +166,10 @@ export async function resetPasswordAction(
   const hashed = await hashPassword(parsed.data.password);
   await db.user.update({ where: { id: result.userId }, data: { password: hashed } });
   await markPasswordResetTokenUsed(token);
+  const invite = await db.workspaceInvite.findUnique({ where: { tokenHash: hashToken(token) }, select: { id: true } });
+  if (invite && !(await activateWorkspaceInvite(invite.id, result.userId))) {
+    return { success: false, error: "The invitation could not be activated. It may have expired or the workspace is full." };
+  }
 
   return { success: true, data: undefined };
 }

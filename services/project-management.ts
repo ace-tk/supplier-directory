@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateDocumentOrImage } from "@/lib/file-validation";
+import { hasTeamPermission } from "@/lib/team-auth";
 import type {
   ProjectClientRecord,
   ProjectListRecord,
@@ -85,12 +86,15 @@ function mapProjectList(project: {
 
 export async function getProjectManagementOverview(): Promise<ProjectManagementOverview> {
   const user = await currentUser();
-  if (!user || user.role !== "ADMIN") return { projects: [], clients: [], users: [], stats: { activeProjects: 0, tasksDue: 0, completedTasks: 0, teamMembers: 0 } };
+  if (!user || !(await hasTeamPermission("projects.view"))) return { projects: [], clients: [], users: [], stats: { activeProjects: 0, tasksDue: 0, completedTasks: 0, teamMembers: 0 } };
+
+  const membership = await db.workspaceMember.findFirst({ where: { userId: user.id, status: "ACTIVE" }, select: { workspaceId: true } });
+  const projectWhere = user.role === "ADMIN" ? { isDraft: false } : { isDraft: false, OR: [{ createdById: user.id }, { headUserId: user.id }, { members: { some: { userId: user.id } } }, { tasks: { some: { assignees: { some: { userId: user.id } } } } }] };
 
   const [projects, clients, users] = await Promise.all([
-    db.project.findMany({ where: { isDraft: false }, include: projectListInclude, orderBy: { updatedAt: "desc" } }),
+    db.project.findMany({ where: projectWhere, include: projectListInclude, orderBy: { updatedAt: "desc" } }),
     db.projectClient.findMany({ include: { _count: { select: { projects: true } } }, orderBy: { companyName: "asc" } }),
-    db.user.findMany({ select: userSelect, orderBy: { name: "asc" } }),
+    membership ? db.user.findMany({ where: { workspaceMemberships: { some: { workspaceId: membership.workspaceId, status: "ACTIVE" } } }, select: userSelect, orderBy: { name: "asc" } }) : db.user.findMany({ where: { id: user.id }, select: userSelect }),
   ]);
   const mapped = projects.map(mapProjectList);
   const now = new Date();
@@ -145,7 +149,7 @@ export async function createManagedProjectAction(input: {
   headUserId: string; memberIds: string[];
 }): Promise<Result<{ id: string }>> {
   const user = await currentUser();
-  if (!user || user.role !== "ADMIN") return { success: false, error: "Admin access required." };
+  if (!user || !(await hasTeamPermission("projects.manage"))) return { success: false, error: "Project management access required." };
   if (input.name.trim().length < 2) return { success: false, error: "Project name is required." };
   const [client, head] = await Promise.all([
     db.projectClient.findUnique({ where: { id: input.clientId } }),
@@ -157,7 +161,8 @@ export async function createManagedProjectAction(input: {
   const expectedEndDate = new Date(input.expectedEndDate);
   if (Number.isNaN(startDate.valueOf()) || expectedEndDate < startDate) return { success: false, error: "Target date must be on or after the start date." };
   const memberIds = [...new Set([user.id, input.headUserId, ...input.memberIds])];
-  const validMembers = await db.user.findMany({ where: { id: { in: memberIds } }, select: { id: true } });
+  const ownerMembership = await db.workspaceMember.findFirst({ where: { userId: user.id, status: "ACTIVE" }, select: { workspaceId: true } });
+  const validMembers = await db.user.findMany({ where: { id: { in: memberIds }, ...(ownerMembership ? { workspaceMemberships: { some: { workspaceId: ownerMembership.workspaceId, status: "ACTIVE" } } } : {}) }, select: { id: true } });
   if (validMembers.length !== memberIds.length) return { success: false, error: "One or more team members were not found." };
 
   const project = await db.project.create({ data: {
@@ -175,6 +180,7 @@ export async function createManagedProjectAction(input: {
 export async function getProjectWorkspace(projectId: string): Promise<ProjectWorkspaceRecord | null> {
   const user = await currentUser();
   if (!user || !(await canAccessProject(projectId, user.id, user.role))) return null;
+  const workspaceMembership = await db.workspaceMember.findFirst({ where: { userId: user.id, status: "ACTIVE" }, select: { workspaceId: true } });
   const [project, availableUsers] = await Promise.all([db.project.findUnique({ where: { id: projectId }, include: {
     ...projectListInclude,
     tasks: { where: { archived: false }, include: { assignees: { include: { user: { select: userSelect } } }, checklist: { orderBy: { order: "asc" } } }, orderBy: { dueDate: "asc" } },
@@ -186,7 +192,7 @@ export async function getProjectWorkspace(projectId: string): Promise<ProjectWor
       messages: { include: { sender: { select: userSelect } }, orderBy: { createdAt: "asc" }, take: 100 },
     }, orderBy: { updatedAt: "desc" } },
     activities: { include: { actor: { select: userSelect } }, orderBy: { createdAt: "desc" }, take: 30 },
-  } }), db.user.findMany({ select: userSelect, orderBy: { name: "asc" } })]);
+  } }), workspaceMembership ? db.user.findMany({ where: { workspaceMemberships: { some: { workspaceId: workspaceMembership.workspaceId, status: "ACTIVE" } } }, select: userSelect, orderBy: { name: "asc" } }) : db.user.findMany({ where: { id: user.id }, select: userSelect })]);
   if (!project) return null;
   const base = mapProjectList(project);
   return {

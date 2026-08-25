@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
-function hashToken(rawToken: string): string {
+export function hashToken(rawToken: string): string {
   return crypto.createHash("sha256").update(rawToken).digest("hex");
 }
 

@@ -14,6 +14,20 @@ enum Role {
   SUPPLIER
   BUYER
   FREELANCER
+  TEAM_MEMBER
+}
+
+enum WorkspaceMemberStatus {
+  ACTIVE
+  INACTIVE
+  REMOVED
+}
+
+enum WorkspaceInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
 }
 
 model User {
@@ -90,6 +104,8 @@ model User {
   moodBoardComments MoodBoardComment[] @relation("MoodBoardCommentAuthor")
 
   passwordResetTokens PasswordResetToken[]
+  workspaceMemberships WorkspaceMember[]
+  workspaceInvitesSent WorkspaceInvite[] @relation("WorkspaceInviteSender")
 
   @@index([email])
 }
@@ -110,6 +126,66 @@ model PasswordResetToken {
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
+  @@index([userId])
+}
+
+/// Company boundary for internal staff. This is additive to platform roles:
+/// an external BUYER/SUPPLIER/FREELANCER may also join a workspace without
+/// duplicating their User account or changing their existing portal identity.
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  seatLimit Int      @default(10)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members WorkspaceMember[]
+  invites WorkspaceInvite[]
+}
+
+model WorkspaceMember {
+  id          String                @id @default(cuid())
+  workspaceId String
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  roleKey     String
+  roleName    String
+  department  String?
+  permissions String[]              @default([])
+  isOwner     Boolean               @default(false)
+  status      WorkspaceMemberStatus @default(ACTIVE)
+  joinedAt    DateTime              @default(now())
+  lastActiveAt DateTime?
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId, status])
+}
+
+model WorkspaceInvite {
+  id          String                @id @default(cuid())
+  workspaceId String
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String?
+  name        String
+  email       String
+  roleKey     String
+  roleName    String
+  department  String?
+  permissions String[]              @default([])
+  message     String?
+  tokenHash   String                @unique
+  status      WorkspaceInviteStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  invitedById String
+  invitedBy   User                  @relation("WorkspaceInviteSender", fields: [invitedById], references: [id], onDelete: Restrict)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([workspaceId, email])
+  @@index([workspaceId, status])
   @@index([userId])
 }
 

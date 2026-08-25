@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { CONVERSATION_SCRIPTS } from "@/data/crm-seed";
+import { hasTeamPermission } from "@/lib/team-auth";
 
 async function seedConversations() {
   const suppliers = await db.supplierListing.findMany({ take: 20, orderBy: { createdAt: "asc" } });
@@ -67,6 +68,7 @@ async function seedConversations() {
 }
 
 export async function GET(req: Request) {
+  if (!(await hasTeamPermission("crm.view"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const { searchParams } = new URL(req.url);
     const supplierId = searchParams.get("supplierId");
@@ -127,6 +129,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if (!(await hasTeamPermission("crm.manage"))) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const body = await req.json();
     const { conversationId, content, type = "TEXT", productId, supplyChainId } = body;

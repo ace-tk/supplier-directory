@@ -1,10 +1,8 @@
+import { redirect } from "next/navigation";
+import { hasTeamPermission } from "@/lib/team-auth";
 import { InvoiceModuleNav } from "@/components/invoicing/InvoiceModuleNav";
 
-export default function InvoicesLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div>
-      <InvoiceModuleNav basePath="/invoices" />
-      {children}
-    </div>
-  );
+export default async function InvoiceAccessLayout({ children }: { children: React.ReactNode }) {
+  if (!(await hasTeamPermission("invoice.view"))) redirect("/unauthorized");
+  return <div><InvoiceModuleNav basePath="/invoices" />{children}</div>;
 }

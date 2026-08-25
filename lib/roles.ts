@@ -61,11 +61,31 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+export function permissionForAdminHref(href: string): string | null {
+  if (href === "/dashboard") return "dashboard.view";
+  if (href.startsWith("/projects")) return "projects.view";
+  if (href.startsWith("/supply-chain")) return "supplychain.view";
+  if (href.startsWith("/freelancers")) return "freelancers.view";
+  if (href.startsWith("/team")) return "team.view";
+  if (href.startsWith("/content") || href.startsWith("/articles")) return "content.view";
+  if (href.startsWith("/product")) return "product.view";
+  if (href.startsWith("/catalog")) return "catalog.view";
+  if (href.startsWith("/mood-board")) return "moodboard.view";
+  if (href.startsWith("/crm") || href.startsWith("/buyer-directory") || href.startsWith("/directory")) return "crm.view";
+  if (href.startsWith("/invoices/expenses")) return "expense.view";
+  if (href.startsWith("/invoices")) return "invoice.view";
+  if (href.startsWith("/inventory")) return "inventory.view";
+  if (href.startsWith("/shop")) return "shop.view";
+  if (href.startsWith("/marketing")) return "marketing.view";
+  return null;
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Admin",
   SUPPLIER: "Supplier",
   BUYER: "Buyer",
   FREELANCER: "Freelancer",
+  TEAM_MEMBER: "Team Member",
 };
 
 /**
@@ -80,6 +100,7 @@ export function roleHome(role: string): string {
     BUYER: "/buyer",
     SUPPLIER: "/supplier",
     FREELANCER: "/freelancer/dashboard",
+    TEAM_MEMBER: "/dashboard",
   };
   return map[role as Role] ?? "/login";
 }
@@ -96,7 +117,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     group: "Team",
     items: [
       { label: "Freelancers", href: "/freelancers", icon: Briefcase },
-      { label: "Team Management", href: "#", icon: Users, comingSoon: true },
+      { label: "Team Management", href: "/team", icon: Users },
     ],
   },
   {

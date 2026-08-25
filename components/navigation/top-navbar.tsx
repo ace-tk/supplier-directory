@@ -21,7 +21,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useAuth } from "@/hooks/use-session";
 import { initials } from "@/utils/format";
 import { cn } from "@/lib/utils";
-import { PORTAL_CONFIG, type PortalKey } from "@/lib/roles";
+import { permissionForAdminHref, PORTAL_CONFIG, type PortalKey } from "@/lib/roles";
 import type { SessionUser } from "@/types/auth";
 
 const ROLE_COLORS: Record<string, string> = {
@@ -34,13 +34,19 @@ const ROLE_COLORS: Record<string, string> = {
 interface TopNavbarProps {
   user?: SessionUser | null;
   portal?: PortalKey;
+  permissions?: string[];
 }
 
-export function TopNavbar({ user, portal = "admin" }: TopNavbarProps) {
+export function TopNavbar({ user, portal = "admin", permissions = [] }: TopNavbarProps) {
   const { logout, isLoggingOut } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const { navGroups } = PORTAL_CONFIG[portal];
+  const { navGroups: allNavGroups } = PORTAL_CONFIG[portal];
+  const navGroups = allNavGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
+    if (portal !== "admin" || permissions.includes("*")) return true;
+    const required = permissionForAdminHref(item.href);
+    return !required || permissions.includes(required);
+  }) })).filter((group) => group.items.length > 0);
 
   return (
     <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-40">

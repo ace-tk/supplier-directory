@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { initials } from "@/utils/format";
-import { PORTAL_CONFIG, ROLE_LABELS, type PortalKey } from "@/lib/roles";
+import { permissionForAdminHref, PORTAL_CONFIG, ROLE_LABELS, type PortalKey } from "@/lib/roles";
 import { useAuth } from "@/hooks/use-session";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { SessionUser } from "@/types/auth";
@@ -16,9 +16,10 @@ import type { SessionUser } from "@/types/auth";
 interface SidebarProps {
   user?: SessionUser | null;
   portal?: PortalKey;
+  permissions?: string[];
 }
 
-export function Sidebar({ user, portal = "admin" }: SidebarProps) {
+export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarProps) {
   const pathname = usePathname();
   const { navGroups, bottomItems, label: portalLabel } = PORTAL_CONFIG[portal];
   const { logout, isLoggingOut } = useAuth();
@@ -89,7 +90,11 @@ export function Sidebar({ user, portal = "admin" }: SidebarProps) {
 
       {/* Navigation */}
       <nav className={cn("flex-1 overflow-y-auto scrollbar-thin py-4 space-y-6", collapsed ? "px-2" : "px-3")}>
-        {navGroups.map((group) => (
+        {navGroups.map((group) => ({ ...group, items: group.items.filter((item) => {
+          if (portal !== "admin" || permissions.includes("*")) return true;
+          const required = permissionForAdminHref(item.href);
+          return !required || permissions.includes(required);
+        }) })).filter((group) => group.items.length > 0).map((group) => (
           <div key={group.group}>
             {!collapsed && (
               <p className="px-2 mb-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground">
