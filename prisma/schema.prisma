@@ -103,6 +103,8 @@ model User {
   moodBoardAssets   MoodBoardAsset[]   @relation("MoodBoardAssetOwner")
   moodBoardComments MoodBoardComment[] @relation("MoodBoardCommentAuthor")
 
+  repeatPrintDesigns RepeatPrintDesign[] @relation("RepeatPrintDesignOwner")
+
   passwordResetTokens PasswordResetToken[]
   workspaceMemberships WorkspaceMember[]
   workspaceInvitesSent WorkspaceInvite[] @relation("WorkspaceInviteSender")
@@ -2389,4 +2391,38 @@ model MoodBoardComment {
   createdAt DateTime @default(now())
 
   @@index([boardId])
+}
+
+// ─── Module: Design Studio — Repeat Print Maker ────────────────────────
+// Admin-only tool: upload up to 4 reference photos of a garment/print,
+// AI reads the motif/colour/style from them (lib/ai/openai-client.ts
+// runVisionChatCompletion) and generates one seamless square tile
+// (generateImage). The tile is stored once; how many times it repeats
+// across the live preview (repeatCount) is a display-only setting, not
+// a separate generation, so it's cheap to persist/restore.
+model RepeatPrintDesign {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("RepeatPrintDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name        String @default("Untitled Print")
+  tileImage   String @db.Text
+  repeatCount Int    @default(4)
+
+  referenceImages RepeatPrintReferenceImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model RepeatPrintReferenceImage {
+  id       String            @id @default(cuid())
+  designId String
+  design   RepeatPrintDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+  dataUrl  String            @db.Text
+  order    Int               @default(0)
+
+  @@index([designId])
 }

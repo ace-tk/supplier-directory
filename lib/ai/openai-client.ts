@@ -49,4 +49,62 @@ export async function runChatCompletion({
   return text;
 }
 
+export interface RunVisionChatCompletionParams {
+  system: string;
+  user: string;
+  /** Data URLs (data:image/...;base64,...) — sent as image_url content parts. */
+  images: string[];
+  model?: string;
+  maxTokens?: number;
+}
+
+/** Same shared client as runChatCompletion, extended to accept image inputs
+ * (gpt-4o-mini and gpt-4o both read images natively via image_url content
+ * parts) — used to have the AI actually look at uploaded reference photos
+ * rather than only ever reasoning over text. */
+export async function runVisionChatCompletion({
+  system,
+  user,
+  images,
+  model = "gpt-4o-mini",
+  maxTokens = 600,
+}: RunVisionChatCompletionParams): Promise<string> {
+  const client = getOpenAIClient();
+  const completion = await client.chat.completions.create({
+    model,
+    max_tokens: maxTokens,
+    messages: [
+      { role: "system", content: system },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: user },
+          ...images.map((url) => ({ type: "image_url" as const, image_url: { url } })),
+        ],
+      },
+    ],
+  });
+
+  const text = completion.choices[0]?.message?.content?.trim();
+  if (!text) throw new Error("The AI didn't return any content. Please try again.");
+  return text;
+}
+
+export interface GenerateImageParams {
+  prompt: string;
+  size?: "1024x1024" | "1024x1536" | "1536x1024";
+}
+
+/** Real text-to-image generation via the same OpenAI client/API key —
+ * gpt-image-1 returns base64 (b64_json), which is exactly the data-URL
+ * shape this codebase already persists images as everywhere else, so no
+ * separate file-storage integration is needed. */
+export async function generateImage({ prompt, size = "1024x1024" }: GenerateImageParams): Promise<string> {
+  const client = getOpenAIClient();
+  const result = await client.images.generate({ model: "gpt-image-1", prompt, size, n: 1 });
+  const b64 = result.data?.[0]?.b64_json;
+  if (!b64) throw new Error("The AI didn't return an image. Please try again.");
+  return `data:image/png;base64,${b64}`;
+}
+
 export { OpenAI };
