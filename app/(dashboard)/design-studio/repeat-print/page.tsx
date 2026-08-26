@@ -9,9 +9,10 @@ import { ReferenceUploader } from "@/components/repeat-print/ReferenceUploader";
 import { GenerationProgress, type GenerationStage } from "@/components/repeat-print/GenerationProgress";
 import { RepeatResult } from "@/components/repeat-print/RepeatResult";
 import { RecentDesigns } from "@/components/repeat-print/RecentDesigns";
+import { prepareSeamlessTileInputs } from "@/lib/repeat-print-canvas";
 import {
   analyzeReferencePrintAction,
-  generateRepeatPrintTileAction,
+  repairSeamTileAction,
   saveRepeatPrintDesignAction,
   getRecentRepeatPrintDesignsAction,
   getRepeatPrintDesignAction,
@@ -66,6 +67,18 @@ export default function RepeatPrintMakerPage() {
     setStage("extracting");
     setElapsedSeconds(0);
 
+    // EXTRACTING: prepare the real seam boundaries client-side (crop, offset-
+    // wrap, mask — see lib/repeat-print-canvas.ts) and get a short real style
+    // description from the vision model. Neither step redraws anything.
+    let prepared;
+    try {
+      prepared = await prepareSeamlessTileInputs(referenceImages[0]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't prepare the reference image.");
+      setPhase("upload");
+      return;
+    }
+
     const analysis = await analyzeReferencePrintAction(referenceImages);
     if (!analysis.success) {
       toast.error(analysis.error);
@@ -73,16 +86,19 @@ export default function RepeatPrintMakerPage() {
       return;
     }
 
+    // GENERATING: repair ONLY the masked seam band. Everything outside the
+    // mask is opaque and therefore preserved pixel-for-pixel by the model.
     setStage("generating");
-    const generation = await generateRepeatPrintTileAction(analysis.data);
-    if (!generation.success) {
-      toast.error(generation.error);
+    const repair = await repairSeamTileAction(prepared.wrappedImage, prepared.mask, analysis.data);
+    if (!repair.success) {
+      toast.error(repair.error);
       setPhase("upload");
       return;
     }
 
+    // TILING: build the live repeat preview from the repaired tile.
     setStage("tiling");
-    setTileImage(generation.data);
+    setTileImage(repair.data);
     setRepeatCount(4);
     setName("Untitled Print");
     setSavedId(null);

@@ -104,7 +104,7 @@ export function ReferenceUploader({
       )}
 
       <p className="text-[11px] text-muted-foreground mt-2">
-        Tip: for the most accurate result, upload the front, back, and a close-up detail shot of the print.
+        Tip: the first image becomes the tile itself — only its seam is repaired, everything else is preserved exactly. Extra images just help the AI match your print&apos;s style.
       </p>
 
       <input

@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 export type GenerationStage = "extracting" | "generating" | "tiling";
 
 const STAGES: { key: GenerationStage; label: string; caption: string }[] = [
-  { key: "extracting", label: "Extracting", caption: "Reading the motif, colours, and art style from your reference." },
-  { key: "generating", label: "Generating", caption: "Generating a new seamless print from that description." },
+  { key: "extracting", label: "Extracting", caption: "Preparing the seam boundaries and reading the artwork's exact traits." },
+  { key: "generating", label: "Generating", caption: "Repairing only the seam — the rest of your artwork stays untouched." },
   { key: "tiling", label: "Tiling", caption: "Building the repeat preview." },
 ];
 

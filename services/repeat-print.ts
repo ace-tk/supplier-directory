@@ -1,16 +1,20 @@
 "use server";
 
-// Design Studio — Repeat Print Maker. Admin-only. Two real AI calls per
-// generation (both through the one shared client in lib/ai/openai-client.ts,
-// never a second OpenAI integration): a vision read of the uploaded
-// reference photos, then a text-to-image call that turns that description
-// into one seamless square tile. Nothing here fakes generation — if
-// OPENAI_API_KEY isn't configured, AIConfigError's honest message surfaces
-// instead of a placeholder image.
+// Design Studio — Repeat Print Maker. Admin-only. A PRESERVATION pipeline,
+// not a redraw: the reference artwork's own pixels are cropped, offset-wrapped
+// (see lib/repeat-print-canvas.ts) and masked entirely client-side, so the
+// only thing AI ever touches is a narrow seam band — everything else in the
+// final tile is exactly the source artwork. Vision analysis (still one real
+// call, through the same shared client in lib/ai/openai-client.ts) exists
+// only to give the seam-repair prompt a short style description so the
+// patch matches the surrounding texture; it is never the source of the
+// output image. Nothing here fakes generation — if OPENAI_API_KEY isn't
+// configured, AIConfigError's honest message surfaces instead of a
+// placeholder image.
 
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
-import { runVisionChatCompletion, generateImage, AIConfigError } from "@/lib/ai/openai-client";
+import { runVisionChatCompletion, editImage, AIConfigError } from "@/lib/ai/openai-client";
 import { validateImage, extractDataUrlMeta } from "@/lib/file-validation";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
@@ -43,11 +47,12 @@ export interface RepeatPrintDesignDetail extends RepeatPrintDesignSummary {
   referenceImages: string[];
 }
 
-/** Stage 1 of the real EXTRACTING → GENERATING → TILING pipeline. Split
- * into its own action (rather than one call that does both AI steps
- * internally) so the client observes two genuinely distinct network round
- * trips with real start/end boundaries — no fabricated progress percentage
- * standing in for work that isn't actually happening in stages. */
+/** Stage 1 (EXTRACTING) — a short, concrete style description used only as
+ * seam-repair guidance in stage 2's prompt, never as a generation source.
+ * Split into its own action (rather than one call that does everything
+ * internally) so the client observes real, distinct network round trips —
+ * no fabricated progress standing in for work that isn't actually
+ * happening in stages. */
 export async function analyzeReferencePrintAction(referenceImages: string[]): Promise<ActionResult<string>> {
   const admin = await requireAdmin();
   if (!admin) return { success: false, error: "Admins only." };
@@ -64,24 +69,29 @@ export async function analyzeReferencePrintAction(referenceImages: string[]): Pr
   return withAiErrorHandling(() =>
     runVisionChatCompletion({
       system:
-        "You are a textile print analyst. Look at the reference photo(s) of a garment, drawing, or artwork and describe ONLY the print/pattern: its motifs, subject matter, color palette (name the actual colors you see), density/scale of the repeat, and art style (e.g. hand-painted watercolor, vector flat, engraved line art). 3-5 sentences, concrete and specific, no commentary about the garment itself (cut, fit, fabric weight).",
-      user: "Describe the print pattern shown in these reference images so it can be regenerated as a new seamless tile.",
+        "You are a textile print analyst helping an inpainting model patch a small seam in an existing piece of artwork without changing its identity. Look at the reference photo(s) and describe, in one tight sentence, ONLY the concrete visual traits an inpainting patch must match: exact motif shapes and relative size, exact color names, line/brush texture, and background tone. Do not describe the garment, do not suggest a new composition, do not use words like 'design' or 'create'.",
+      user: "Describe this print's exact visual traits so a seam-repair patch can match them precisely.",
       images: referenceImages,
-      maxTokens: 300,
+      maxTokens: 150,
     })
   );
 }
 
-/** Stage 2 — turns the real description from stage 1 into a real generated
- * image. Kept as a separate action for the same reason as stage 1 above. */
-export async function generateRepeatPrintTileAction(description: string): Promise<ActionResult<string>> {
+/** Stage 2 (GENERATING) — repairs ONLY the masked seam band produced by
+ * lib/repeat-print-canvas.ts's offset-wrap; every other pixel in
+ * `wrappedImage` is opaque in `mask` and therefore preserved untouched by
+ * the model. This — not the stage-1 description — is why the output stays
+ * the same artwork instead of becoming a new interpretation of it. */
+export async function repairSeamTileAction(wrappedImage: Blob, mask: Blob, styleDescription: string): Promise<ActionResult<string>> {
   const admin = await requireAdmin();
   if (!admin) return { success: false, error: "Admins only." };
-  if (!description.trim()) return { success: false, error: "Nothing to generate from." };
+  if (!wrappedImage || !mask) return { success: false, error: "Nothing to repair." };
 
   return withAiErrorHandling(() =>
-    generateImage({
-      prompt: `A seamless, edge-to-edge tileable repeating surface pattern, flat top-down view (not on a garment, no folds, no shadows, no mockup). ${description} The motifs must tile continuously with no visible seam or border when repeated edge-to-edge in all directions.`,
+    editImage({
+      image: wrappedImage,
+      mask,
+      prompt: `Make only the masked seam region continuous and seamless, blending the artwork on either side of it so it reads as one uninterrupted piece. Preserve everything outside the mask exactly as given: do not redraw, restyle, recolor, resize, or reinterpret any of it. Match the surrounding artwork's exact traits: ${styleDescription} Do not add new motifs, do not increase density or detail, do not change the background tone, do not simplify or beautify anything outside the seam.`,
       size: "1024x1024",
     })
   );
