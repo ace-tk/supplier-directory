@@ -104,6 +104,7 @@ model User {
   moodBoardComments MoodBoardComment[] @relation("MoodBoardCommentAuthor")
 
   repeatPrintDesigns RepeatPrintDesign[] @relation("RepeatPrintDesignOwner")
+  garmentDesigns     GarmentDesign[]     @relation("GarmentDesignOwner")
 
   passwordResetTokens PasswordResetToken[]
   workspaceMemberships WorkspaceMember[]
@@ -2423,6 +2424,50 @@ model RepeatPrintReferenceImage {
   design   RepeatPrintDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
   dataUrl  String            @db.Text
   order    Int               @default(0)
+
+  @@index([designId])
+}
+
+// ─── Module: Design Studio — AI Garment Studio ─────────────────────────
+// Admin-only. GENERATE produces a new GarmentDesign (image-conditioned —
+// the uploaded photo/sketch + optional material reference are passed
+// straight into images.edit with no mask, never a text-only description).
+// Every accepted EDIT (Change/Regenerate/Remove/Patterns/Prints-Logos/
+// Colorize) appends one real GarmentDesignVersion — never overwrites the
+// original — via a masked images.edit call, so only the user-selected
+// region is ever touched. No object storage exists in this codebase (every
+// module persists images as base64 @db.Text, see RepeatPrintDesign,
+// MoodBoardAsset, ProductDesignAttachment); this follows the same
+// convention rather than inventing a one-off storage layer.
+model GarmentDesign {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("GarmentDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name                   String  @default("Untitled Garment")
+  originalImage          String  @db.Text
+  prompt                 String?
+  materialReferenceImage String? @db.Text
+  isSaved                Boolean @default(false)
+
+  versions GarmentDesignVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model GarmentDesignVersion {
+  id       String        @id @default(cuid())
+  designId String
+  design   GarmentDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  label String
+  image String @db.Text
+  order Int    @default(0)
+
+  createdAt DateTime @default(now())
 
   @@index([designId])
 }
