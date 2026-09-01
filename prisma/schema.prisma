@@ -30,6 +30,53 @@ enum WorkspaceInviteStatus {
   CANCELLED
 }
 
+enum NotificationPreferenceCategory {
+  CRM_MESSAGES
+  TASK_ASSIGNMENTS
+  PROJECT_UPDATES
+  INVOICE_UPDATES
+  ORDER_UPDATES
+  SUPPLIER_ACTIVITY
+  BUYER_ACTIVITY
+  CAMPAIGN_ACTIVITY
+  TEAM_INVITATIONS
+  AI_DESIGN_COMPLETION
+}
+
+enum SupportRequestType {
+  TICKET
+  BUG_REPORT
+  FEATURE_REQUEST
+}
+
+enum SupportRequestCategory {
+  ACCOUNT
+  SUPPLIER_BUYER
+  CRM
+  ORDERS
+  INVOICES
+  PROJECTS
+  TEAM
+  MARKETING
+  DESIGN_STUDIO
+  TECHNICAL
+  OTHER
+}
+
+enum SupportRequestPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportRequestStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -110,6 +157,9 @@ model User {
   workspaceMemberships WorkspaceMember[]
   workspaceInvitesSent WorkspaceInvite[] @relation("WorkspaceInviteSender")
 
+  notificationPreferences NotificationPreference[]
+  supportRequests         SupportRequest[]
+
   @@index([email])
 }
 
@@ -141,6 +191,24 @@ model Workspace {
   seatLimit Int      @default(10)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // General settings
+  businessEmail   String?
+  businessPhone   String?
+  website         String?
+  country         String?
+  timezone        String?
+  defaultCurrency String?
+  dateFormat      String?
+  logoUrl         String?
+
+  // Company profile
+  legalName          String?
+  businessType       String?
+  taxId              String?
+  registeredAddress  String?
+  billingAddress     String?
+  description        String?
 
   members WorkspaceMember[]
   invites WorkspaceInvite[]
@@ -190,6 +258,48 @@ model WorkspaceInvite {
   @@index([workspaceId, email])
   @@index([workspaceId, status])
   @@index([userId])
+}
+
+/// Per-user, per-category in-app notification toggle. Only an "in-app"
+/// channel is modeled — email/WhatsApp delivery is mocked platform-wide
+/// (see lib/email-service.ts), so no channel field is added for either
+/// until real delivery exists to back it.
+model NotificationPreference {
+  id        String                          @id @default(cuid())
+  userId    String
+  user      User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  NotificationPreferenceCategory
+  inApp     Boolean                         @default(true)
+  createdAt DateTime                        @default(now())
+  updatedAt DateTime                        @updatedAt
+
+  @@unique([userId, category])
+}
+
+/// Unified support-request model backing Contact Support tickets, Report a
+/// Problem, and Feature Request — distinguished by `type` rather than three
+/// separate tables, per the same "don't duplicate architecture" principle
+/// used elsewhere in this schema.
+model SupportRequest {
+  id             String                  @id @default(cuid())
+  userId         String
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           SupportRequestType      @default(TICKET)
+  subject        String
+  category       SupportRequestCategory  @default(OTHER)
+  priority       SupportRequestPriority  @default(NORMAL)
+  description    String
+  module         String?
+  route          String?
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentSize Int?
+  status         SupportRequestStatus    @default(OPEN)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([userId, status])
+  @@index([status])
 }
 
 model Supplier {

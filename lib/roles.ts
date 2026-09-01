@@ -79,6 +79,7 @@ export function permissionForAdminHref(href: string): string | null {
   if (href.startsWith("/inventory")) return "inventory.view";
   if (href.startsWith("/shop")) return "shop.view";
   if (href.startsWith("/marketing")) return "marketing.view";
+  if (href.startsWith("/settings")) return "settings.manage";
   return null;
 }
 
@@ -204,8 +205,8 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
 ];
 
 export const ADMIN_BOTTOM_ITEMS: NavItem[] = [
-  { label: "Settings", href: "#", icon: Settings, comingSoon: true },
-  { label: "Help & Support", href: "#", icon: HelpCircle, comingSoon: true },
+  { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Help & Support", href: "/help", icon: HelpCircle },
 ];
 
 // ---------------------------------------------------------------------------
@@ -358,6 +359,20 @@ export const FREELANCER_BOTTOM_ITEMS: NavItem[] = [
 // only ever read from inside sidebar.tsx, never passed in.
 // ---------------------------------------------------------------------------
 export type PortalKey = "admin" | "buyer" | "supplier" | "freelancer";
+
+/** Which portal shell (sidebar/topnav) a role belongs in — used by shared
+ * routes outside the (dashboard) group, like /help, that render AppShell
+ * directly instead of inheriting a route group's fixed portal. */
+export function portalForRole(role: string): PortalKey {
+  const map: Partial<Record<Role, PortalKey>> = {
+    ADMIN: "admin",
+    TEAM_MEMBER: "admin",
+    BUYER: "buyer",
+    SUPPLIER: "supplier",
+    FREELANCER: "freelancer",
+  };
+  return map[role as Role] ?? "admin";
+}
 
 export const PORTAL_CONFIG: Record<PortalKey, { navGroups: NavGroup[]; bottomItems: NavItem[]; label?: string }> = {
   admin: { navGroups: ADMIN_NAV_GROUPS, bottomItems: ADMIN_BOTTOM_ITEMS },

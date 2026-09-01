@@ -3,7 +3,9 @@
     "allow": [
       "Bash(cat)",
       "Bash(node /tmp/check-db.mjs)",
-      "Bash(npx tsx *)"
+      "Bash(npx tsx *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)"
     ]
   }
 }

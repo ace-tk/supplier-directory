@@ -6,7 +6,7 @@ const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? "supplybase-dev-secret-change-in-production"
 );
 
-const PROTECTED_PREFIXES = ["/dashboard", "/projects", "/settings", "/directory", "/crm", "/shop", "/reports", "/inventory"];
+const PROTECTED_PREFIXES = ["/dashboard", "/projects", "/settings", "/help", "/directory", "/crm", "/shop", "/reports", "/inventory"];
 const AUTH_ROUTES = ["/login", "/signup", "/forgot-password"];
 
 export async function proxy(req: NextRequest) {
