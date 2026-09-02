@@ -17,6 +17,7 @@ import {
   applyPatternAction,
   applyPrintLogoAction,
   colorizeRegionAction,
+  commitGarmentEditAction,
   type GarmentDesignDetail,
 } from "@/services/garment-studio";
 
@@ -85,14 +86,36 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     toast.success("Applied");
   }
 
-  async function requireMaskedImage(): Promise<{ image: Blob; mask: Blob } | null> {
+  async function requireMaskedImage(): Promise<{ image: Blob; mask: Blob; width: number; height: number } | null> {
     if (!canvasRef.current) return null;
     if (canvasRef.current.isMaskEmpty()) {
       toast.error("Mask an area first.");
       return null;
     }
     const [image, mask] = await Promise.all([canvasRef.current.getImageBlob(), canvasRef.current.getMaskBlob()]);
-    return { image, mask };
+    const { width, height } = canvasRef.current.getDimensions();
+    return { image, mask, width, height };
+  }
+
+  /** Runs after any of the six edit-tool actions returns its raw AI
+   * result: composites it against the original (outside the mask is
+   * guaranteed to stay the original's exact pixels — see
+   * GarmentCanvas.compositeWithAiResult) BEFORE persisting anything, then
+   * commits that composited image as the new version. The raw AI response
+   * is never itself persisted or displayed. */
+  async function compositeAndCommit(result: { success: true; data: { image: string; label: string } } | { success: false; error: string }): Promise<string | null> {
+    if (!result.success) {
+      toast.error(result.error);
+      return null;
+    }
+    if (!canvasRef.current || !design) return null;
+    const composited = await canvasRef.current.compositeWithAiResult(result.data.image);
+    const commit = await commitGarmentEditAction(design.id, composited, result.data.label);
+    if (!commit.success) {
+      toast.error(commit.error);
+      return null;
+    }
+    return commit.data.versionId;
   }
 
   async function handleChangeSave() {
@@ -101,10 +124,11 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     const inputs = await requireMaskedImage();
     if (!inputs) return;
     setSaving(true);
-    const result = await changeRegionAction(design.id, inputs.image, inputs.mask, changePrompt);
+    const result = await changeRegionAction(design.id, inputs.image, inputs.mask, changePrompt, inputs.width, inputs.height);
+    const versionId = await compositeAndCommit(result);
     setSaving(false);
-    if (!result.success) return toast.error(result.error);
-    await afterApply(result.data.versionId);
+    if (!versionId) return;
+    await afterApply(versionId);
   }
 
   async function handleRegenerateSave() {
@@ -112,10 +136,11 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     const inputs = await requireMaskedImage();
     if (!inputs) return;
     setSaving(true);
-    const result = await regenerateRegionAction(design.id, inputs.image, inputs.mask, regeneratePrompt || undefined);
+    const result = await regenerateRegionAction(design.id, inputs.image, inputs.mask, regeneratePrompt || undefined, inputs.width, inputs.height);
+    const versionId = await compositeAndCommit(result);
     setSaving(false);
-    if (!result.success) return toast.error(result.error);
-    await afterApply(result.data.versionId);
+    if (!versionId) return;
+    await afterApply(versionId);
   }
 
   async function handleRemoveSave() {
@@ -123,10 +148,11 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     const inputs = await requireMaskedImage();
     if (!inputs) return;
     setSaving(true);
-    const result = await removeRegionAction(design.id, inputs.image, inputs.mask);
+    const result = await removeRegionAction(design.id, inputs.image, inputs.mask, inputs.width, inputs.height);
+    const versionId = await compositeAndCommit(result);
     setSaving(false);
-    if (!result.success) return toast.error(result.error);
-    await afterApply(result.data.versionId);
+    if (!versionId) return;
+    await afterApply(versionId);
   }
 
   async function handlePatternSave() {
@@ -135,12 +161,13 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     const inputs = await requireMaskedImage();
     if (!inputs) return;
     setSaving(true);
-    const result = await applyPatternAction(design.id, inputs.image, inputs.mask, patternFile, patternScale, patternRotation, patternBrightness);
+    const result = await applyPatternAction(design.id, inputs.image, inputs.mask, patternFile, patternScale, patternRotation, patternBrightness, inputs.width, inputs.height);
+    const versionId = await compositeAndCommit(result);
     setSaving(false);
-    if (!result.success) return toast.error(result.error);
+    if (!versionId) return;
     setPatternFile(null);
     setPatternDataUrl(null);
-    await afterApply(result.data.versionId);
+    await afterApply(versionId);
   }
 
   async function handleLogoSave() {
@@ -149,12 +176,13 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     const inputs = await requireMaskedImage();
     if (!inputs) return;
     setSaving(true);
-    const result = await applyPrintLogoAction(design.id, inputs.image, inputs.mask, logoFile, logoScale, logoRotation, logoBrightness);
+    const result = await applyPrintLogoAction(design.id, inputs.image, inputs.mask, logoFile, logoScale, logoRotation, logoBrightness, inputs.width, inputs.height);
+    const versionId = await compositeAndCommit(result);
     setSaving(false);
-    if (!result.success) return toast.error(result.error);
+    if (!versionId) return;
     setLogoFile(null);
     setLogoDataUrl(null);
-    await afterApply(result.data.versionId);
+    await afterApply(versionId);
   }
 
   async function handleColorizeSave() {
@@ -162,10 +190,11 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     const inputs = await requireMaskedImage();
     if (!inputs) return;
     setSaving(true);
-    const result = await colorizeRegionAction(design.id, inputs.image, inputs.mask, colorHex, colorBrightness);
+    const result = await colorizeRegionAction(design.id, inputs.image, inputs.mask, colorHex, colorBrightness, inputs.width, inputs.height);
+    const versionId = await compositeAndCommit(result);
     setSaving(false);
-    if (!result.success) return toast.error(result.error);
-    await afterApply(result.data.versionId);
+    if (!versionId) return;
+    await afterApply(versionId);
   }
 
   function handleDownload() {

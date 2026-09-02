@@ -139,16 +139,34 @@ async function requireDesign(id: string) {
   return db.garmentDesign.findUnique({ where: { id } });
 }
 
-/** Shared commit path for every EDIT tool: real masked images.edit call,
- * then one real GarmentDesignVersion appended — never overwrites earlier
- * versions, never regenerates outside the mask. */
-async function applyEditAndPersist(
+/** OpenAI's images.edit only accepts a few fixed sizes — requesting one
+ * that doesn't match the source's own aspect ratio forces the model to
+ * reflow/reinterpret the whole composition to fit, not just the masked
+ * region. Picking the closest real match keeps the model grounded in the
+ * source's actual framing instead of fighting a mismatched canvas. */
+function nearestSupportedSize(width: number, height: number): "1024x1024" | "1024x1536" | "1536x1024" {
+  const ratio = width / height;
+  if (ratio > 1.15) return "1536x1024";
+  if (ratio < 0.87) return "1024x1536";
+  return "1024x1024";
+}
+
+/** Shared AI-call path for every EDIT tool — deliberately does NOT persist
+ * anything. The model's raw response is an untrusted intermediate result:
+ * it is never assumed to have left pixels outside the mask untouched, no
+ * matter what the prompt requested. The caller (the editor page) must run
+ * it through GarmentCanvas.compositeWithAiResult (lib/garment-canvas.ts
+ * compositeMaskedEdit) — which deterministically rebuilds outside-mask
+ * pixels from the original — before calling commitGarmentEditAction. */
+async function runMaskedEdit(
   designId: string,
   images: Blob | Blob[],
   mask: Blob,
   prompt: string,
-  label: string
-): Promise<ActionResult<{ versionId: string; image: string }>> {
+  label: string,
+  width: number,
+  height: number
+): Promise<ActionResult<{ image: string; label: string }>> {
   const admin = await requireAdmin();
   if (!admin) return { success: false, error: "Admins only." };
 
@@ -156,37 +174,60 @@ async function applyEditAndPersist(
   if (!design) return { success: false, error: "Design not found." };
 
   return withAiErrorHandling(async () => {
-    const resultImage = await editImage({ image: images, mask, prompt, size: "1024x1024" });
-
-    const count = await db.garmentDesignVersion.count({ where: { designId } });
-    const version = await db.garmentDesignVersion.create({
-      data: { designId, label, image: resultImage, order: count },
-      select: { id: true },
-    });
-    await db.garmentDesign.update({ where: { id: designId }, data: { updatedAt: new Date() } });
-
-    return { versionId: version.id, image: resultImage };
+    const resultImage = await editImage({ image: images, mask, prompt, size: nearestSupportedSize(width, height) });
+    return { image: resultImage, label };
   });
+}
+
+/** The ONLY place a GarmentDesignVersion is created for an edit tool —
+ * shared by all six (Change/Regenerate/Remove/Patterns/Prints-Logos/
+ * Colorize). Must be called with the already client-composited final
+ * image (see runMaskedEdit's doc comment), never with a raw AI response —
+ * this function has no way to tell the difference, so that guarantee is
+ * enforced entirely by the editor page's call sequence. Never overwrites
+ * earlier versions; always appends.
+ *
+ * `image` is a Blob, not a data URL string — a multi-megabyte base64
+ * string passed as a plain Server Action argument hits a real Next.js/
+ * React Flight serialization limit ("Maximum array nesting exceeded",
+ * confirmed by testing this exact action). Converted to the data URL the
+ * DB column stores via the same blobToDataUrl used by generateGarmentAction. */
+export async function commitGarmentEditAction(designId: string, image: Blob, label: string): Promise<ActionResult<{ versionId: string }>> {
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Admins only." };
+
+  const design = await requireDesign(designId);
+  if (!design) return { success: false, error: "Design not found." };
+
+  const imageDataUrl = await blobToDataUrl(image);
+  const count = await db.garmentDesignVersion.count({ where: { designId } });
+  const version = await db.garmentDesignVersion.create({
+    data: { designId, label, image: imageDataUrl, order: count },
+    select: { id: true },
+  });
+  await db.garmentDesign.update({ where: { id: designId }, data: { updatedAt: new Date() } });
+
+  return { success: true, data: { versionId: version.id } };
 }
 
 const PRESERVE_INSTRUCTION =
   "Modify only the masked region. Preserve everything outside the mask exactly: the model/person, pose, face, other garment parts, background, lighting, and composition. Maintain realistic fabric folds, shadows, and continuity at the edges of the edit.";
 
-export async function changeRegionAction(designId: string, currentImage: Blob, mask: Blob, instruction: string): Promise<ActionResult<{ versionId: string; image: string }>> {
+export async function changeRegionAction(designId: string, currentImage: Blob, mask: Blob, instruction: string, width: number, height: number): Promise<ActionResult<{ image: string; label: string }>> {
   if (!instruction.trim()) return { success: false, error: "Describe the change you want." };
-  return applyEditAndPersist(designId, currentImage, mask, `${instruction} ${PRESERVE_INSTRUCTION}`, "Change");
+  return runMaskedEdit(designId, currentImage, mask, `${instruction} ${PRESERVE_INSTRUCTION}`, "Change", width, height);
 }
 
-export async function regenerateRegionAction(designId: string, currentImage: Blob, mask: Blob, instruction?: string): Promise<ActionResult<{ versionId: string; image: string }>> {
+export async function regenerateRegionAction(designId: string, currentImage: Blob, mask: Blob, instruction: string | undefined, width: number, height: number): Promise<ActionResult<{ image: string; label: string }>> {
   const prompt = instruction?.trim()
     ? `Generate a fresh alternative for the masked region: ${instruction}. ${PRESERVE_INSTRUCTION}`
     : `Generate a fresh alternative interpretation of the masked region, consistent with the rest of the garment's style. ${PRESERVE_INSTRUCTION}`;
-  return applyEditAndPersist(designId, currentImage, mask, prompt, "Regenerate");
+  return runMaskedEdit(designId, currentImage, mask, prompt, "Regenerate", width, height);
 }
 
-export async function removeRegionAction(designId: string, currentImage: Blob, mask: Blob): Promise<ActionResult<{ versionId: string; image: string }>> {
+export async function removeRegionAction(designId: string, currentImage: Blob, mask: Blob, width: number, height: number): Promise<ActionResult<{ image: string; label: string }>> {
   const prompt = `Remove the masked detail entirely and naturally reconstruct the underlying fabric/garment surface as if it was never there. ${PRESERVE_INSTRUCTION}`;
-  return applyEditAndPersist(designId, currentImage, mask, prompt, "Remove");
+  return runMaskedEdit(designId, currentImage, mask, prompt, "Remove", width, height);
 }
 
 export async function applyPatternAction(
@@ -196,12 +237,14 @@ export async function applyPatternAction(
   patternImage: Blob,
   scalePercent: number,
   rotationDeg: number,
-  brightnessPercent: number
-): Promise<ActionResult<{ versionId: string; image: string }>> {
+  brightnessPercent: number,
+  width: number,
+  height: number
+): Promise<ActionResult<{ image: string; label: string }>> {
   const check = checkUploadedImage(patternImage);
   if (!check.valid) return { success: false, error: check.error! };
   const prompt = `Apply the pattern shown in the second reference image to the masked region only, tiled at approximately ${Math.round(scalePercent)}% relative scale, rotated ${Math.round(rotationDeg)} degrees, at ${Math.round(brightnessPercent)}% brightness. The pattern must follow the garment's real fabric folds, shadows, and highlights — it must not look like a flat rectangle pasted on top. ${PRESERVE_INSTRUCTION}`;
-  return applyEditAndPersist(designId, [currentImage, patternImage], mask, prompt, "Apply pattern");
+  return runMaskedEdit(designId, [currentImage, patternImage], mask, prompt, "Apply pattern", width, height);
 }
 
 export async function applyPrintLogoAction(
@@ -211,12 +254,14 @@ export async function applyPrintLogoAction(
   logoImage: Blob,
   scalePercent: number,
   rotationDeg: number,
-  brightnessPercent: number
-): Promise<ActionResult<{ versionId: string; image: string }>> {
+  brightnessPercent: number,
+  width: number,
+  height: number
+): Promise<ActionResult<{ image: string; label: string }>> {
   const check = checkUploadedImage(logoImage);
   if (!check.valid) return { success: false, error: check.error! };
   const prompt = `Apply the print/logo shown in the second reference image onto the masked region only, at approximately ${Math.round(scalePercent)}% relative scale, rotated ${Math.round(rotationDeg)} degrees, at ${Math.round(brightnessPercent)}% brightness. Integrate it realistically into the garment's fabric — follow its folds, shadows and perspective, don't leave it as a flat overlay. ${PRESERVE_INSTRUCTION}`;
-  return applyEditAndPersist(designId, [currentImage, logoImage], mask, prompt, "Apply print/logo");
+  return runMaskedEdit(designId, [currentImage, logoImage], mask, prompt, "Apply print/logo", width, height);
 }
 
 export async function colorizeRegionAction(
@@ -224,10 +269,12 @@ export async function colorizeRegionAction(
   currentImage: Blob,
   mask: Blob,
   colorHex: string,
-  brightnessPercent: number
-): Promise<ActionResult<{ versionId: string; image: string }>> {
+  brightnessPercent: number,
+  width: number,
+  height: number
+): Promise<ActionResult<{ image: string; label: string }>> {
   const prompt = `Recolor the masked region to ${colorHex} at approximately ${Math.round(brightnessPercent)}% brightness. Preserve the fabric's texture, folds, shadows and highlights — do not flat-fill the region, keep it looking like real dyed fabric. ${PRESERVE_INSTRUCTION}`;
-  return applyEditAndPersist(designId, currentImage, mask, prompt, "Colorize");
+  return runMaskedEdit(designId, currentImage, mask, prompt, "Colorize", width, height);
 }
 
 export async function getGarmentDesignsAction(filter: "all" | "saved" | "edited"): Promise<ActionResult<GarmentDesignSummary[]>> {

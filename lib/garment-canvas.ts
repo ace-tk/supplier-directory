@@ -164,6 +164,25 @@ export class MaskBuffer {
     return canvasToBlob(this.canvas);
   }
 
+  /** Same selection as selectionAlpha, but with a blurred boundary — used
+   * only to soften the seam where AI-edited pixels meet preserved
+   * original pixels in the final composite (see compositeMaskedEdit). The
+   * blur radius is intentionally small and resolution-relative: the deep
+   * interior of both the selected and preserved regions stays fully
+   * opaque/transparent, so a large unmasked region is never partially
+   * blended with AI output — only the immediate boundary is feathered. */
+  selectionAlphaFeathered(featherPx: number): HTMLCanvasElement {
+    const hard = this.selectionAlpha();
+    if (featherPx <= 0) return hard;
+    const out = document.createElement("canvas");
+    out.width = hard.width;
+    out.height = hard.height;
+    const ctx = out.getContext("2d")!;
+    ctx.filter = `blur(${featherPx}px)`;
+    ctx.drawImage(hard, 0, 0);
+    return out;
+  }
+
   /** An alpha-only canvas: opaque exactly where the mask is selected
    * (transparent in the real mask), transparent elsewhere — used as a
    * destination-in clip so a preview layer only shows through the
@@ -286,6 +305,58 @@ export function renderPatternPreview(
   target.drawImage(sourceImage, 0, 0, width, height);
   target.drawImage(final, 0, 0);
   target.restore();
+}
+
+/** THE structural preservation guarantee for every masked AI edit tool
+ * (Change/Regenerate/Remove/Patterns/Prints-Logos/Colorize — all six route
+ * through this). The AI's own response is never trusted to have left
+ * unmasked pixels untouched, no matter what the prompt asked for or how
+ * the model actually behaved: this deterministically rebuilds the final
+ * image as `mask ? aiResult : original` at the source image's own pixel
+ * grid, with a small feather only at the mask boundary. A pixel more than
+ * a few px from the boundary is either exactly the original (untouched by
+ * this function) or exactly the AI's pixel — there is no path through this
+ * code where AI content can appear outside the mask.
+ *
+ * The AI's returned image is very often a different resolution/aspect
+ * ratio than the source (OpenAI's edit endpoint only accepts a few fixed
+ * square/portrait/landscape sizes) — it's resampled onto the exact
+ * original canvas grid first so every subsequent pixel operation is
+ * aligned to the same coordinate space as the mask.
+ *
+ * Returns a Blob, not a data URL string — a multi-megabyte base64 string
+ * passed as a plain Server Action argument hits a real Next.js/React
+ * Flight serialization limit ("Maximum array nesting exceeded", confirmed
+ * by testing this exact function), the same constraint documented on
+ * EditImageParams in lib/ai/openai-client.ts and PreparedTile in
+ * lib/repeat-print-canvas.ts. Blob/File use a different, binary-safe
+ * transport path that Server Actions support natively. */
+export async function compositeMaskedEdit(originalCanvas: HTMLCanvasElement, mask: MaskBuffer, aiResultDataUrl: string, featherPx?: number): Promise<Blob> {
+  const width = originalCanvas.width;
+  const height = originalCanvas.height;
+  const feather = featherPx ?? Math.max(2, Math.round(Math.min(width, height) / 300));
+
+  const aiImg = await loadImage(aiResultDataUrl);
+  const aiLayer = document.createElement("canvas");
+  aiLayer.width = width;
+  aiLayer.height = height;
+  const aiCtx = aiLayer.getContext("2d")!;
+  aiCtx.drawImage(aiImg, 0, 0, width, height);
+
+  // Clip the AI layer down to (a feathered version of) the user's mask —
+  // everywhere outside it, this layer becomes fully transparent.
+  aiCtx.globalCompositeOperation = "destination-in";
+  aiCtx.drawImage(mask.selectionAlphaFeathered(feather), 0, 0);
+  aiCtx.globalCompositeOperation = "source-over";
+
+  const result = document.createElement("canvas");
+  result.width = width;
+  result.height = height;
+  const rctx = result.getContext("2d")!;
+  rctx.drawImage(originalCanvas, 0, 0); // base: exact original pixels, everywhere
+  rctx.drawImage(aiLayer, 0, 0); // only the (feathered) masked region can override them
+
+  return canvasToBlob(result);
 }
 
 export interface ColorizePreviewParams {

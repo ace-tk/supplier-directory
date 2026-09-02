@@ -10,6 +10,7 @@ import {
   MaskBuffer,
   renderPatternPreview,
   renderColorizePreview,
+  compositeMaskedEdit,
   type MaskTool,
 } from "@/lib/garment-canvas";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,16 @@ export interface GarmentCanvasHandle {
   getMaskBlob: () => Promise<Blob>;
   isMaskEmpty: () => boolean;
   clearMask: () => void;
+  /** The canvas's current source-image pixel dimensions — pass to the
+   * server action so it can request an AI edit size matching the actual
+   * aspect ratio instead of an arbitrary hardcoded one. */
+  getDimensions: () => { width: number; height: number };
+  /** Rebuilds the AI's raw edit result against the original image so
+   * pixels outside the mask are guaranteed to be the original's exact
+   * pixels — see lib/garment-canvas.ts compositeMaskedEdit. Must be
+   * called before persisting any masked-edit result. Returns a Blob (not
+   * a data URL string) — see compositeMaskedEdit's doc comment for why. */
+  compositeWithAiResult: (aiResultDataUrl: string) => Promise<Blob>;
 }
 
 interface GarmentCanvasProps {
@@ -273,6 +284,13 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
     },
     clearMask() {
       handleClearMask();
+    },
+    getDimensions() {
+      return dimensions;
+    },
+    async compositeWithAiResult(aiResultDataUrl: string) {
+      if (!baseCanvasRef.current || !maskRef.current) throw new Error("Image not loaded yet.");
+      return compositeMaskedEdit(baseCanvasRef.current, maskRef.current, aiResultDataUrl);
     },
   }));
 
