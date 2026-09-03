@@ -158,8 +158,8 @@ export function GarmentInput({ onGenerated }: { onGenerated: (id: string) => voi
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto scrollbar-thin space-y-6 pr-1">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin space-y-6 pr-1">
         <div>
           <p className="text-sm font-semibold text-foreground mb-2">Input image</p>
           <UploadBox
@@ -179,7 +179,7 @@ export function GarmentInput({ onGenerated }: { onGenerated: (id: string) => voi
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe the garment you want to generate…"
-            className="min-h-24"
+            className="min-h-24 max-h-48 overflow-y-auto"
           />
           {suggesting && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2">

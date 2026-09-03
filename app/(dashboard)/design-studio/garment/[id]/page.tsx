@@ -267,7 +267,7 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
           <EditorSidebar active={activeTool} onSelect={setActiveTool} />
         </div>
 
-        <div className="w-[340px] shrink-0 border-r border-border bg-card overflow-hidden">
+        <div className="w-[340px] shrink-0 min-h-0 border-r border-border bg-card overflow-hidden">
           {activeTool === "change" && (
             <EditToolPanel
               toolTitle="Change the selected area"
@@ -363,7 +363,7 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 min-h-0">
           <GarmentCanvas
             ref={canvasRef}
             imageUrl={activeVersion.image}
@@ -379,7 +379,7 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
           />
         </div>
 
-        <div className="w-64 shrink-0 border-l border-border bg-card">
+        <div className="w-64 shrink-0 min-h-0 border-l border-border bg-card">
           <HistoryPanel versions={design.versions} activeVersionId={activeVersion.id} onSelect={setActiveVersionId} />
         </div>
       </div>

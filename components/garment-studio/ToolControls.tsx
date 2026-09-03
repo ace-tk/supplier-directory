@@ -136,7 +136,7 @@ export function ImageUploadStep({
 }
 
 export function PromptStep({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
-  return <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="min-h-20" />;
+  return <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="min-h-20 max-h-40 overflow-y-auto" />;
 }
 
 const COLOR_SWATCHES = ["#EF4444", "#F97316", "#EAB308", "#22C55E", "#14B8A6", "#3B82F6", "#6366F1", "#A855F7", "#EC4899", "#78716C", "#111827", "#FFFFFF"];

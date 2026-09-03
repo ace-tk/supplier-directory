@@ -36,8 +36,8 @@ export function EditToolPanel({
   const saveStepNumber = steps.length + 1;
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-5 space-y-5">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin px-5 py-5 space-y-5">
         <h2 className="text-base font-bold text-foreground">{toolTitle}</h2>
 
         {steps.map((step, i) => (
