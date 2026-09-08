@@ -1,10 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { AuthSession, SessionUser } from "@/types/auth";
-
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? "supplybase-dev-secret-change-in-production"
-);
+import { AUTH_SECRET as SECRET } from "@/lib/auth-secret";
 
 const COOKIE_NAME = "sb_session";
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 7; // 7 days

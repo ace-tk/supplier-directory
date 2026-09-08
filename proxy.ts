@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
-
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? "supplybase-dev-secret-change-in-production"
-);
+import { AUTH_SECRET as SECRET } from "@/lib/auth-secret";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/projects", "/settings", "/help", "/directory", "/crm", "/shop", "/reports", "/inventory"];
 const AUTH_ROUTES = ["/login", "/signup", "/forgot-password"];
