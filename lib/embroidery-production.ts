@@ -48,6 +48,63 @@ export const PLACEMENT_OPTIONS: PlacementOption[] = [
   { id: "custom", label: "Custom", baseWidthMm: 100, baseHeightMm: 100, previewTop: 35, previewLeft: 40 },
 ];
 
+export type GarmentTypeId = "t-shirt" | "hoodie" | "sweatshirt" | "polo" | "jacket" | "cap" | "other";
+
+export const GARMENT_TYPES: { id: GarmentTypeId; label: string }[] = [
+  { id: "t-shirt", label: "T-Shirt" },
+  { id: "hoodie", label: "Hoodie" },
+  { id: "sweatshirt", label: "Sweatshirt" },
+  { id: "polo", label: "Polo" },
+  { id: "jacket", label: "Jacket" },
+  { id: "cap", label: "Cap" },
+  { id: "other", label: "Other" },
+];
+
+/** Curated named palette for quick-adding thread colors. Real, fixed hex
+ * values — not AI-derived — used only to label/suggest, never to change
+ * output. */
+export const THREAD_COLOR_PALETTE: { name: string; hex: string }[] = [
+  { name: "Black", hex: "#111111" },
+  { name: "White", hex: "#FFFFFF" },
+  { name: "Navy", hex: "#1E3A8A" },
+  { name: "Royal Blue", hex: "#2563EB" },
+  { name: "Red", hex: "#DC2626" },
+  { name: "Burgundy", hex: "#7F1D1D" },
+  { name: "Green", hex: "#16A34A" },
+  { name: "Forest Green", hex: "#14532D" },
+  { name: "Yellow", hex: "#EAB308" },
+  { name: "Orange", hex: "#EA580C" },
+  { name: "Pink", hex: "#EC4899" },
+  { name: "Purple", hex: "#7C3AED" },
+  { name: "Brown", hex: "#78350F" },
+  { name: "Grey", hex: "#6B7280" },
+  { name: "Beige", hex: "#D6C7A1" },
+];
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Labels an arbitrary hex (from the native color picker) with its closest
+ * named color from the curated palette, purely by RGB distance — a real,
+ * deterministic computation, not an AI guess. */
+export function nearestThreadColorName(hex: string): string {
+  const [r, g, b] = hexToRgb(hex);
+  let best = THREAD_COLOR_PALETTE[0];
+  let bestDist = Infinity;
+  for (const c of THREAD_COLOR_PALETTE) {
+    const [cr, cg, cb] = hexToRgb(c.hex);
+    const dist = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = c;
+    }
+  }
+  return best.name;
+}
+
 export interface EmbroideryAnalysis {
   complexity: "Low" | "Medium" | "High";
   colors: string[];

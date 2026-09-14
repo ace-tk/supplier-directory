@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Download, FileText, Image as ImageIcon, Loader2, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { dataUrlToFile } from "@/lib/file-to-data-url";
@@ -27,20 +27,79 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   a.remove();
 }
 
-export function ProductionExportPanel({
-  name,
+/** Production Readiness — three real, deterministic checkpoints (never a
+ * claim of machine-readiness): a source artwork exists, an AI embroidery
+ * conversion exists, and a production estimate has been computed. */
+function ReadinessRow({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${done ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/30"}`} />
+      <span className={done ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+    </div>
+  );
+}
+
+export function ProductionPanel({
   analysis,
   settings,
   placement,
   sizePercent,
-  embroideryImage,
 }: {
-  name: string;
   analysis: EmbroideryAnalysis;
   settings: EmbroiderySettings;
   placement: PlacementId;
   sizePercent: number;
+}) {
+  const spec = computeProductionSpec(analysis, settings, placement, sizePercent);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Production Readiness</p>
+        <div className="space-y-1.5">
+          <ReadinessRow label="Preview Ready" done />
+          <ReadinessRow label="AI Converted" done />
+          <ReadinessRow label="Production Estimate" done />
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Specification</p>
+          <Badge variant="secondary" className="border-0 text-[10px]">
+            Estimated
+          </Badge>
+        </div>
+        <Stat label="Design Size" value={`${spec.widthMm} × ${spec.heightMm} mm`} />
+        <Stat label="Thread Colors" value={spec.threadColorCount} />
+        <Stat label="Estimated Thread Count" value={spec.threadColorCount} />
+        <Stat label="Estimated Stitch Count" value={`~${spec.estimatedStitchCount.toLocaleString()}`} />
+        <Stat label="Technique" value={spec.technique} />
+        <Stat label="Complexity" value={spec.complexity} />
+        <Stat label="Backing" value={spec.backingRecommended ? "Recommended" : "Optional"} />
+      </div>
+
+      {spec.warnings.length > 0 && (
+        <div className="space-y-1.5">
+          {spec.warnings.map((w, i) => (
+            <p key={i} className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {w}
+            </p>
+          ))}
+          <p className="text-[10px] text-muted-foreground">Estimated stitch count may differ from final machine digitization.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ExportActions({ name, embroideryImage, analysis, settings, placement, sizePercent }: {
+  name: string;
   embroideryImage: string;
+  analysis: EmbroideryAnalysis;
+  settings: EmbroiderySettings;
+  placement: PlacementId;
+  sizePercent: number;
 }) {
   const [exportingTransparent, setExportingTransparent] = useState(false);
   const spec = computeProductionSpec(analysis, settings, placement, sizePercent);
@@ -82,59 +141,29 @@ export function ProductionExportPanel({
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-semibold text-foreground">Embroidery Specification</p>
-          <Badge variant="secondary" className="border-0 text-[10px] gap-1">
-            <Info className="w-2.5 h-2.5" /> Estimated
-          </Badge>
-        </div>
-        <Stat label="Design Size" value={`${spec.widthMm} × ${spec.heightMm} mm`} />
-        <Stat label="Thread Colors" value={spec.threadColorCount} />
-        <Stat label="Estimated Stitch Count" value={`~${spec.estimatedStitchCount.toLocaleString()}`} />
-        <Stat label="Technique" value={spec.technique} />
-        <Stat label="Complexity" value={spec.complexity} />
-        <Stat label="Backing" value={spec.backingRecommended ? "Recommended" : "Optional"} />
+    <div className="space-y-2">
+      <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => downloadDataUrl(embroideryImage, `${name || "embroidery"}-preview.png`)}>
+        <ImageIcon className="w-3.5 h-3.5" /> Preview Export (PNG)
+      </Button>
+      <Button variant="outline" size="sm" className="w-full justify-start" onClick={handleTransparentExport} disabled={exportingTransparent}>
+        {exportingTransparent ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
+        {exportingTransparent ? "Removing background…" : "Transparent Artwork"}
+      </Button>
+      <Button variant="outline" size="sm" className="w-full justify-start" onClick={handleSummaryExport}>
+        <FileText className="w-3.5 h-3.5" /> Production Specification (.txt)
+      </Button>
 
-        {spec.warnings.length > 0 && (
-          <div className="mt-3 space-y-1.5">
-            {spec.warnings.map((w, i) => (
-              <p key={i} className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {w}
-              </p>
-            ))}
+      <div className="pt-2 mt-1 border-t border-border/60 space-y-1.5">
+        {["DST", "PES", "EXP"].map((format) => (
+          <div key={format} className="flex items-center justify-between text-xs text-muted-foreground/70">
+            <span className="flex items-center gap-1.5">
+              <Download className="w-3 h-3" /> {format} (machine-ready embroidery file)
+            </span>
+            <Badge variant="secondary" className="border-0 text-[10px]">
+              Coming Soon
+            </Badge>
           </div>
-        )}
-      </div>
-
-      <div>
-        <p className="text-sm font-semibold text-foreground mb-2">Export</p>
-        <div className="space-y-2">
-          <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => downloadDataUrl(embroideryImage, `${name || "embroidery"}-preview.png`)}>
-            <ImageIcon className="w-3.5 h-3.5" /> Embroidery Preview PNG
-          </Button>
-          <Button variant="outline" size="sm" className="w-full justify-start" onClick={handleTransparentExport} disabled={exportingTransparent}>
-            {exportingTransparent ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
-            {exportingTransparent ? "Removing background…" : "Transparent Artwork"}
-          </Button>
-          <Button variant="outline" size="sm" className="w-full justify-start" onClick={handleSummaryExport}>
-            <FileText className="w-3.5 h-3.5" /> Production Specification (.txt)
-          </Button>
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-border/60 space-y-1.5">
-          {["DST", "PES", "EXP"].map((format) => (
-            <div key={format} className="flex items-center justify-between text-xs text-muted-foreground/70">
-              <span className="flex items-center gap-1.5">
-                <Download className="w-3 h-3" /> {format} (machine embroidery file)
-              </span>
-              <Badge variant="secondary" className="border-0 text-[10px]">
-                Coming Soon
-              </Badge>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   );

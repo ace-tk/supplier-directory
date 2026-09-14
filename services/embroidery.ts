@@ -185,6 +185,9 @@ export interface EmbroideryDesignSummary {
   sourceImage: string;
   embroideryImage: string | null;
   placement: string;
+  isFavorite: boolean;
+  garmentType: string | null;
+  garmentColor: string | null;
   ownerName: string;
   updatedAt: string;
 }
@@ -192,6 +195,7 @@ export interface EmbroideryDesignSummary {
 export interface EmbroideryDesignDetail extends EmbroideryDesignSummary {
   analysis: EmbroideryAnalysis | null;
   settings: EmbroiderySettings | null;
+  garmentPreview: Record<string, unknown> | null;
 }
 
 export async function saveEmbroideryDesignAction(input: {
@@ -202,6 +206,13 @@ export async function saveEmbroideryDesignAction(input: {
   analysis: EmbroideryAnalysis | null;
   settings: EmbroiderySettings | null;
   placement: PlacementId;
+  /** The full quick-preview transform (scale/position/rotation/chosen
+   * garment) — kept as a generic Json-shaped record here so this service
+   * doesn't depend on a UI component's type. */
+  garmentPreview?: Record<string, unknown> | null;
+  isFavorite?: boolean;
+  garmentType?: string | null;
+  garmentColor?: string | null;
 }): Promise<ActionResult<{ id: string }>> {
   const admin = await requireAdmin();
   if (!admin) return { success: false, error: "Admins only." };
@@ -214,6 +225,10 @@ export async function saveEmbroideryDesignAction(input: {
     analysis: input.analysis as object | undefined,
     settings: input.settings as object | undefined,
     placement: input.placement,
+    ...(input.garmentPreview !== undefined ? { garmentPreview: input.garmentPreview as object | undefined } : {}),
+    ...(input.isFavorite !== undefined ? { isFavorite: input.isFavorite } : {}),
+    ...(input.garmentType !== undefined ? { garmentType: input.garmentType } : {}),
+    ...(input.garmentColor !== undefined ? { garmentColor: input.garmentColor } : {}),
   };
 
   if (input.id) {
@@ -245,6 +260,9 @@ export async function getRecentEmbroideryDesignsAction(): Promise<ActionResult<E
       sourceImage: r.sourceImage,
       embroideryImage: r.embroideryImage,
       placement: r.placement,
+      isFavorite: r.isFavorite,
+      garmentType: r.garmentType,
+      garmentColor: r.garmentColor,
       ownerName: r.owner.name,
       updatedAt: r.updatedAt.toISOString(),
     })),
@@ -273,12 +291,28 @@ export async function getEmbroideryDesignAction(id: string): Promise<ActionResul
       sourceImage: design.sourceImage,
       embroideryImage: design.embroideryImage,
       placement: design.placement,
+      isFavorite: design.isFavorite,
+      garmentType: design.garmentType,
+      garmentColor: design.garmentColor,
       ownerName: design.owner.name,
       updatedAt: design.updatedAt.toISOString(),
       analysis: (design.analysis as unknown as EmbroideryAnalysis | null) ?? null,
       settings: (design.settings as unknown as EmbroiderySettings | null) ?? null,
+      garmentPreview: (design.garmentPreview as unknown as Record<string, unknown> | null) ?? null,
     },
   };
+}
+
+/** Header "Favorite" toggle — same shape as GarmentDesign's isSaved toggle. */
+export async function toggleFavoriteEmbroideryDesignAction(id: string): Promise<ActionResult<{ isFavorite: boolean }>> {
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Admins only." };
+
+  const design = await db.embroideryDesign.findUnique({ where: { id }, select: { isFavorite: true } });
+  if (!design) return { success: false, error: "Design not found." };
+
+  const updated = await db.embroideryDesign.update({ where: { id }, data: { isFavorite: !design.isFavorite }, select: { isFavorite: true } });
+  return { success: true, data: updated };
 }
 
 export async function deleteEmbroideryDesignAction(id: string): Promise<ActionResult> {

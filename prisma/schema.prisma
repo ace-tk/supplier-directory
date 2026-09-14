@@ -2611,6 +2611,22 @@ model EmbroideryDesign {
 
   placement String @default("left-chest")
 
+  // Full garment preview transform (GarmentPreviewState: chosen garment id/
+  // image, scale, position, rotation) — placement stays its own column
+  // above for simple querying; this Json carries everything else so
+  // reopening a saved project restores the exact quick-preview layout
+  // instead of resetting Design Settings to defaults.
+  garmentPreview Json?
+
+  isFavorite Boolean @default(false)
+
+  // Garment type/color are production-reference metadata only — they do
+  // NOT swap the garment preview image (no stock mockup library exists).
+  // The visual preview still comes from an existing saved AI Garment
+  // Studio design, chosen separately.
+  garmentType  String?
+  garmentColor String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
