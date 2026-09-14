@@ -44,10 +44,10 @@ export const designStudioWorkflows: DesignStudioWorkflow[] = [
   {
     id: "print-to-embroidery",
     name: "Print → Embroidery",
-    description: "Convert a print design into an embroidery-ready file.",
+    description: "Convert artwork into an embroidery concept and preview it on a garment.",
     href: "/design-studio/print-to-embroidery",
     icon: Scissors,
-    status: "coming-soon",
+    status: "available",
   },
   {
     id: "color-variations",

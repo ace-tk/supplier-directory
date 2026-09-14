@@ -10,6 +10,8 @@ import { PatternLibraryPicker } from "@/components/garment-studio/PatternLibrary
 import { GarmentCanvas, type GarmentCanvasHandle, type PreviewConfig } from "@/components/garment-studio/GarmentCanvas";
 import { HistoryPanel } from "@/components/garment-studio/HistoryPanel";
 import { PreviewToggle, SettingSlider, ImageUploadStep, PromptStep, ColorPickerStep } from "@/components/garment-studio/ToolControls";
+import { dataUrlToFile } from "@/lib/file-to-data-url";
+import { getEmbroideryDesignAction } from "@/services/embroidery";
 import {
   getGarmentDesignAction,
   changeRegionAction,
@@ -22,14 +24,21 @@ import {
   type GarmentDesignDetail,
 } from "@/services/garment-studio";
 
-export default function GarmentEditorPage({ params }: { params: Promise<{ id: string }> }) {
+export default function GarmentEditorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tool?: string; embroideryId?: string }>;
+}) {
   const { id } = use(params);
+  const { tool: toolParam, embroideryId } = use(searchParams);
   const router = useRouter();
   const canvasRef = useRef<GarmentCanvasHandle>(null);
 
   const [design, setDesign] = useState<GarmentDesignDetail | null>(null);
   const [activeVersionId, setActiveVersionId] = useState("");
-  const [activeTool, setActiveTool] = useState<EditTool>("change");
+  const [activeTool, setActiveTool] = useState<EditTool>(toolParam === "prints-logos" ? "prints-logos" : "change");
   const [saving, setSaving] = useState(false);
 
   const [changePrompt, setChangePrompt] = useState("");
@@ -59,6 +68,23 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Hand-off from Print → Embroidery's Garment Preview ("Apply in AI
+  // Garment Studio" -> /design-studio/garment/[id]?tool=prints-logos&
+  // embroideryId=...) — the Prints/Logos tool is pre-selected above
+  // (activeTool's initial state); this loads the converted embroidery
+  // image into it, same as a manual upload would.
+  useEffect(() => {
+    if (!embroideryId) return;
+    getEmbroideryDesignAction(embroideryId).then((result) => {
+      if (!result.success || !result.data.embroideryImage) return;
+      const embroideryImage = result.data.embroideryImage;
+      dataUrlToFile(embroideryImage, `${result.data.name}.png`).then((file) => {
+        setLogoFile(file);
+        setLogoDataUrl(embroideryImage);
+      });
+    });
+  }, [embroideryId]);
 
   async function load(keepVersionId?: string) {
     const result = await getGarmentDesignAction(id);

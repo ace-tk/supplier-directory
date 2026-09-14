@@ -123,6 +123,11 @@ export interface EditImageParams {
   mask?: Blob;
   prompt: string;
   size?: "1024x1024" | "1024x1536" | "1536x1024";
+  /** Omitted by every existing caller (Garment Studio, Repeat Print) —
+   * behaves exactly as before. Only Print → Embroidery's "Transparent
+   * Artwork" export passes "transparent", using gpt-image-1's native
+   * background support instead of a second AI integration. */
+  background?: "transparent" | "opaque" | "auto";
 }
 
 /** Real image-conditioned editing/generation via the same client/API key
@@ -132,7 +137,7 @@ export interface EditImageParams {
  * without one, the whole image is used as strong conditioning for a new
  * interpretation. input_fidelity:"high" asks the model to match the
  * source as closely as possible rather than improvising. */
-export async function editImage({ image, mask, prompt, size = "1024x1024" }: EditImageParams): Promise<string> {
+export async function editImage({ image, mask, prompt, size = "1024x1024", background }: EditImageParams): Promise<string> {
   const client = getOpenAIClient();
   const images = Array.isArray(image) ? image : [image];
   const imageFiles = await Promise.all(images.map((img, i) => toFile(img, `image-${i}.png`, { type: "image/png" })));
@@ -145,6 +150,7 @@ export async function editImage({ image, mask, prompt, size = "1024x1024" }: Edi
     prompt,
     size,
     input_fidelity: "high",
+    ...(background ? { background } : {}),
   });
 
   const b64 = result.data?.[0]?.b64_json;

@@ -152,6 +152,7 @@ model User {
 
   repeatPrintDesigns RepeatPrintDesign[] @relation("RepeatPrintDesignOwner")
   garmentDesigns     GarmentDesign[]     @relation("GarmentDesignOwner")
+  embroideryDesigns  EmbroideryDesign[]  @relation("EmbroideryDesignOwner")
 
   passwordResetTokens PasswordResetToken[]
   workspaceMemberships WorkspaceMember[]
@@ -2580,4 +2581,38 @@ model GarmentDesignVersion {
   createdAt DateTime @default(now())
 
   @@index([designId])
+}
+
+// ─── Module: Design Studio — Print → Embroidery ────────────────────────
+// Admin-only. Distinct from RepeatPrintDesign (a tiled seamless-repeat
+// composition) and GarmentDesign (a versioned garment photo/edit history):
+// this is a single artwork → embroidery-concept conversion project, with
+// its AI analysis and refinement settings kept alongside it. No version
+// history is needed for V1 — refinement always re-converts from the
+// untouched sourceImage (never the prior embroidery output), so one
+// mutable row per project is sufficient and avoids drift.
+model EmbroideryDesign {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("EmbroideryDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Embroidery")
+
+  sourceImage     String  @db.Text
+  embroideryImage String? @db.Text
+
+  // AI analysis output (EmbroideryAnalysis) — kept as-is for display,
+  // never presented as anything but an AI-derived estimate.
+  analysis Json?
+
+  // Refinement settings (EmbroiderySettings): style, thread colors,
+  // detail level, outline/fill toggles.
+  settings Json?
+
+  placement String @default("left-chest")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
 }
