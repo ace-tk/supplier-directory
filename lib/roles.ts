@@ -43,8 +43,6 @@ import {
   UserSearch,
   Contact,
   Palette,
-  Grid3x3,
-  Shirt,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -148,10 +146,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   },
   {
     group: "Design Studio",
-    items: [
-      { label: "Repeat Print Maker", href: "/design-studio/repeat-print", icon: Grid3x3 },
-      { label: "AI Garment Studio", href: "/design-studio/garment", icon: Shirt },
-    ],
+    items: [{ label: "AI Design Studio", href: "/design-studio", icon: Sparkles }],
   },
   {
     group: "Commerce",

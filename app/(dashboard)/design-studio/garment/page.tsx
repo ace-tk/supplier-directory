@@ -19,10 +19,10 @@ export default function GarmentStudioHomePage() {
       <div className="flex items-center gap-3 px-5 py-3 border-b border-border bg-card shrink-0">
         <button
           type="button"
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push("/design-studio")}
           className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Dashboard
+          <ArrowLeft className="w-4 h-4" /> AI Design Studio
         </button>
       </div>
 

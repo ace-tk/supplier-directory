@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
+import { StudioNav } from "@/components/design-studio/StudioNav";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { ReferenceUploader } from "@/components/repeat-print/ReferenceUploader";
@@ -22,7 +24,12 @@ import {
 
 type Phase = "upload" | "generating" | "result";
 
-export default function RepeatPrintMakerPage() {
+export default function RepeatPrintMakerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ open?: string }>;
+}) {
+  const { open: openId } = use(searchParams);
   const [phase, setPhase] = useState<Phase>("upload");
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [stage, setStage] = useState<GenerationStage>("extracting");
@@ -41,6 +48,14 @@ export default function RepeatPrintMakerPage() {
   useEffect(() => {
     loadRecent();
   }, []);
+
+  // Deep link from Pattern Library ("Open in Repeat Print Maker" ->
+  // /design-studio/repeat-print?open=<id>) — opens the saved design once on
+  // arrival, same as clicking it in the Recent Designs grid below.
+  useEffect(() => {
+    if (openId) handleOpen(openId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId]);
 
   useEffect(() => {
     if (phase !== "generating") {
@@ -163,10 +178,13 @@ export default function RepeatPrintMakerPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Repeat Print Maker"
-        description="Create seamless repeating patterns from artwork or reference images."
-      />
+      <StudioNav />
+      <div className="mt-6">
+        <PageHeader
+          title="Repeat Print Maker"
+          description="Create seamless repeating patterns from artwork or reference images."
+        />
+      </div>
 
       {phase === "upload" && (
         <div className="max-w-xl rounded-2xl border border-border bg-card p-6">
@@ -205,6 +223,11 @@ export default function RepeatPrintMakerPage() {
       )}
 
       <RecentDesigns designs={recentDesigns} onOpen={handleOpen} onDelete={handleDelete} />
+      {recentDesigns.length > 0 && (
+        <Link href="/design-studio/pattern-library" className="mt-3 inline-block text-xs font-medium text-primary hover:underline">
+          Browse full Pattern Library →
+        </Link>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Download, Loader2 } from "lucide-react";
 import { EditorSidebar, type EditTool } from "@/components/garment-studio/EditorSidebar";
 import { EditToolPanel } from "@/components/garment-studio/EditToolPanel";
+import { PatternLibraryPicker } from "@/components/garment-studio/PatternLibraryPicker";
 import { GarmentCanvas, type GarmentCanvasHandle, type PreviewConfig } from "@/components/garment-studio/GarmentCanvas";
 import { HistoryPanel } from "@/components/garment-studio/HistoryPanel";
 import { PreviewToggle, SettingSlider, ImageUploadStep, PromptStep, ColorPickerStep } from "@/components/garment-studio/ToolControls";
@@ -295,7 +296,15 @@ export default function GarmentEditorPage({ params }: { params: Promise<{ id: st
               toolTitle="Apply pattern to selected area"
               maskInstruction="Mask an area to apply your pattern"
               extraSteps={[
-                { title: "Upload pattern", content: <ImageUploadStep dataUrl={patternDataUrl} onChange={(f, u) => { setPatternFile(f); setPatternDataUrl(u); }} /> },
+                {
+                  title: "Upload pattern",
+                  content: (
+                    <div className="space-y-2">
+                      <ImageUploadStep dataUrl={patternDataUrl} onChange={(f, u) => { setPatternFile(f); setPatternDataUrl(u); }} />
+                      <PatternLibraryPicker onSelect={(f, u) => { setPatternFile(f); setPatternDataUrl(u); }} />
+                    </div>
+                  ),
+                },
                 {
                   title: "Adjust settings",
                   content: (
