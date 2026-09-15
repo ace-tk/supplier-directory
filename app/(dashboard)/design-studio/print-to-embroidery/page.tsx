@@ -22,6 +22,7 @@ import { EditorHeader, type SaveStatus } from "@/components/embroidery/EditorHea
 import { ArtworkSourcePicker } from "@/components/embroidery/ArtworkSourcePicker";
 import { AnalysisPanel } from "@/components/embroidery/AnalysisPanel";
 import { EmbroideryStyleCards } from "@/components/embroidery/EmbroideryStyleCards";
+import { DecorationTechniqueCards } from "@/components/embroidery/DecorationTechniqueCards";
 import { ThreadColorsPanel } from "@/components/embroidery/ThreadColorsPanel";
 import { RefinePanel } from "@/components/embroidery/RefinePanel";
 import { DesignSettingsPanel } from "@/components/embroidery/DesignSettingsPanel";
@@ -35,7 +36,7 @@ import { fileToDataUrl, dataUrlToFile } from "@/lib/file-to-data-url";
 import { loadImage } from "@/lib/garment-canvas";
 import { formatRelativeTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
-import { DEFAULT_SETTINGS_FROM_ANALYSIS, type EmbroideryAnalysis, type EmbroiderySettings, type GarmentTypeId } from "@/lib/embroidery-production";
+import { DEFAULT_SETTINGS_FROM_ANALYSIS, DECORATION_TECHNIQUES, type EmbroideryAnalysis, type EmbroiderySettings, type GarmentTypeId } from "@/lib/embroidery-production";
 import {
   analyzeArtworkAction,
   convertToEmbroideryAction,
@@ -540,6 +541,7 @@ export default function PrintToEmbroideryPage({ searchParams }: { searchParams: 
             analyzing={analyzing}
             analysis={analysis}
             embroideryImage={embroideryImage}
+            onEmbroideryImageChange={markDirty(setEmbroideryImage)}
             settings={settings}
             onSettingsChange={markDirty(setSettings)}
             onRegenerate={handleConvert}
@@ -625,6 +627,7 @@ export default function PrintToEmbroideryPage({ searchParams }: { searchParams: 
             analyzing={analyzing}
             analysis={analysis}
             embroideryImage={embroideryImage}
+            onEmbroideryImageChange={markDirty(setEmbroideryImage)}
             settings={settings}
             onSettingsChange={markDirty(setSettings)}
             onRegenerate={handleConvert}
@@ -865,6 +868,7 @@ function RightPanelContent({
   analyzing,
   analysis,
   embroideryImage,
+  onEmbroideryImageChange,
   settings,
   onSettingsChange,
   onRegenerate,
@@ -879,6 +883,7 @@ function RightPanelContent({
   analyzing: boolean;
   analysis: EmbroideryAnalysis | null;
   embroideryImage: string | null;
+  onEmbroideryImageChange: (dataUrl: string) => void;
   settings: EmbroiderySettings | null;
   onSettingsChange: (s: EmbroiderySettings) => void;
   onRegenerate: () => void;
@@ -904,14 +909,28 @@ function RightPanelContent({
       </CollapsibleSection>
 
       {settings && (
+        <CollapsibleSection title="Decoration Type">
+          <DecorationTechniqueCards value={settings.technique} onChange={(id) => onSettingsChange({ ...settings, technique: id })} />
+        </CollapsibleSection>
+      )}
+
+      {settings && settings.technique === "EMBROIDERY" && (
         <CollapsibleSection title="Embroidery Style">
           <EmbroideryStyleCards value={settings.style} onChange={(id) => onSettingsChange({ ...settings, style: id })} />
         </CollapsibleSection>
       )}
 
       {settings && (
-        <CollapsibleSection title="Thread Colors" badge={<span className="text-[10px] text-muted-foreground">{settings.threadColors.length}</span>}>
-          <ThreadColorsPanel colors={settings.threadColors} onChange={(colors) => onSettingsChange({ ...settings, threadColors: colors })} />
+        <CollapsibleSection
+          title={DECORATION_TECHNIQUES[settings.technique].colorLabel}
+          badge={<span className="text-[10px] text-muted-foreground">{settings.threadColors.length}</span>}
+        >
+          <ThreadColorsPanel
+            colors={settings.threadColors}
+            onChange={(colors) => onSettingsChange({ ...settings, threadColors: colors })}
+            embroideryImage={embroideryImage}
+            onEmbroideryImageChange={onEmbroideryImageChange}
+          />
         </CollapsibleSection>
       )}
 

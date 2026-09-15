@@ -48,6 +48,85 @@ export const PLACEMENT_OPTIONS: PlacementOption[] = [
   { id: "custom", label: "Custom", baseWidthMm: 100, baseHeightMm: 100, previewTop: 35, previewLeft: 40 },
 ];
 
+/** The decoration/production method applied to the artwork. Embroidery was
+ * the only technique this module ever supported; the print techniques below
+ * reuse every other piece of state (thread/color list, placement, garment
+ * preview, save/undo/export) unchanged — only the AI guidance and the
+ * production-facing labels differ per technique (see DECORATION_TECHNIQUES). */
+export type DecorationTechnique = "EMBROIDERY" | "SCREEN_PRINT" | "HD_PRINT" | "PUFF_PRINT";
+
+export interface DecorationTechniqueConfig {
+  id: DecorationTechnique;
+  label: string;
+  description: string;
+  /** Appended to the AI conversion/refinement prompt as the surface
+   * treatment to render. Never touches artwork identity/placement/
+   * proportions — see buildConversionPrompt in services/embroidery.ts. */
+  aiGuidance: string;
+  /** Heading for the shared color list under this technique — "Thread
+   * Colors" only really describes embroidery; print techniques reuse the
+   * exact same ThreadColor state as a color/Pantone reference instead. */
+  colorLabel: string;
+  /** Shown in the Production panel / export as "Decoration Technique: <label>". */
+  productionLabel: string;
+  /** Print techniques only — an honest, non-embroidery production note
+   * (see computePrintProductionSpec). Embroidery keeps its own real
+   * stitch/backing estimate from computeProductionSpec instead. */
+  productionNote?: string;
+}
+
+export const DECORATION_TECHNIQUES: Record<DecorationTechnique, DecorationTechniqueConfig> = {
+  EMBROIDERY: {
+    id: "EMBROIDERY",
+    label: "Embroidery",
+    description: "Stitched embroidery concept with thread texture and depth.",
+    aiGuidance:
+      "Render it as if machine-embroidered on fabric: visible thread texture, stitched edges, raised fill areas, subtle embroidery depth and realistic thread sheen.",
+    colorLabel: "Thread Colors",
+    productionLabel: "Embroidery",
+  },
+  SCREEN_PRINT: {
+    id: "SCREEN_PRINT",
+    label: "Screen Print",
+    description: "Flat ink print with clean solid shapes and crisp edges.",
+    aiGuidance:
+      "Render it as a realistic screen-printed design: flat ink appearance, clean solid shapes, crisp edges, limited/controlled color separations, ink sitting on the fabric surface. Do not add embroidery stitching, thread/fiber texture, or a raised 3D puff effect.",
+    colorLabel: "Print Colors",
+    productionLabel: "Screen Print",
+    productionNote:
+      "Estimated color separations are based on the selected colors — not a certified print-ready separation file.",
+  },
+  HD_PRINT: {
+    id: "HD_PRINT",
+    label: "HD Print",
+    description: "High-resolution, detailed print with crisp typography.",
+    aiGuidance:
+      "Render it as a high-resolution, highly detailed printed design: sharp fine details, crisp typography, smooth gradients where appropriate, realistic ink/print texture integrated with the fabric. Do not render this as embroidery, a raised/puff print, or stitching.",
+    colorLabel: "Print Colors",
+    productionLabel: "HD Print",
+    productionNote: "High-resolution detail is a rendering treatment — actual print resolution depends on your production printer/RIP workflow.",
+  },
+  PUFF_PRINT: {
+    id: "PUFF_PRINT",
+    label: "Puff Print",
+    description: "Raised, dimensional print with a soft 3D foam effect.",
+    aiGuidance:
+      "Render it as a raised, dimensional puff-print design: a soft 3D foam effect, elevated soft edges, and realistic shadows/highlights caused by the raised ink sitting above the fabric surface. This is still a print, not embroidery — do not generate stitches, thread patterns, or a woven fabric texture.",
+    colorLabel: "Print Colors",
+    productionLabel: "Puff Print",
+    productionNote: "Raised/puff surface effect is a rendering treatment — actual foam height and finish depend on your production puff-print process.",
+  },
+};
+
+export const DEFAULT_DECORATION_TECHNIQUE: DecorationTechnique = "EMBROIDERY";
+
+/** Old saved settings predate this field entirely; anything else unrecognized
+ * also falls back to Embroidery — the only technique this module supported
+ * before this feature, so it's the correct default for both cases. */
+export function normalizeDecorationTechnique(raw: unknown): DecorationTechnique {
+  return raw === "SCREEN_PRINT" || raw === "HD_PRINT" || raw === "PUFF_PRINT" || raw === "EMBROIDERY" ? raw : DEFAULT_DECORATION_TECHNIQUE;
+}
+
 export type GarmentTypeId = "t-shirt" | "hoodie" | "sweatshirt" | "polo" | "jacket" | "cap" | "other";
 
 export const GARMENT_TYPES: { id: GarmentTypeId; label: string }[] = [
@@ -136,6 +215,7 @@ export interface ThreadColor {
 export const MAX_THREAD_COLORS = 12;
 
 export interface EmbroiderySettings {
+  technique: DecorationTechnique;
   style: EmbroideryStyleId;
   threadColors: ThreadColor[];
   detailLevel: number; // 0-100, 0 = maximally simplified
@@ -144,6 +224,7 @@ export interface EmbroiderySettings {
 }
 
 export const DEFAULT_SETTINGS_FROM_ANALYSIS = (analysis: EmbroideryAnalysis): EmbroiderySettings => ({
+  technique: DEFAULT_DECORATION_TECHNIQUE,
   style: "standard",
   threadColors: analysis.colors.slice(0, 8).map((hex) => ({ hex })),
   detailLevel: analysis.complexity === "High" ? 40 : analysis.complexity === "Medium" ? 60 : 80,
@@ -179,8 +260,9 @@ export function normalizeThreadColors(raw: unknown): ThreadColor[] {
  * normalizeThreadColors, applied to the whole settings object. */
 export function normalizeEmbroiderySettings(raw: unknown): EmbroiderySettings | null {
   if (!raw || typeof raw !== "object") return null;
-  const r = raw as Partial<EmbroiderySettings> & { threadColors?: unknown };
+  const r = raw as Partial<EmbroiderySettings> & { threadColors?: unknown; technique?: unknown };
   return {
+    technique: normalizeDecorationTechnique(r.technique),
     style: (r.style as EmbroideryStyleId) ?? "standard",
     threadColors: normalizeThreadColors(r.threadColors),
     detailLevel: typeof r.detailLevel === "number" ? r.detailLevel : 60,
@@ -219,16 +301,22 @@ const STITCH_DENSITY_PER_MM2: Record<ProductionSpec["complexity"], number> = {
   High: 16,
 };
 
+/** Shared by both computeProductionSpec (embroidery) and
+ * computePrintProductionSpec (print techniques) — placement/size math is
+ * generic, not embroidery-specific. */
+export function computeDesignSizeMm(placement: PlacementId, sizePercent: number): { widthMm: number; heightMm: number } {
+  const base = PLACEMENT_OPTIONS.find((p) => p.id === placement) ?? PLACEMENT_OPTIONS[0];
+  const scale = sizePercent / 100;
+  return { widthMm: Math.round(base.baseWidthMm * scale), heightMm: Math.round(base.baseHeightMm * scale) };
+}
+
 export function computeProductionSpec(
   analysis: EmbroideryAnalysis,
   settings: EmbroiderySettings,
   placement: PlacementId,
   sizePercent: number
 ): ProductionSpec {
-  const base = PLACEMENT_OPTIONS.find((p) => p.id === placement) ?? PLACEMENT_OPTIONS[0];
-  const scale = sizePercent / 100;
-  const widthMm = Math.round(base.baseWidthMm * scale);
-  const heightMm = Math.round(base.baseHeightMm * scale);
+  const { widthMm, heightMm } = computeDesignSizeMm(placement, sizePercent);
 
   // Detail Level pulls estimated density toward the next complexity tier in
   // either direction, reflecting that more simplification (lower detail)
@@ -268,5 +356,30 @@ export function computeProductionSpec(
     complexity,
     backingRecommended,
     warnings,
+  };
+}
+
+export interface PrintProductionSpec {
+  decorationTechnique: DecorationTechnique;
+  widthMm: number;
+  heightMm: number;
+  colorCount: number;
+  note: string;
+}
+
+/** Production info for the print techniques (Screen Print / HD Print / Puff
+ * Print) — deliberately much smaller than computeProductionSpec: there's no
+ * real stitch/backing estimate for a print, and this app doesn't fabricate
+ * one. Only size (generic placement math, same as embroidery) and the
+ * selected color count are genuinely derivable; everything else is a single
+ * honest, technique-specific note (see DECORATION_TECHNIQUES). */
+export function computePrintProductionSpec(settings: EmbroiderySettings, placement: PlacementId, sizePercent: number): PrintProductionSpec {
+  const { widthMm, heightMm } = computeDesignSizeMm(placement, sizePercent);
+  return {
+    decorationTechnique: settings.technique,
+    widthMm,
+    heightMm,
+    colorCount: settings.threadColors.length,
+    note: DECORATION_TECHNIQUES[settings.technique].productionNote ?? "",
   };
 }

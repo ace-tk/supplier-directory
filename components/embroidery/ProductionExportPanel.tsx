@@ -7,7 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { dataUrlToFile } from "@/lib/file-to-data-url";
 import { exportTransparentArtworkAction } from "@/services/embroidery";
-import { computeProductionSpec, describeThreadColor, type EmbroideryAnalysis, type EmbroiderySettings, type PlacementId } from "@/lib/embroidery-production";
+import {
+  computeProductionSpec,
+  computePrintProductionSpec,
+  describeThreadColor,
+  DECORATION_TECHNIQUES,
+  type EmbroideryAnalysis,
+  type EmbroiderySettings,
+  type PlacementId,
+} from "@/lib/embroidery-production";
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -39,6 +47,65 @@ function ReadinessRow({ label, done }: { label: string; done: boolean }) {
   );
 }
 
+function ThreadColorList({ settings }: { settings: EmbroiderySettings }) {
+  if (settings.threadColors.length === 0) return null;
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">{DECORATION_TECHNIQUES[settings.technique].colorLabel}</p>
+      <div className="space-y-1">
+        {settings.threadColors.map((c, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <span className="w-3.5 h-3.5 rounded-full border border-border shrink-0" style={{ backgroundColor: c.hex }} />
+            <span className="text-foreground truncate">{describeThreadColor(c)}</span>
+          </div>
+        ))}
+      </div>
+      {settings.threadColors.some((c) => c.pantoneCode) && (
+        <p className="mt-1.5 text-[10px] text-muted-foreground">Digital color values are screen approximations and should not be treated as a physical Pantone standard.</p>
+      )}
+    </div>
+  );
+}
+
+/** Screen Print / HD Print / Puff Print — deliberately smaller than the
+ * embroidery specification below: no stitch/backing estimate exists for a
+ * print, and this app doesn't fabricate one (see computePrintProductionSpec). */
+function PrintProductionPanel({ settings, placement, sizePercent }: { settings: EmbroiderySettings; placement: PlacementId; sizePercent: number }) {
+  const config = DECORATION_TECHNIQUES[settings.technique];
+  const spec = computePrintProductionSpec(settings, placement, sizePercent);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Production Readiness</p>
+        <div className="space-y-1.5">
+          <ReadinessRow label="Preview Ready" done />
+          <ReadinessRow label="AI Converted" done />
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Specification</p>
+          <Badge variant="secondary" className="border-0 text-[10px]">
+            Estimated
+          </Badge>
+        </div>
+        <Stat label="Decoration Technique" value={config.productionLabel} />
+        <Stat label="Print Size" value={`${spec.widthMm} × ${spec.heightMm} mm`} />
+        <Stat label="Color References" value={spec.colorCount} />
+      </div>
+
+      <ThreadColorList settings={settings} />
+
+      {spec.note && <p className="text-[10px] text-muted-foreground">{spec.note}</p>}
+      <p className="text-[10px] text-muted-foreground">
+        This app does not generate production-ready print separation, RIP, or manufacturing files — treat this as a design/creative reference only.
+      </p>
+    </div>
+  );
+}
+
 export function ProductionPanel({
   analysis,
   settings,
@@ -50,6 +117,10 @@ export function ProductionPanel({
   placement: PlacementId;
   sizePercent: number;
 }) {
+  if (settings.technique !== "EMBROIDERY") {
+    return <PrintProductionPanel settings={settings} placement={placement} sizePercent={sizePercent} />;
+  }
+
   const spec = computeProductionSpec(analysis, settings, placement, sizePercent);
 
   return (
@@ -70,6 +141,7 @@ export function ProductionPanel({
             Estimated
           </Badge>
         </div>
+        <Stat label="Decoration Technique" value={DECORATION_TECHNIQUES[settings.technique].productionLabel} />
         <Stat label="Design Size" value={`${spec.widthMm} × ${spec.heightMm} mm`} />
         <Stat label="Thread Colors" value={spec.threadColorCount} />
         <Stat label="Estimated Thread Count" value={spec.threadColorCount} />
@@ -79,22 +151,7 @@ export function ProductionPanel({
         <Stat label="Backing" value={spec.backingRecommended ? "Recommended" : "Optional"} />
       </div>
 
-      {settings.threadColors.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Thread Colors</p>
-          <div className="space-y-1">
-            {settings.threadColors.map((c, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <span className="w-3.5 h-3.5 rounded-full border border-border shrink-0" style={{ backgroundColor: c.hex }} />
-                <span className="text-foreground truncate">{describeThreadColor(c)}</span>
-              </div>
-            ))}
-          </div>
-          {settings.threadColors.some((c) => c.pantoneCode) && (
-            <p className="mt-1.5 text-[10px] text-muted-foreground">Digital color values are screen approximations and should not be treated as a physical Pantone standard.</p>
-          )}
-        </div>
-      )}
+      <ThreadColorList settings={settings} />
 
       {spec.warnings.length > 0 && (
         <div className="space-y-1.5">
@@ -119,7 +176,7 @@ export function ExportActions({ name, embroideryImage, analysis, settings, place
   sizePercent: number;
 }) {
   const [exportingTransparent, setExportingTransparent] = useState(false);
-  const spec = computeProductionSpec(analysis, settings, placement, sizePercent);
+  const isEmbroidery = settings.technique === "EMBROIDERY";
 
   async function handleTransparentExport() {
     setExportingTransparent(true);
@@ -137,22 +194,44 @@ export function ExportActions({ name, embroideryImage, analysis, settings, place
   }
 
   function handleSummaryExport() {
-    const lines = [
-      `EMBROIDERY SPECIFICATION — ${name || "Untitled Embroidery"}`,
-      "",
-      `Design Size: ${spec.widthMm} x ${spec.heightMm} mm`,
-      `Thread Colors: ${spec.threadColorCount}`,
-      ...settings.threadColors.map((c, i) => `  ${i + 1}. ${describeThreadColor(c)}`),
-      `Estimated Stitch Count: ~${spec.estimatedStitchCount.toLocaleString()} (estimated)`,
-      `Technique: ${spec.technique}`,
-      `Complexity: ${spec.complexity} (AI estimate)`,
-      `Backing: ${spec.backingRecommended ? "Recommended" : "Optional"}`,
-      "",
-      ...(spec.warnings.length ? ["Warnings:", ...spec.warnings.map((w) => `- ${w}`)] : []),
-      ...(settings.threadColors.some((c) => c.pantoneCode) ? ["", "Digital color values are screen approximations and should not be treated as a physical Pantone standard."] : []),
-      "",
-      "Note: stitch count and complexity are AI/heuristic estimates, not output from a machine embroidery digitization engine.",
-    ];
+    const decorationLine = `Decoration Technique: ${DECORATION_TECHNIQUES[settings.technique].productionLabel}`;
+    const lines = isEmbroidery
+      ? (() => {
+          const spec = computeProductionSpec(analysis, settings, placement, sizePercent);
+          return [
+            `EMBROIDERY SPECIFICATION — ${name || "Untitled Embroidery"}`,
+            "",
+            decorationLine,
+            `Design Size: ${spec.widthMm} x ${spec.heightMm} mm`,
+            `Thread Colors: ${spec.threadColorCount}`,
+            ...settings.threadColors.map((c, i) => `  ${i + 1}. ${describeThreadColor(c)}`),
+            `Estimated Stitch Count: ~${spec.estimatedStitchCount.toLocaleString()} (estimated)`,
+            `Technique: ${spec.technique}`,
+            `Complexity: ${spec.complexity} (AI estimate)`,
+            `Backing: ${spec.backingRecommended ? "Recommended" : "Optional"}`,
+            "",
+            ...(spec.warnings.length ? ["Warnings:", ...spec.warnings.map((w) => `- ${w}`)] : []),
+            ...(settings.threadColors.some((c) => c.pantoneCode) ? ["", "Digital color values are screen approximations and should not be treated as a physical Pantone standard."] : []),
+            "",
+            "Note: stitch count and complexity are AI/heuristic estimates, not output from a machine embroidery digitization engine.",
+          ];
+        })()
+      : (() => {
+          const spec = computePrintProductionSpec(settings, placement, sizePercent);
+          return [
+            `PRODUCTION SPECIFICATION — ${name || "Untitled Design"}`,
+            "",
+            decorationLine,
+            `Print Size: ${spec.widthMm} x ${spec.heightMm} mm`,
+            `Color References: ${spec.colorCount}`,
+            ...settings.threadColors.map((c, i) => `  ${i + 1}. ${describeThreadColor(c)}`),
+            "",
+            ...(spec.note ? [spec.note] : []),
+            ...(settings.threadColors.some((c) => c.pantoneCode) ? ["Digital color values are screen approximations and should not be treated as a physical Pantone standard."] : []),
+            "",
+            "Note: this app does not generate production-ready print separation, RIP, or manufacturing files — treat this as a design/creative reference only.",
+          ];
+        })();
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     downloadDataUrl(url, `${name || "embroidery"}-spec.txt`);
@@ -172,18 +251,20 @@ export function ExportActions({ name, embroideryImage, analysis, settings, place
         <FileText className="w-3.5 h-3.5" /> Production Specification (.txt)
       </Button>
 
-      <div className="pt-2 mt-1 border-t border-border/60 space-y-1.5">
-        {["DST", "PES", "EXP"].map((format) => (
-          <div key={format} className="flex items-center justify-between text-xs text-muted-foreground/70">
-            <span className="flex items-center gap-1.5">
-              <Download className="w-3 h-3" /> {format} (machine-ready embroidery file)
-            </span>
-            <Badge variant="secondary" className="border-0 text-[10px]">
-              Coming Soon
-            </Badge>
-          </div>
-        ))}
-      </div>
+      {isEmbroidery && (
+        <div className="pt-2 mt-1 border-t border-border/60 space-y-1.5">
+          {["DST", "PES", "EXP"].map((format) => (
+            <div key={format} className="flex items-center justify-between text-xs text-muted-foreground/70">
+              <span className="flex items-center gap-1.5">
+                <Download className="w-3 h-3" /> {format} (machine-ready embroidery file)
+              </span>
+              <Badge variant="secondary" className="border-0 text-[10px]">
+                Coming Soon
+              </Badge>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

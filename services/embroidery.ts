@@ -19,6 +19,7 @@ import {
   type EmbroiderySettings,
   type PlacementId,
   EMBROIDERY_STYLES,
+  DECORATION_TECHNIQUES,
   describeThreadColor,
   normalizeEmbroiderySettings,
 } from "@/lib/embroidery-production";
@@ -111,7 +112,40 @@ export async function analyzeArtworkAction(artworkDataUrl: string): Promise<Acti
   });
 }
 
+/** Non-embroidery (Screen Print / HD Print / Puff Print) prompt — same
+ * preserve-the-artwork contract and same color-note wording as embroidery,
+ * only the technique-specific rendering guidance differs (DECORATION_TECHNIQUES). */
+function buildPrintConversionPrompt(settings: EmbroiderySettings): string {
+  const config = DECORATION_TECHNIQUES[settings.technique];
+  const detailNote =
+    settings.detailLevel < 40
+      ? "Simplify fine details and small elements significantly — merge thin lines and tiny shapes into cleaner, bolder forms."
+      : settings.detailLevel > 80
+        ? "Preserve as much fine detail as the technique realistically allows."
+        : "Simplify only the finest details that would be impractical to reproduce cleanly at this size.";
+  const outlineNote = settings.outline ? "Give major shapes a clean, crisp printed outline/edge." : "Do not add a distinct outline around shapes.";
+  const fillNote = settings.fill ? "Fill solid areas with an even, flat color fill." : "Keep fills light, avoiding dense flat color coverage.";
+  const colorNote = settings.threadColors.length
+    ? `Use this color palette: ${settings.threadColors.map(describeThreadColor).join("; ")}. Where a Pantone code/name is given, it is the intended color reference — the accompanying hex is only a digital screen approximation, not an exact physical match.`
+    : "";
+
+  return [
+    `Convert this artwork into a realistic ${config.label.toLowerCase()} concept on fabric.`,
+    "Preserve the original artwork's composition, logo identity, major shapes, any text, and color relationships as closely as possible — this must remain recognizably the same design, not a new interpretation.",
+    config.aiGuidance,
+    detailNote,
+    outlineNote,
+    fillNote,
+    colorNote,
+    "Show the design on a plain neutral background, not on a garment.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function buildConversionPrompt(settings: EmbroiderySettings): string {
+  if (settings.technique !== "EMBROIDERY") return buildPrintConversionPrompt(settings);
+
   const technique = EMBROIDERY_STYLES.find((s) => s.id === settings.style)?.technique ?? "Satin + Fill";
   const detailNote =
     settings.detailLevel < 40

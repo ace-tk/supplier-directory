@@ -398,3 +398,87 @@ export function renderColorizePreview(
   target.drawImage(final, 0, 0);
   target.restore();
 }
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function clamp255(n: number): number {
+  return Math.max(0, Math.min(255, Math.round(n)));
+}
+
+// Quick Color Swap tuning — kept in one place rather than scattered magic
+// numbers. TOLERANCE: pixels within this RGB distance of the picked thread
+// color are fully swapped. FALLOFF: an additional band beyond that where the
+// swap blends in proportionally instead of a hard cutoff, so anti-aliased
+// edges between this thread color and its neighbors stay smooth instead of
+// getting a visible seam.
+const SWAP_TOLERANCE = 42;
+const SWAP_FALLOFF = 24;
+
+export interface ThreadColorSwapResult {
+  dataUrl: string;
+  /** False when no pixel was close enough to `fromHex` to change — the
+   * caller should report "color not found" and leave everything else as-is. */
+  matched: boolean;
+}
+
+/**
+ * Print → Embroidery "Quick Color Swap" — a real, deterministic, non-AI
+ * recolor of the already-generated embroidery preview image. Only pixels
+ * close to `fromHex` are touched (a color-distance threshold, softened by
+ * SWAP_FALLOFF so anti-aliased edges blend rather than getting a hard seam);
+ * every other color, the artwork's shape, and the design's transparency are
+ * left completely untouched. Each matched pixel keeps its own lightness
+ * relative to `fromHex` (the AI-rendered thread shading/texture at that
+ * pixel) and re-applies it to `toHex`, instead of flatly overwriting it —
+ * same idea as this file's other real Canvas 2D recolor (renderColorizePreview),
+ * applied per-pixel instead of as a full-layer blend since only one thread
+ * color, not the whole image, should change.
+ */
+export async function swapThreadColor(imageDataUrl: string, fromHex: string, toHex: string): Promise<ThreadColorSwapResult> {
+  const img = await loadImage(imageDataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas isn't supported in this browser.");
+  ctx.drawImage(img, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+  const [fr, fg, fb] = hexToRgb(fromHex);
+  const [tr, tg, tb] = hexToRgb(toHex);
+
+  let matched = false;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue; // fully transparent pixel — never touched
+
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const dist = Math.sqrt((r - fr) ** 2 + (g - fg) ** 2 + (b - fb) ** 2);
+    if (dist >= SWAP_TOLERANCE + SWAP_FALLOFF) continue;
+
+    const weight = dist <= SWAP_TOLERANCE ? 1 : 1 - (dist - SWAP_TOLERANCE) / SWAP_FALLOFF;
+    matched = true;
+
+    const delta = (r - fr + (g - fg) + (b - fb)) / 3;
+    const nr = clamp255(tr + delta);
+    const ng = clamp255(tg + delta);
+    const nb = clamp255(tb + delta);
+
+    data[i] = Math.round(r + (nr - r) * weight);
+    data[i + 1] = Math.round(g + (ng - g) * weight);
+    data[i + 2] = Math.round(b + (nb - b) * weight);
+    // alpha untouched — transparency preserved exactly.
+  }
+
+  if (!matched) return { dataUrl: imageDataUrl, matched: false };
+
+  ctx.putImageData(imageData, 0, 0);
+  return { dataUrl: canvasToDataUrl(canvas), matched: true };
+}
