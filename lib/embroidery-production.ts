@@ -118,9 +118,26 @@ export interface EmbroideryAnalysis {
   recommendations: string[];
 }
 
+/** A single thread color. `pantone*` fields are optional so plain
+ * hex-only threads (native color picker, curated palette) keep working
+ * unchanged — only colors added via the Pantone Shade Picker carry them. */
+export interface ThreadColor {
+  hex: string;
+  pantoneCode?: string;
+  pantoneName?: string;
+  /** Fashion, Home + Interiors system — the only Pantone system this app curates. */
+  pantoneSystem?: "FHI";
+  /** Textile Paper Cotton. */
+  pantoneSuffix?: "TCX";
+}
+
+/** No prior limit existed on thread-color count; kept here as the single
+ * place to tune it rather than an arbitrary check scattered across the UI. */
+export const MAX_THREAD_COLORS = 12;
+
 export interface EmbroiderySettings {
   style: EmbroideryStyleId;
-  threadColors: string[];
+  threadColors: ThreadColor[];
   detailLevel: number; // 0-100, 0 = maximally simplified
   outline: boolean;
   fill: boolean;
@@ -128,11 +145,59 @@ export interface EmbroiderySettings {
 
 export const DEFAULT_SETTINGS_FROM_ANALYSIS = (analysis: EmbroideryAnalysis): EmbroiderySettings => ({
   style: "standard",
-  threadColors: analysis.colors.slice(0, 8),
+  threadColors: analysis.colors.slice(0, 8).map((hex) => ({ hex })),
   detailLevel: analysis.complexity === "High" ? 40 : analysis.complexity === "Medium" ? 60 : 80,
   outline: true,
   fill: true,
 });
+
+/** Accepts either the current ThreadColor[] shape or the old plain
+ * hex-string[] shape (pre-Pantone saved designs) and returns the current
+ * shape — so old EmbroideryDesign rows keep loading without a migration. */
+export function normalizeThreadColors(raw: unknown): ThreadColor[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ThreadColor[] = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      out.push({ hex: item });
+    } else if (item && typeof item === "object" && typeof (item as { hex?: unknown }).hex === "string") {
+      const c = item as Partial<ThreadColor>;
+      out.push({
+        hex: c.hex!,
+        ...(c.pantoneCode ? { pantoneCode: c.pantoneCode } : {}),
+        ...(c.pantoneName ? { pantoneName: c.pantoneName } : {}),
+        ...(c.pantoneSystem ? { pantoneSystem: c.pantoneSystem } : {}),
+        ...(c.pantoneSuffix ? { pantoneSuffix: c.pantoneSuffix } : {}),
+      });
+    }
+  }
+  return out;
+}
+
+/** Normalizes an EmbroiderySettings blob read back from the (Json)
+ * database column — same backward-compatibility purpose as
+ * normalizeThreadColors, applied to the whole settings object. */
+export function normalizeEmbroiderySettings(raw: unknown): EmbroiderySettings | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Partial<EmbroiderySettings> & { threadColors?: unknown };
+  return {
+    style: (r.style as EmbroideryStyleId) ?? "standard",
+    threadColors: normalizeThreadColors(r.threadColors),
+    detailLevel: typeof r.detailLevel === "number" ? r.detailLevel : 60,
+    outline: r.outline !== undefined ? Boolean(r.outline) : true,
+    fill: r.fill !== undefined ? Boolean(r.fill) : true,
+  };
+}
+
+/** How a single thread color should read in an AI prompt or an exported
+ * production spec: Pantone code/name is the intended textile reference,
+ * hex is only ever a screen approximation — never claimed as an exact
+ * physical match. */
+export function describeThreadColor(c: ThreadColor): string {
+  return c.pantoneCode
+    ? `${c.pantoneCode}${c.pantoneSuffix ? ` ${c.pantoneSuffix}` : ""} — ${c.pantoneName ?? "Unnamed"} (digital approx. ${c.hex})`
+    : c.hex;
+}
 
 export interface ProductionSpec {
   widthMm: number;

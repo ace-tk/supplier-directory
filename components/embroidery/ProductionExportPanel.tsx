@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { dataUrlToFile } from "@/lib/file-to-data-url";
 import { exportTransparentArtworkAction } from "@/services/embroidery";
-import { computeProductionSpec, type EmbroideryAnalysis, type EmbroiderySettings, type PlacementId } from "@/lib/embroidery-production";
+import { computeProductionSpec, describeThreadColor, type EmbroideryAnalysis, type EmbroiderySettings, type PlacementId } from "@/lib/embroidery-production";
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -79,6 +79,23 @@ export function ProductionPanel({
         <Stat label="Backing" value={spec.backingRecommended ? "Recommended" : "Optional"} />
       </div>
 
+      {settings.threadColors.length > 0 && (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Thread Colors</p>
+          <div className="space-y-1">
+            {settings.threadColors.map((c, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className="w-3.5 h-3.5 rounded-full border border-border shrink-0" style={{ backgroundColor: c.hex }} />
+                <span className="text-foreground truncate">{describeThreadColor(c)}</span>
+              </div>
+            ))}
+          </div>
+          {settings.threadColors.some((c) => c.pantoneCode) && (
+            <p className="mt-1.5 text-[10px] text-muted-foreground">Digital color values are screen approximations and should not be treated as a physical Pantone standard.</p>
+          )}
+        </div>
+      )}
+
       {spec.warnings.length > 0 && (
         <div className="space-y-1.5">
           {spec.warnings.map((w, i) => (
@@ -125,12 +142,14 @@ export function ExportActions({ name, embroideryImage, analysis, settings, place
       "",
       `Design Size: ${spec.widthMm} x ${spec.heightMm} mm`,
       `Thread Colors: ${spec.threadColorCount}`,
+      ...settings.threadColors.map((c, i) => `  ${i + 1}. ${describeThreadColor(c)}`),
       `Estimated Stitch Count: ~${spec.estimatedStitchCount.toLocaleString()} (estimated)`,
       `Technique: ${spec.technique}`,
       `Complexity: ${spec.complexity} (AI estimate)`,
       `Backing: ${spec.backingRecommended ? "Recommended" : "Optional"}`,
       "",
       ...(spec.warnings.length ? ["Warnings:", ...spec.warnings.map((w) => `- ${w}`)] : []),
+      ...(settings.threadColors.some((c) => c.pantoneCode) ? ["", "Digital color values are screen approximations and should not be treated as a physical Pantone standard."] : []),
       "",
       "Note: stitch count and complexity are AI/heuristic estimates, not output from a machine embroidery digitization engine.",
     ];

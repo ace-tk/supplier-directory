@@ -19,6 +19,8 @@ import {
   type EmbroiderySettings,
   type PlacementId,
   EMBROIDERY_STYLES,
+  describeThreadColor,
+  normalizeEmbroiderySettings,
 } from "@/lib/embroidery-production";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
@@ -120,7 +122,7 @@ function buildConversionPrompt(settings: EmbroiderySettings): string {
   const outlineNote = settings.outline ? "Give major shapes a clear stitched outline/edge." : "Do not add a distinct outline stitch around shapes.";
   const fillNote = settings.fill ? "Fill solid areas with visible directional thread texture." : "Keep fills light, avoiding dense thread fill.";
   const colorNote = settings.threadColors.length
-    ? `Render using approximately this thread color palette: ${settings.threadColors.join(", ")}.`
+    ? `Use this thread color palette: ${settings.threadColors.map(describeThreadColor).join("; ")}. Where a Pantone code/name is given, it is the intended textile thread reference — the accompanying hex is only a digital screen approximation, not an exact physical match.`
     : "";
 
   return [
@@ -297,7 +299,7 @@ export async function getEmbroideryDesignAction(id: string): Promise<ActionResul
       ownerName: design.owner.name,
       updatedAt: design.updatedAt.toISOString(),
       analysis: (design.analysis as unknown as EmbroideryAnalysis | null) ?? null,
-      settings: (design.settings as unknown as EmbroiderySettings | null) ?? null,
+      settings: normalizeEmbroiderySettings(design.settings),
       garmentPreview: (design.garmentPreview as unknown as Record<string, unknown> | null) ?? null,
     },
   };
