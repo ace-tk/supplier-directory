@@ -213,6 +213,48 @@ export async function commitGarmentEditAction(designId: string, image: Blob, lab
 const PRESERVE_INSTRUCTION =
   "Modify only the masked region. Preserve everything outside the mask exactly: the model/person, pose, face, other garment parts, background, lighting, and composition. Maintain realistic fabric folds, shadows, and continuity at the edges of the edit.";
 
+/** A raw hex code ("#EC4899") is an unreliable color instruction for an
+ * image-generation prompt — the model has no guarantee of mapping it to the
+ * intended hue, and observed Colorize output includes solid-black artifacts
+ * on small garment hardware (buttons) that reads as the model defaulting
+ * rather than recognizing the hex value. Pairing the hex with a plain-
+ * language name gives the model an unambiguous instruction it can actually
+ * follow, while the hex is kept alongside for precision. */
+function hexToColorName(hex: string): string {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const n = parseInt(full, 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2 / 255;
+
+  if (max - min < 12) {
+    if (lightness > 0.94) return "white";
+    if (lightness < 0.08) return "black";
+    return "gray";
+  }
+
+  const delta = max - min;
+  let hue: number;
+  if (max === r) hue = ((g - b) / delta) % 6;
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+  hue = Math.round(hue * 60);
+  if (hue < 0) hue += 360;
+
+  const saturation = delta / 255 / (1 - Math.abs(2 * lightness - 1));
+  const base =
+    hue < 15 || hue >= 345 ? "red" : hue < 45 ? "orange" : hue < 65 ? "yellow" : hue < 150 ? "green" : hue < 195 ? "teal" : hue < 255 ? "blue" : hue < 290 ? "purple" : "pink";
+
+  if (saturation < 0.15) return "gray";
+  if (lightness < 0.2) return `dark ${base}`;
+  if (lightness > 0.85) return `pale ${base}`;
+  return base;
+}
+
 export async function changeRegionAction(designId: string, currentImage: Blob, mask: Blob, instruction: string, width: number, height: number): Promise<ActionResult<{ image: string; label: string }>> {
   if (!instruction.trim()) return { success: false, error: "Describe the change you want." };
   return runMaskedEdit(designId, currentImage, mask, `${instruction} ${PRESERVE_INSTRUCTION}`, "Change", width, height);
@@ -260,7 +302,7 @@ export async function applyPrintLogoAction(
 ): Promise<ActionResult<{ image: string; label: string }>> {
   const check = checkUploadedImage(logoImage);
   if (!check.valid) return { success: false, error: check.error! };
-  const prompt = `Apply the print/logo shown in the second reference image onto the masked region only, at approximately ${Math.round(scalePercent)}% relative scale, rotated ${Math.round(rotationDeg)} degrees, at ${Math.round(brightnessPercent)}% brightness. Integrate it realistically into the garment's fabric — follow its folds, shadows and perspective, don't leave it as a flat overlay. ${PRESERVE_INSTRUCTION}`;
+  const prompt = `Apply the print/logo shown in the second reference image onto the masked region only, sized to fit entirely within the masked area at approximately ${Math.round(scalePercent)}% relative scale, rotated ${Math.round(rotationDeg)} degrees, at ${Math.round(brightnessPercent)}% brightness. Integrate it realistically into the garment's fabric — follow its folds, shadows and perspective, don't leave it as a flat overlay. Do not change the garment fabric's own base color anywhere in the masked region — only add the print/logo on top of it. ${PRESERVE_INSTRUCTION}`;
   return runMaskedEdit(designId, [currentImage, logoImage], mask, prompt, "Apply print/logo", width, height);
 }
 
@@ -273,7 +315,8 @@ export async function colorizeRegionAction(
   width: number,
   height: number
 ): Promise<ActionResult<{ image: string; label: string }>> {
-  const prompt = `Recolor the masked region to ${colorHex} at approximately ${Math.round(brightnessPercent)}% brightness. Preserve the fabric's texture, folds, shadows and highlights — do not flat-fill the region, keep it looking like real dyed fabric. ${PRESERVE_INSTRUCTION}`;
+  const colorName = hexToColorName(colorHex);
+  const prompt = `Recolor the masked region's fabric to ${colorName} (${colorHex}) at approximately ${Math.round(brightnessPercent)}% brightness. Preserve the fabric's texture, folds, shadows and highlights — do not flat-fill the region, keep it looking like real dyed fabric. Do not recolor rigid hardware inside the masked region such as buttons, zippers, snaps, or buckles — dyeing fabric does not change plastic, metal, or wood hardware, so leave any such hardware in its original color and material. ${PRESERVE_INSTRUCTION}`;
   return runMaskedEdit(designId, currentImage, mask, prompt, "Colorize", width, height);
 }
 

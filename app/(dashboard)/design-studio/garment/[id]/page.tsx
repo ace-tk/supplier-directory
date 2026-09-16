@@ -11,6 +11,7 @@ import { GarmentCanvas, type GarmentCanvasHandle, type PreviewConfig } from "@/c
 import { HistoryPanel } from "@/components/garment-studio/HistoryPanel";
 import { PreviewToggle, SettingSlider, ImageUploadStep, PromptStep, ColorPickerStep } from "@/components/garment-studio/ToolControls";
 import { dataUrlToFile } from "@/lib/file-to-data-url";
+import { loadImage } from "@/lib/garment-canvas";
 import { getEmbroideryDesignAction } from "@/services/embroidery";
 import {
   getGarmentDesignAction,
@@ -68,6 +69,13 @@ export default function GarmentEditorPage({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // A mask painted for one tool (e.g. a broad Colorize selection) must
+  // never silently carry over into a different tool's Apply (e.g. a small
+  // Prints/Logos placement) — each tool starts from a clean selection.
+  useEffect(() => {
+    canvasRef.current?.clearMask();
+  }, [activeTool]);
 
   // Hand-off from Print → Embroidery's Garment Preview ("Apply in AI
   // Garment Studio" -> /design-studio/garment/[id]?tool=prints-logos&
@@ -199,11 +207,16 @@ export default function GarmentEditorPage({
 
   async function handleLogoSave() {
     if (!design) return;
-    if (!logoFile) return toast.error("Upload a print or logo image first.");
+    if (!logoFile || !logoDataUrl) return toast.error("Upload a print or logo image first.");
     const inputs = await requireMaskedImage();
     if (!inputs) return;
+    // Cap the requested scale to the mask's own bounding box — a single
+    // print/logo placement should never be requested larger than the area
+    // the user actually masked (see GarmentCanvas.getFittedLogoScalePercent).
+    const logoImg = await loadImage(logoDataUrl);
+    const fittedScale = canvasRef.current?.getFittedLogoScalePercent(logoScale, logoImg.naturalWidth, logoImg.naturalHeight) ?? logoScale;
     setSaving(true);
-    const result = await applyPrintLogoAction(design.id, inputs.image, inputs.mask, logoFile, logoScale, logoRotation, logoBrightness, inputs.width, inputs.height);
+    const result = await applyPrintLogoAction(design.id, inputs.image, inputs.mask, logoFile, fittedScale, logoRotation, logoBrightness, inputs.width, inputs.height);
     const versionId = await compositeAndCommit(result);
     setSaving(false);
     if (!versionId) return;

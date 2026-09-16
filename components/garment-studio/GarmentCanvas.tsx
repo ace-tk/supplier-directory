@@ -11,6 +11,7 @@ import {
   renderPatternPreview,
   renderColorizePreview,
   compositeMaskedEdit,
+  fitLogoScalePercent,
   type MaskTool,
 } from "@/lib/garment-canvas";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,11 @@ export interface GarmentCanvasHandle {
    * server action so it can request an AI edit size matching the actual
    * aspect ratio instead of an arbitrary hardcoded one. */
   getDimensions: () => { width: number; height: number };
+  /** Caps a requested Prints/Logos scale% to the current mask's own
+   * bounding box (see lib/garment-canvas.ts fitLogoScalePercent) — call
+   * right before applyPrintLogoAction so the AI is never asked for a
+   * placement larger than what the user actually masked. */
+  getFittedLogoScalePercent: (requestedScalePercent: number, logoNaturalWidth: number, logoNaturalHeight: number) => number;
   /** Rebuilds the AI's raw edit result against the original image so
    * pixels outside the mask are guaranteed to be the original's exact
    * pixels — see lib/garment-canvas.ts compositeMaskedEdit. Must be
@@ -128,8 +134,16 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
     if (preview?.kind === "pattern" || preview?.kind === "logo") {
       const img = patternImageRef.current;
       if (img) {
+        // Prints/Logos (unlike an intentionally-repeating Pattern) is a
+        // single placement — cap its scale to the mask's own bounding box
+        // so the preview shows exactly what will actually be requested/
+        // rendered (see fitLogoScalePercent's doc comment).
+        const scalePercent =
+          preview.kind === "logo"
+            ? fitLogoScalePercent(preview.scalePercent, canvas.width, canvas.height, mask.boundingBox(), img.naturalWidth, img.naturalHeight)
+            : preview.scalePercent;
         renderPatternPreview(ctx, canvas.width, canvas.height, base, mask, img, {
-          scalePercent: preview.scalePercent,
+          scalePercent,
           rotationDeg: preview.rotationDeg,
           brightnessPercent: preview.brightnessPercent,
           offsetX: preview.offsetX,
@@ -287,6 +301,10 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
     },
     getDimensions() {
       return dimensions;
+    },
+    getFittedLogoScalePercent(requestedScalePercent: number, logoNaturalWidth: number, logoNaturalHeight: number) {
+      if (!maskRef.current) return requestedScalePercent;
+      return fitLogoScalePercent(requestedScalePercent, dimensions.width, dimensions.height, maskRef.current.boundingBox(), logoNaturalWidth, logoNaturalHeight);
     },
     async compositeWithAiResult(aiResultDataUrl: string) {
       if (!baseCanvasRef.current || !maskRef.current) throw new Error("Image not loaded yet.");

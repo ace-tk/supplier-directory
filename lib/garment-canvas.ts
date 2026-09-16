@@ -101,6 +101,35 @@ export class MaskBuffer {
     return false;
   }
 
+  /** Tight bounding box of the currently selected (transparent-in-mask)
+   * pixels, in this mask's own pixel coordinates — or null if nothing is
+   * selected. Used to keep a single Prints/Logos placement from being
+   * requested/rendered larger than the area the user actually painted
+   * (see fitLogoScalePercent), instead of letting an oversized placement
+   * get abruptly clipped by the mask at edit time. */
+  boundingBox(): { x: number; y: number; width: number; height: number } | null {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const { data } = this.ctx.getImageData(0, 0, w, h);
+    let minX = w;
+    let minY = h;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < h; y++) {
+      const rowOffset = y * w;
+      for (let x = 0; x < w; x++) {
+        if (data[(rowOffset + x) * 4 + 3] < 255) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < minX) return null;
+    return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  }
+
   strokeDab(x: number, y: number, radius: number, erase: boolean) {
     this.ctx.globalCompositeOperation = erase ? "source-over" : "destination-out";
     this.ctx.fillStyle = "black";
@@ -226,6 +255,33 @@ export interface PatternPreviewParams {
   brightnessPercent: number; // 50 = neutral, matches the reference slider's 50% default
   offsetX?: number;
   offsetY?: number;
+}
+
+/** Prints/Logos — unlike Patterns (an intentionally infinite, repeating
+ * tile), a single print/logo placement should never be requested/rendered
+ * larger than the area the user actually masked: an oversized request gets
+ * abruptly clipped at the mask boundary once composited (see
+ * compositeMaskedEdit), which is what "artwork extends outside the
+ * garment" turned out to be in practice — the mask, not the photo
+ * background, is the printable-area boundary. This caps `requestedScalePercent`
+ * (same tileSize convention as renderPatternPreview: 100% = the shorter
+ * canvas dimension) so the logo's own aspect-preserved footprint fits
+ * within the mask's bounding box, auto-shrinking oversized requests instead
+ * of letting them get clipped. Returns the input unchanged if there's no
+ * selection yet to fit against. */
+export function fitLogoScalePercent(
+  requestedScalePercent: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  bbox: { width: number; height: number } | null,
+  logoNaturalWidth: number,
+  logoNaturalHeight: number
+): number {
+  if (!bbox || logoNaturalWidth <= 0 || logoNaturalHeight <= 0) return requestedScalePercent;
+  const logoAspect = logoNaturalWidth / logoNaturalHeight;
+  const maxTileWidth = Math.min(bbox.width, bbox.height * logoAspect);
+  const maxScalePercent = (maxTileWidth / Math.min(canvasWidth, canvasHeight)) * 100;
+  return Math.min(requestedScalePercent, Math.max(maxScalePercent, 0));
 }
 
 /** Real, non-AI "apply pattern to masked region" preview: tiles the
