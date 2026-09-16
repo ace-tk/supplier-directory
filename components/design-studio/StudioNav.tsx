@@ -24,7 +24,12 @@ export function StudioNav() {
   return (
     <nav className="flex items-center gap-1 overflow-x-auto scrollbar-thin rounded-full border border-border bg-card p-1 w-fit max-w-full">
       {items.map((item) => {
-        const isActive = item.href === HOME_HREF ? pathname === HOME_HREF : pathname.startsWith(item.href);
+        // Match on a path-segment boundary, not a raw string prefix — a
+        // plain startsWith would also mark "/design-studio/garment" active
+        // while viewing "/design-studio/garment-back-design", since the
+        // latter starts with the former as a substring even though it's a
+        // sibling route, not a nested one.
+        const isActive = item.href === HOME_HREF ? pathname === HOME_HREF : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.id}

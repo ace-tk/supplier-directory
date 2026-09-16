@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Grid3x3, Shirt, Library, Scissors, SwatchBook, Layers, Package } from "lucide-react";
+import { Grid3x3, Shirt, Library, Scissors, SwatchBook, Layers, Package, RotateCw } from "lucide-react";
 
 export interface DesignStudioWorkflow {
   id: string;
@@ -31,6 +31,14 @@ export const designStudioWorkflows: DesignStudioWorkflow[] = [
     description: "Generate garments with AI and edit them region by region.",
     href: "/design-studio/garment",
     icon: Shirt,
+    status: "available",
+  },
+  {
+    id: "garment-back-design",
+    name: "Garment Back Design",
+    description: "Generate a matching back view for any front-facing garment design.",
+    href: "/design-studio/garment-back-design",
+    icon: RotateCw,
     status: "available",
   },
   {

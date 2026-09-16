@@ -150,9 +150,10 @@ model User {
   moodBoardAssets   MoodBoardAsset[]   @relation("MoodBoardAssetOwner")
   moodBoardComments MoodBoardComment[] @relation("MoodBoardCommentAuthor")
 
-  repeatPrintDesigns RepeatPrintDesign[] @relation("RepeatPrintDesignOwner")
-  garmentDesigns     GarmentDesign[]     @relation("GarmentDesignOwner")
-  embroideryDesigns  EmbroideryDesign[]  @relation("EmbroideryDesignOwner")
+  repeatPrintDesigns RepeatPrintDesign[]  @relation("RepeatPrintDesignOwner")
+  garmentDesigns     GarmentDesign[]      @relation("GarmentDesignOwner")
+  garmentBackDesigns GarmentBackDesign[]  @relation("GarmentBackDesignOwner")
+  embroideryDesigns  EmbroideryDesign[]   @relation("EmbroideryDesignOwner")
 
   passwordResetTokens PasswordResetToken[]
   workspaceMemberships WorkspaceMember[]
@@ -2575,6 +2576,53 @@ model GarmentDesignVersion {
   design   GarmentDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
 
   label String
+  image String @db.Text
+  order Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([designId])
+}
+
+// Design Studio — Garment Back Design. A dedicated project per front→back
+// generation, versioned the same way as GarmentDesign (append-only,
+// Regenerate never overwrites), but deliberately its own model rather than
+// reusing GarmentDesign: the field semantics differ (frontImage is the
+// user's untouched upload, never AI output; there is no masking/edit-tool
+// history) and this workflow's own page has no Change/Regenerate/Remove/
+// Patterns/Prints-Logos/Colorize editor — it doesn't belong in the same
+// gallery/editor as a full GarmentDesign.
+model GarmentBackDesign {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("GarmentBackDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Back Design")
+
+  // The user's uploaded front-view reference — preserved exactly as
+  // uploaded, never overwritten by a generated result, same pristine-
+  // source convention EmbroideryDesign.sourceImage and GarmentDesign's own
+  // conditioning image already use.
+  frontImage String @db.Text
+
+  // Optional guidance for the back view (e.g. "continue the floral print
+  // on the back") — appended to, never replacing, the anti-drift system
+  // prompt in services/garment-back-design.ts.
+  backDescription String? @db.Text
+
+  versions GarmentBackDesignVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model GarmentBackDesignVersion {
+  id       String            @id @default(cuid())
+  designId String
+  design   GarmentBackDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+
   image String @db.Text
   order Int    @default(0)
 
