@@ -66,9 +66,24 @@ export function SettingSlider({
 export function ImageUploadStep({
   dataUrl,
   onChange,
+  label = "Uploaded reference",
+  optional = true,
 }: {
   dataUrl: string | null;
   onChange: (file: File | null, dataUrl: string | null) => void;
+  /** Alt text for the preview thumbnail once an image is uploaded — defaults
+   * to the original generic wording so existing callers (Patterns,
+   * Prints/Logos, where this is one reference asset among others) render
+   * exactly as before. Callers where the upload IS the primary subject
+   * (e.g. Garment Back Design's front-view photo) should pass something
+   * specific instead of the generic default. */
+  label?: string;
+  /** Whether the empty dropzone shows "(optional)". True by default because
+   * Patterns and Prints/Logos both offer an alternative to a direct upload
+   * (Pattern Library, or simply not adding a print) — upload really is
+   * optional there. Callers where this upload is the only/required input
+   * must pass false, or the copy actively misrepresents it. */
+  optional?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -88,7 +103,7 @@ export function ImageUploadStep({
     return (
       <div className="rounded-2xl border border-dashed border-border p-3 relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={dataUrl} alt="Uploaded reference" className="w-full h-32 object-cover rounded-lg" />
+        <img src={dataUrl} alt={label} className="w-full h-32 object-cover rounded-lg" />
         <button
           type="button"
           onClick={() => onChange(null, null)}
@@ -127,8 +142,8 @@ export function ImageUploadStep({
       <p className="text-xs text-foreground">
         Drag and drop an image
         <br />
-        or <span className="text-primary underline">choose a file</span>{" "}
-        <span className="text-muted-foreground">(optional)</span>
+        or <span className="text-primary underline">choose a file</span>
+        {optional && <span className="text-muted-foreground"> (optional)</span>}
       </p>
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => e.target.files?.length && handleFiles(e.target.files)} />
     </div>

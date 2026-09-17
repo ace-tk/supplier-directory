@@ -132,7 +132,7 @@ export default function GarmentBackDesignPage({ searchParams }: { searchParams: 
             <div>
               <p className="text-sm font-semibold text-foreground mb-1">1. Upload style image</p>
               <p className="text-sm text-muted-foreground mb-2">PNG, JPG, JPEG, or WEBP — the front view of the garment.</p>
-              <ImageUploadStep dataUrl={frontDataUrl} onChange={handleFileSelected} />
+              <ImageUploadStep dataUrl={frontDataUrl} onChange={handleFileSelected} label="Front garment reference" optional={false} />
             </div>
 
             <div>
