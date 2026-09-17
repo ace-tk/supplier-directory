@@ -1,7 +1,9 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Pencil, Eraser, Square, PenTool, Move, Undo2, MoreHorizontal, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Pencil, Eraser, Square, PenTool, Move, Undo2, MoreHorizontal, Trash2, Wand2 } from "lucide-react";
+import { autoSelectMaskAction, type SegmentPoint } from "@/services/garment-segmentation";
 import {
   loadBoundedImage,
   loadImage,
@@ -62,10 +64,15 @@ interface GarmentCanvasProps {
   thumbnailUrl: string;
   preview: PreviewConfig;
   onPatternOffsetChange?: (offsetX: number, offsetY: number) => void;
+  /** Fires whenever an Auto Select (SAM 2) request starts/finishes, so the
+   * page can temporarily disable Save/Colorize/etc. — the mask a save
+   * would read is only trustworthy once the in-flight selection request
+   * has actually applied its result. */
+  onAutoSelectBusyChange?: (busy: boolean) => void;
 }
 
 export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>(function GarmentCanvas(
-  { imageUrl, thumbnailUrl, preview, onPatternOffsetChange },
+  { imageUrl, thumbnailUrl, preview, onPatternOffsetChange, onAutoSelectBusyChange },
   ref
 ) {
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,6 +85,14 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
   const [brushSize, setBrushSize] = useState(40);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [loaded, setLoaded] = useState(false);
+
+  // Auto Select (SAM 2) — a running list of click points for the current
+  // selection session, sent in full on every click so SAM 2 can refine the
+  // same selection (Add/Subtract), exactly like Photoshop's own object
+  // selection tool. Reset whenever the tool changes or the mask is cleared.
+  const autoSelectPointsRef = useRef<SegmentPoint[]>([]);
+  const [autoSelectMode, setAutoSelectMode] = useState<"add" | "subtract">("add");
+  const [autoSelectStatus, setAutoSelectStatus] = useState<"idle" | "running" | "ready" | "error">("idle");
 
   // Adjust-during-render: reset the loading flag the instant imageUrl
   // changes (e.g. a different history version was selected), rather than
@@ -102,6 +117,8 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
       baseCanvasRef.current = canvas;
       maskRef.current = new MaskBuffer(width, height);
       undoStackRef.current = [];
+      autoSelectPointsRef.current = [];
+      setAutoSelectStatus("idle");
       setDimensions({ width, height });
       setLoaded(true);
     });
@@ -185,6 +202,22 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, preview, tool]);
 
+  // Every tool switch starts a fresh Auto Select session — a point history
+  // from a previous session (or a different tool's manual edits in
+  // between) shouldn't silently keep refining a selection the user can no
+  // longer see the context for. Adjust-during-render (see prevImageUrl
+  // above) rather than a setState-in-effect, for the same reason.
+  const [prevTool, setPrevTool] = useState<MaskTool>(tool);
+  if (tool !== prevTool) {
+    setPrevTool(tool);
+    autoSelectPointsRef.current = [];
+    setAutoSelectStatus("idle");
+  }
+
+  useEffect(() => {
+    onAutoSelectBusyChange?.(autoSelectStatus === "running");
+  }, [autoSelectStatus, onAutoSelectBusyChange]);
+
   function pushUndoSnapshot() {
     const mask = maskRef.current;
     if (!mask) return;
@@ -205,6 +238,8 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
   function handleClearMask() {
     pushUndoSnapshot();
     maskRef.current?.clear();
+    autoSelectPointsRef.current = [];
+    setAutoSelectStatus("idle");
     redraw();
   }
 
@@ -213,12 +248,62 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
     return screenToCanvasPoint(canvas, e.clientX, e.clientY);
   }
 
+  /** Auto Select (SAM 2) — sends the exact same base canvas image the rest
+   * of the masking pipeline already uses, plus the accumulated click
+   * points for this session (Add/Subtract), to the local segmentation
+   * service, then replaces the mask with its result via
+   * MaskBuffer.applyExternalMask. Never throws outward: every failure
+   * shows a toast and leaves the existing mask/manual tools untouched. */
+  async function runAutoSelectClick(point: { x: number; y: number }) {
+    const mask = maskRef.current;
+    const base = baseCanvasRef.current;
+    if (!mask || !base || autoSelectStatus === "running") return;
+
+    const label: 0 | 1 = autoSelectMode === "add" ? 1 : 0;
+    const nextPoints = [...autoSelectPointsRef.current, { x: Math.round(point.x), y: Math.round(point.y), label }];
+    autoSelectPointsRef.current = nextPoints;
+    setAutoSelectStatus("running");
+
+    try {
+      const imageBlob = await canvasToBlob(base);
+      const result = await autoSelectMaskAction(imageBlob, nextPoints);
+
+      // If the image/mask was swapped out (e.g. a different history
+      // version selected) while this request was in flight, discard the
+      // now-irrelevant result instead of applying it to the wrong canvas.
+      if (maskRef.current !== mask) return;
+
+      if (!result.success) {
+        toast.error(result.error);
+        autoSelectPointsRef.current = autoSelectPointsRef.current.slice(0, -1);
+        setAutoSelectStatus("error");
+        return;
+      }
+
+      const maskImg = await loadImage(result.data.maskDataUrl);
+      if (maskRef.current !== mask) return;
+
+      pushUndoSnapshot();
+      mask.applyExternalMask(maskImg);
+      redraw();
+      setAutoSelectStatus("ready");
+    } catch {
+      toast.error("Auto Select couldn't generate a selection. You can continue with Brush, Rectangle or Polygon.");
+      autoSelectPointsRef.current = autoSelectPointsRef.current.slice(0, -1);
+      setAutoSelectStatus("error");
+    }
+  }
+
   function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
     if (!maskRef.current) return;
     const p = pointerToCanvas(e);
 
     if (tool === "move") {
       moveStartRef.current = p;
+      return;
+    }
+    if (tool === "auto-select") {
+      void runAutoSelectClick(p);
       return;
     }
     if (tool === "polygon") {
@@ -349,6 +434,7 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
         <ToolButton icon={Eraser} active={tool === "eraser"} label="Eraser" onClick={() => setTool("eraser")} />
         <ToolButton icon={Square} active={tool === "rectangle"} label="Rectangle select" onClick={() => setTool("rectangle")} />
         <ToolButton icon={PenTool} active={tool === "polygon"} label="Polygon select" onClick={() => setTool("polygon")} />
+        <ToolButton icon={Wand2} active={tool === "auto-select"} label="Auto Select" onClick={() => setTool("auto-select")} />
         {showMoveTool && <ToolButton icon={Move} active={tool === "move"} label="Move pattern" onClick={() => setTool("move")} />}
 
         {(tool === "brush" || tool === "eraser") && (
@@ -363,6 +449,44 @@ export const GarmentCanvas = forwardRef<GarmentCanvasHandle, GarmentCanvasProps>
               className="w-28 accent-primary"
               aria-label="Brush size"
             />
+          </div>
+        )}
+
+        {tool === "auto-select" && (
+          <div className="flex items-center gap-2 ml-1">
+            <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
+              <button
+                type="button"
+                onClick={() => setAutoSelectMode("add")}
+                aria-pressed={autoSelectMode === "add"}
+                className={cn(
+                  "px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                  autoSelectMode === "add" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setAutoSelectMode("subtract")}
+                aria-pressed={autoSelectMode === "subtract"}
+                className={cn(
+                  "px-2 py-1 rounded-md text-xs font-medium transition-colors",
+                  autoSelectMode === "subtract" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Subtract
+              </button>
+            </div>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {autoSelectStatus === "running"
+                ? "Generating selection…"
+                : autoSelectStatus === "ready"
+                  ? "Selection ready — refine if needed"
+                  : autoSelectStatus === "error"
+                    ? "Auto Select couldn't select that area — try another spot or use Brush/Rectangle/Polygon"
+                    : "Click a garment area to automatically select it (AI estimate — refine with Brush/Eraser if needed)"}
+            </span>
           </div>
         )}
 

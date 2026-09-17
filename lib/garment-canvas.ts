@@ -66,7 +66,7 @@ export function screenToCanvasPoint(canvas: HTMLCanvasElement, clientX: number, 
   return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
 }
 
-export type MaskTool = "brush" | "eraser" | "rectangle" | "polygon" | "move";
+export type MaskTool = "brush" | "eraser" | "rectangle" | "polygon" | "move" | "auto-select";
 
 /** The real mask buffer, maintained separately from what's drawn on
  * screen: opaque black = preserved (OpenAI's edit-mask convention),
@@ -240,6 +240,42 @@ export class MaskBuffer {
     target.globalCompositeOperation = "destination-in";
     target.drawImage(sel, 0, 0, width, height);
     target.globalCompositeOperation = "source-over";
+  }
+
+  /** Replaces the current selection with an externally-computed mask — used
+   * by Auto Select (SAM 2) to feed its result into this exact same
+   * MaskBuffer representation, so every downstream consumer (getMaskBlob,
+   * compositeMaskedEdit, the existing overlay, Brush/Eraser refinement)
+   * needs zero changes and can't tell the difference from a hand-painted
+   * selection. `maskImage` is treated as grayscale: bright pixels (>127)
+   * become selected (transparent, per this class's own convention),
+   * everything else becomes preserved (opaque black) — matching the plain
+   * white-on-black mask services/segmentation/server.py returns.
+   *
+   * `maskImage` must already be exactly this buffer's own pixel
+   * dimensions — guaranteed by construction, since Auto Select always
+   * sends this exact canvas's own image for inference (see
+   * services/garment-segmentation.ts). A real mismatch throws rather than
+   * silently misaligning the selection. */
+  applyExternalMask(maskImage: HTMLImageElement) {
+    if (maskImage.naturalWidth !== this.canvas.width || maskImage.naturalHeight !== this.canvas.height) {
+      throw new Error("Auto Select returned a selection that doesn't match the image size.");
+    }
+
+    const src = document.createElement("canvas");
+    src.width = this.canvas.width;
+    src.height = this.canvas.height;
+    const sctx = src.getContext("2d")!;
+    sctx.drawImage(maskImage, 0, 0);
+    const { data: maskData } = sctx.getImageData(0, 0, src.width, src.height);
+
+    this.clear();
+    const selection = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+    for (let i = 0; i < maskData.length; i += 4) {
+      const selected = maskData[i] > 127;
+      selection.data[i + 3] = selected ? 0 : 255;
+    }
+    this.ctx.putImageData(selection, 0, 0);
   }
 }
 

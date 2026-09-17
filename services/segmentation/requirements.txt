@@ -1,0 +1,14 @@
+# Local SAM 2 segmentation microservice — see README.md.
+#
+# torch/torchvision are installed separately in the setup instructions
+# (README.md) rather than pinned here, since the correct wheel depends on
+# the host (macOS arm64 with MPS vs. a CUDA Linux box for later Oracle
+# Cloud deployment) — pip resolves the right one automatically either way
+# as long as they're present before installing the rest of this file.
+
+sam2==1.1.0
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+python-multipart==0.0.32
+pillow==12.3.0
+numpy==2.5.3

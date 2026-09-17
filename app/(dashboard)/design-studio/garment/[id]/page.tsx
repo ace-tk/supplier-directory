@@ -41,6 +41,10 @@ export default function GarmentEditorPage({
   const [activeVersionId, setActiveVersionId] = useState("");
   const [activeTool, setActiveTool] = useState<EditTool>(toolParam === "prints-logos" ? "prints-logos" : "change");
   const [saving, setSaving] = useState(false);
+  // Disables Save/Colorize/etc. while an Auto Select (SAM 2) request is in
+  // flight — the mask a save would read is only trustworthy once that
+  // selection has actually applied (see GarmentCanvas's onAutoSelectBusyChange).
+  const [autoSelectBusy, setAutoSelectBusy] = useState(false);
 
   const [changePrompt, setChangePrompt] = useState("");
   const [regeneratePrompt, setRegeneratePrompt] = useState("");
@@ -315,6 +319,7 @@ export default function GarmentEditorPage({
               extraSteps={[{ title: "Describe the change", content: <PromptStep value={changePrompt} onChange={setChangePrompt} placeholder="e.g. Make this a puff sleeve" /> }]}
               onSave={handleChangeSave}
               saving={saving}
+              saveDisabled={autoSelectBusy}
             />
           )}
           {activeTool === "regenerate" && (
@@ -325,10 +330,18 @@ export default function GarmentEditorPage({
               saveLabel="Regenerate"
               onSave={handleRegenerateSave}
               saving={saving}
+              saveDisabled={autoSelectBusy}
             />
           )}
           {activeTool === "remove" && (
-            <EditToolPanel toolTitle="Remove the selected detail" maskInstruction="Mask the detail you want removed" saveLabel="Remove" onSave={handleRemoveSave} saving={saving} />
+            <EditToolPanel
+              toolTitle="Remove the selected detail"
+              maskInstruction="Mask the detail you want removed"
+              saveLabel="Remove"
+              onSave={handleRemoveSave}
+              saving={saving}
+              saveDisabled={autoSelectBusy}
+            />
           )}
           {activeTool === "patterns" && (
             <EditToolPanel
@@ -360,6 +373,7 @@ export default function GarmentEditorPage({
               ]}
               onSave={handlePatternSave}
               saving={saving}
+              saveDisabled={autoSelectBusy}
             />
           )}
           {activeTool === "prints-logos" && (
@@ -384,6 +398,7 @@ export default function GarmentEditorPage({
               ]}
               onSave={handleLogoSave}
               saving={saving}
+              saveDisabled={autoSelectBusy}
             />
           )}
           {activeTool === "colorize" && (
@@ -407,6 +422,7 @@ export default function GarmentEditorPage({
               saveLabel="Colorize"
               onSave={handleColorizeSave}
               saving={saving}
+              saveDisabled={autoSelectBusy}
             />
           )}
         </div>
@@ -417,6 +433,7 @@ export default function GarmentEditorPage({
             imageUrl={activeVersion.image}
             thumbnailUrl={activeVersion.image}
             preview={preview}
+            onAutoSelectBusyChange={setAutoSelectBusy}
             onPatternOffsetChange={
               activeTool === "patterns"
                 ? (x, y) => setPatternOffset({ x, y })
