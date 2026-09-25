@@ -100,7 +100,7 @@ export function ProductMediaViewer({ productId, productName, images }: { product
       <div className="w-full h-[420px] rounded-xl border border-border bg-muted/40 overflow-hidden relative">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img loading="lazy" src={cover.dataUrl} alt={productName} className="w-full h-full object-contain" />
+          <img src={cover.dataUrl} alt={productName} className="w-full h-full object-contain" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">No images uploaded yet</div>
         )}

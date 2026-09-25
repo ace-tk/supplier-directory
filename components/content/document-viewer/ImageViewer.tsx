@@ -48,7 +48,6 @@ export function ImageViewer({ file, variant = "compact" }: { file: DraftAttachme
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        loading="lazy"
         src={file.dataUrl}
         alt={file.fileName}
         onLoad={(e) => setDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })}

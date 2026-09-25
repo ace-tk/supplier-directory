@@ -193,7 +193,7 @@ export function DesignYourOwn({
           <div className="w-full h-[420px] rounded-xl border border-border bg-muted/40 overflow-hidden">
             {cover ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img loading="lazy" src={cover.dataUrl} alt={row.productName} className="w-full h-full object-contain" />
+              <img src={cover.dataUrl} alt={row.productName} className="w-full h-full object-contain" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">No product image yet</div>
             )}

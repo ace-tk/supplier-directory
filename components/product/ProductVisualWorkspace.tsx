@@ -191,7 +191,7 @@ export function ProductVisualWorkspace({
       <div className="w-full h-[380px] rounded-xl border border-border bg-muted/40 overflow-hidden relative">
         {selected ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img loading="lazy" src={selected.dataUrl} alt="Product" className="w-full h-full object-contain" />
+          <img src={selected.dataUrl} alt="Product" className="w-full h-full object-contain" />
         ) : (
           <button
             type="button"

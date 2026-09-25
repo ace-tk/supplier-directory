@@ -341,7 +341,7 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
             <div className="w-full h-[360px] rounded-xl border border-border bg-muted/40 overflow-hidden relative">
               {coverImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img loading="lazy" src={coverImage.dataUrl} alt="Product" className="w-full h-full object-contain" />
+                <img src={coverImage.dataUrl} alt="Product" className="w-full h-full object-contain" />
               ) : (
                 <button
                   type="button"

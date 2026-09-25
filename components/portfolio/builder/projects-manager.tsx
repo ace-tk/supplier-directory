@@ -241,7 +241,7 @@ export function ProjectsManager({ data, onChange }: { data: PortfolioViewModel; 
               <div className="aspect-video rounded-lg border border-dashed border-border bg-muted overflow-hidden flex items-center justify-center relative">
                 {form.coverImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img loading="lazy" src={form.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                  <img src={form.coverImage} alt="Cover" className="w-full h-full object-cover" />
                 ) : (
                   <button type="button" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="flex flex-col items-center gap-1 text-muted-foreground text-xs">
                     {uploadingCover ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}

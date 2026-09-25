@@ -363,7 +363,7 @@ export function ContentEditor({
                 <Label className="text-xs font-medium">Featured Image</Label>
                 {featuredImage ? (
                   <div className="relative w-full max-w-[220px] aspect-video rounded-lg overflow-hidden bg-muted group">
-                    <img loading="lazy" src={featuredImage} alt="Featured" className="w-full h-full object-cover" />
+                    <img src={featuredImage} alt="Featured" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setFeaturedImage(null)}

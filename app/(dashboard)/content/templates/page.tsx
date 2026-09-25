@@ -1,16 +1,15 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/session";
-import { getTemplatesForOwner } from "@/lib/content-queries";
-import { TemplateLibrary } from "@/components/content/TemplateLibrary";
+import { StreamedTemplateLibrary } from "@/components/content/StreamedTemplateLibrary";
 
 export default async function TemplateLibraryPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
   const user = await getUser();
   if (!user) redirect("/login?from=/content/templates");
 
   const { category } = await searchParams;
-  // Fetched here (the same query TemplateLibrary's own getTemplatesAction()
-  // would otherwise call on mount) so the library renders with real data on
-  // first paint instead of an empty shell followed by a client round-trip.
-  const initialTemplates = await getTemplatesForOwner(user.id);
-  return <TemplateLibrary basePath="/content" initialCategory={category} initialTemplates={initialTemplates} />;
+  // Still fetched on the server (so the client component renders with real
+  // data and skips its own fetch on mount), but inside a Suspense boundary
+  // so the shell + skeleton stream first instead of the whole response
+  // waiting on the templates query.
+  return <StreamedTemplateLibrary basePath="/content" userId={user.id} initialCategory={category} />;
 }

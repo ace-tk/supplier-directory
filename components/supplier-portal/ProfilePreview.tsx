@@ -44,7 +44,7 @@ export function ProfilePreview({ state, supplierCode }: ProfilePreviewProps) {
         <div className="relative h-32 bg-gradient-to-br from-primary/20 via-primary/10 to-muted">
           {cover && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img loading="lazy" src={cover.fileUrl} alt="Cover" className="w-full h-full object-cover" />
+            <img src={cover.fileUrl} alt="Cover" className="w-full h-full object-cover" />
           )}
           {supplierCode && (
             <div className="absolute top-3 right-3 bg-black/60 text-white text-xs font-mono font-semibold px-2.5 py-1 rounded-full">
@@ -59,7 +59,7 @@ export function ProfilePreview({ state, supplierCode }: ProfilePreviewProps) {
             <div className="w-16 h-16 rounded-xl border-4 border-background bg-primary/10 flex items-center justify-center overflow-hidden shadow-md">
               {logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img loading="lazy" src={logo.fileUrl} alt="Logo" className="w-full h-full object-cover" />
+                <img src={logo.fileUrl} alt="Logo" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-xl font-bold text-primary">{initials}</span>
               )}

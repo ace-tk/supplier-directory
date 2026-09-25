@@ -6,11 +6,16 @@ import { toast } from "sonner";
 import { type Supplier } from "@/types/supplier";
 import { type SupplierFormValues } from "@/lib/validations/supplier";
 
-export function useSuppliers() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+export function useSuppliers(initialSuppliers?: Supplier[]) {
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers ?? []);
+  const [loading, setLoading] = useState(!initialSuppliers);
 
   useEffect(() => {
+    // When the Server Component already fetched the directory
+    // (initialSuppliers), skip the redundant client round-trip on first
+    // mount — this fetch is the same GET /api/suppliers the page's own
+    // server-side getSupplierDirectory() call already ran.
+    if (initialSuppliers) return;
     let cancelled = false;
     fetch("/api/suppliers")
       .then((r) => {
@@ -27,6 +32,7 @@ export function useSuppliers() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const createSupplier = useCallback(

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { supplierSchema } from "@/lib/validations/supplier";
-import { ensureSuppliersSeeded } from "@/lib/seed";
+import { getSupplierDirectory } from "@/lib/supplier-queries";
 type DbPayload = Parameters<typeof db.supplierListing.create>[0]["data"];
 
 function toDbPayload(data: ReturnType<typeof supplierSchema.parse>, extra?: { initials?: string; logoColor?: string }): DbPayload {
@@ -32,19 +32,7 @@ function toDbPayload(data: ReturnType<typeof supplierSchema.parse>, extra?: { in
 
 export async function GET() {
   try {
-    // Idempotent backfill — adds any seed suppliers not yet in the DB.
-    await ensureSuppliersSeeded();
-
-    const suppliers = await db.supplierListing.findMany({
-      orderBy: { createdAt: "asc" },
-      // Safety cap, not real pagination — this endpoint has no page/limit
-      // params today and the UI renders whatever it gets in one shot, so a
-      // real paginated response would change visible behavior. This just
-      // stops the directory query/payload from growing unbounded as more
-      // suppliers are added; current volume is far below this ceiling.
-      take: 500,
-    });
-
+    const suppliers = await getSupplierDirectory();
     return NextResponse.json(suppliers);
   } catch (err) {
     console.error("[GET /api/suppliers]", err);

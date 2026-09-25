@@ -240,7 +240,7 @@ export function ManufactureYourOwn({
               <div className="w-24 h-24 rounded-lg border border-border bg-muted/40 overflow-hidden shrink-0">
                 {row.images[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img loading="lazy" src={row.images[0].dataUrl} alt={row.productName} className="w-full h-full object-contain" />
+                  <img src={row.images[0].dataUrl} alt={row.productName} className="w-full h-full object-contain" />
                 ) : (
                   <div className="w-full h-full" />
                 )}
