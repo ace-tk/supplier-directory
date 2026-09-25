@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Clock, FolderOpen, Sparkles } from "lucide-react";
 import { StudioNav } from "@/components/design-studio/StudioNav";
 import { Badge } from "@/components/ui/badge";
-import { designStudioWorkflows } from "@/lib/design-studio-workflows";
+import { designStudioProposalCards, designStudioWorkflows } from "@/lib/design-studio-workflows";
 import { getGarmentDesignsAction } from "@/services/garment-studio";
 import { getRecentRepeatPrintDesignsAction } from "@/services/repeat-print";
 import { formatRelativeTime } from "@/utils/format";
@@ -57,6 +57,25 @@ export default async function AiDesignStudioHomePage() {
       <section>
         <h2 className="text-base font-semibold text-foreground mb-1">Create something new</h2>
         <p className="text-sm text-muted-foreground mb-4">Choose a workflow to start.</p>
+        {/* Display-only for now — no workflow behind these yet. The image is a
+            CSS background so a not-yet-added file leaves a plain muted panel
+            instead of a broken-image icon. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          {designStudioProposalCards.map((card) => (
+            <div key={card.id} className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card">
+              <div
+                role="img"
+                aria-label={card.name}
+                className="aspect-[3/2] w-full bg-muted bg-cover bg-center"
+                style={{ backgroundImage: `url(${card.image})` }}
+              />
+              <div className="p-5">
+                <p className="text-sm font-semibold text-foreground">{card.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{card.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {designStudioWorkflows.map((workflow) => {
             const isAvailable = workflow.status === "available";
@@ -71,11 +90,6 @@ export default async function AiDesignStudioHomePage() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <workflow.icon className="h-5 w-5" />
                   </div>
-                  {!isAvailable && (
-                    <Badge variant="secondary" className="border-0 text-[10px]">
-                      Coming Soon
-                    </Badge>
-                  )}
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">{workflow.name}</p>

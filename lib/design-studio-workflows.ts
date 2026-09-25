@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Grid3x3, Shirt, Library, Scissors, SwatchBook, Layers, Package, RotateCw } from "lucide-react";
+import { Grid3x3, Shirt, Library, Scissors, Package, RotateCw } from "lucide-react";
 
 export interface DesignStudioWorkflow {
   id: string;
@@ -65,20 +65,44 @@ export const designStudioWorkflows: DesignStudioWorkflow[] = [
     icon: Package,
     status: "available",
   },
+];
+
+export interface DesignStudioProposalCard {
+  id: string;
+  name: string;
+  description: string;
+  /** Served from public/ai-studio/reference-images/. */
+  image: string;
+}
+
+/**
+ * Display-only Studio Home cards, in order. No workflow is wired to these
+ * yet — each gets an href (and moves to its own route) once its workflow is
+ * built.
+ */
+export const designStudioProposalCards: DesignStudioProposalCard[] = [
   {
-    id: "color-variations",
-    name: "Color Variations",
-    description: "Generate colorway variations of a design automatically.",
-    href: "/design-studio/color-variations",
-    icon: SwatchBook,
-    status: "coming-soon",
+    id: "hit-collection-proposal",
+    name: "Hit Collection Proposal",
+    description: "Extend a bestseller into cohesive style variations while preserving its core design language.",
+    image: "/ai-studio/reference-images/hit-collection-proposal.webp",
   },
   {
-    id: "garment-variations",
-    name: "Garment Variations",
-    description: "Produce style and silhouette variations of a garment.",
-    href: "/design-studio/garment-variations",
-    icon: Layers,
-    status: "coming-soon",
+    id: "collection-proposal",
+    name: "Collection Proposal",
+    description: "Build a cohesive collection proposal around a bestseller with aligned themes, categories and design language.",
+    image: "/ai-studio/reference-images/collection-proposal.webp",
+  },
+  {
+    id: "detail-to-design",
+    name: "Detail to Design",
+    description: "Turn a neckline, sleeve, pocket or other detail reference into multiple apparel concepts.",
+    image: "/ai-studio/reference-images/detail-to-design.webp",
+  },
+  {
+    id: "fabric-to-design",
+    name: "Fabric to Design",
+    description: "Create apparel concepts that match the color, texture and drape of a fabric reference.",
+    image: "/ai-studio/reference-images/fabric-to-design.webp",
   },
 ];
