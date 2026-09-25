@@ -191,7 +191,7 @@ export function ProductVisualWorkspace({
       <div className="w-full h-[380px] rounded-xl border border-border bg-muted/40 overflow-hidden relative">
         {selected ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={selected.dataUrl} alt="Product" className="w-full h-full object-contain" />
+          <img loading="lazy" src={selected.dataUrl} alt="Product" className="w-full h-full object-contain" />
         ) : (
           <button
             type="button"
@@ -219,7 +219,7 @@ export function ProductVisualWorkspace({
             )}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img.dataUrl} alt="" className="w-full h-full object-cover" />
+            <img loading="lazy" src={img.dataUrl} alt="" className="w-full h-full object-cover" />
             {i === 0 && (
               <span className="absolute bottom-1 left-1 flex items-center gap-0.5 rounded bg-black/70 text-white text-[9px] px-1 py-0.5">
                 <Star className="h-2.5 w-2.5 fill-current" /> Cover

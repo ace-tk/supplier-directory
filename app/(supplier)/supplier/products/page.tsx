@@ -15,7 +15,7 @@ const columns: RecordColumn<SupplierProductRow>[] = [
     label: "Product",
     render: (r) => (
       <span className="flex items-center gap-3">
-        <img src={r.images[0]} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+        <img loading="lazy" src={r.images[0]} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
         <span className="font-medium text-foreground whitespace-normal">{r.name}</span>
       </span>
     ),

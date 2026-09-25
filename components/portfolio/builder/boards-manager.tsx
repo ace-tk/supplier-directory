@@ -89,7 +89,7 @@ export function BoardsManager({ data, onChange }: { data: PortfolioViewModel; on
                 <div className="aspect-square bg-muted">
                   {board.coverImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={board.coverImage} alt={board.title} className="w-full h-full object-cover" />
+                    <img loading="lazy" src={board.coverImage} alt={board.title} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No pins yet</div>
                   )}
@@ -196,7 +196,7 @@ function BoardPinsDialog({
           {pins.map((pin) => (
             <div key={pin.id} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={pin.image} alt={pin.title ?? "Pin"} className="w-full h-full object-cover" />
+              <img loading="lazy" src={pin.image} alt={pin.title ?? "Pin"} className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={() => handleDeletePin(pin.id)}

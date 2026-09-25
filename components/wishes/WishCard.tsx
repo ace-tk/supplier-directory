@@ -38,7 +38,7 @@ export function WishCard({ wish, href }: { wish: ProductWishRecord; href: string
         />
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover.dataUrl} alt={wish.name} className="relative w-full h-full object-contain p-10" />
+          <img loading="lazy" src={cover.dataUrl} alt={wish.name} className="relative w-full h-full object-contain p-10" />
         ) : (
           <div className="relative w-full h-full flex items-center justify-center text-muted-foreground">
             <ImageOff className="w-8 h-8" />

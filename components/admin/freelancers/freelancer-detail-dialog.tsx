@@ -38,7 +38,7 @@ export function FreelancerDetailDialog({ freelancer, open, onOpenChange }: Freel
             <div className="w-14 h-14 rounded-full overflow-hidden bg-muted shrink-0 flex items-center justify-center">
               {freelancer.avatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={freelancer.avatar} alt={freelancer.name} className="w-full h-full object-cover" />
+                <img loading="lazy" src={freelancer.avatar} alt={freelancer.name} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-sm font-semibold text-muted-foreground">{initials(freelancer.name)}</span>
               )}

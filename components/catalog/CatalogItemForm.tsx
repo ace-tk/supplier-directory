@@ -341,7 +341,7 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
             <div className="w-full h-[360px] rounded-xl border border-border bg-muted/40 overflow-hidden relative">
               {coverImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={coverImage.dataUrl} alt="Product" className="w-full h-full object-contain" />
+                <img loading="lazy" src={coverImage.dataUrl} alt="Product" className="w-full h-full object-contain" />
               ) : (
                 <button
                   type="button"
@@ -361,7 +361,7 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
               {images.map((img) => (
                 <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
+                  <img loading="lazy" src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(img.id)}
@@ -376,7 +376,7 @@ export function CatalogItemForm({ basePath, initialRow }: { basePath: string; in
               {pendingImages.map((img, i) => (
                 <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
+                  <img loading="lazy" src={img.dataUrl} alt="Product" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => handleRemovePendingImage(i)}

@@ -231,7 +231,7 @@ export function WishForm({ wish }: { wish?: ProductWishRecord }) {
             {images.map((img) => (
               <div key={img.id} className="relative group aspect-square rounded-xl overflow-hidden bg-muted">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.dataUrl} alt="Reference" className="w-full h-full object-cover" />
+                <img loading="lazy" src={img.dataUrl} alt="Reference" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removeImage(img.id)}

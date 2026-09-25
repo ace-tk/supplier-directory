@@ -42,7 +42,7 @@ export default async function AdminAllMoodBoardsPage() {
               <div className="aspect-video bg-muted flex items-center justify-center">
                 {b.coverImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.coverImage} alt={b.name} className="w-full h-full object-cover" />
+                  <img loading="lazy" src={b.coverImage} alt={b.name} className="w-full h-full object-cover" />
                 ) : (
                   <ImageOff className="h-6 w-6 text-muted-foreground" />
                 )}

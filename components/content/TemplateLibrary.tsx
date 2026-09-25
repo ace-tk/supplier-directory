@@ -22,8 +22,14 @@ type SortOrder = "updated" | "created" | "name";
  * compact Templates tab inside the editor, but reading the exact same
  * data (ContentItem rows with isTemplate=true via getTemplatesAction).
  */
-export function TemplateLibrary({ basePath, initialCategory }: { basePath: string; initialCategory?: string }) {
-  const [templates, setTemplates] = useState<ContentItemSummary[] | null>(null);
+interface TemplateLibraryProps {
+  basePath: string;
+  initialCategory?: string;
+  initialTemplates?: ContentItemSummary[];
+}
+
+export function TemplateLibrary({ basePath, initialCategory, initialTemplates }: TemplateLibraryProps) {
+  const [templates, setTemplates] = useState<ContentItemSummary[] | null>(initialTemplates ?? null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState(initialCategory || "All");
   const [sort, setSort] = useState<SortOrder>("updated");
@@ -32,10 +38,15 @@ export function TemplateLibrary({ basePath, initialCategory }: { basePath: strin
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
+    // Skip the redundant client round-trip when the Server Component
+    // already fetched templates (initialTemplates) — same getTemplatesAction()
+    // call, just run server-side before first paint instead of after mount.
+    if (initialTemplates) return;
     getTemplatesAction().then((r) => {
       if (r.success) setTemplates(r.data);
       else toast.error(r.error);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const categories = useMemo(() => {

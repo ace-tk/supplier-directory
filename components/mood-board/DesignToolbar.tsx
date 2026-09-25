@@ -155,7 +155,7 @@ export function DesignToolbar({
               {prints.map((p) => (
                 <button key={p.id} type="button" onClick={() => onAddImageAsset(p.dataUrl)} className="aspect-square rounded overflow-hidden border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.dataUrl} alt="" className="w-full h-full object-cover" />
+                  <img loading="lazy" src={p.dataUrl} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -176,7 +176,7 @@ export function DesignToolbar({
               {embroideries.map((p) => (
                 <button key={p.id} type="button" onClick={() => onAddImageAsset(p.dataUrl)} className="aspect-square rounded overflow-hidden border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.dataUrl} alt="" className="w-full h-full object-cover" />
+                  <img loading="lazy" src={p.dataUrl} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

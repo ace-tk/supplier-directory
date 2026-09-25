@@ -44,7 +44,7 @@ export default async function WishDetailPage({ params }: { params: Promise<{ id:
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {wish.images.map((img) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={img.id} src={img.dataUrl} alt={wish.name} className="w-full aspect-square rounded-xl object-cover bg-muted" />
+                <img loading="lazy" key={img.id} src={img.dataUrl} alt={wish.name} className="w-full aspect-square rounded-xl object-cover bg-muted" />
               ))}
             </div>
           ) : (

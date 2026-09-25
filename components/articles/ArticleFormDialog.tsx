@@ -150,7 +150,7 @@ export function ArticleFormDialog({
             <div className="space-y-1.5">
               <Label className="text-xs">Thumbnail Preview</Label>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={form.thumbnailUrl} alt="" className="h-24 w-full object-cover rounded-lg border border-border" />
+              <img loading="lazy" src={form.thumbnailUrl} alt="" className="h-24 w-full object-cover rounded-lg border border-border" />
             </div>
           )}
         </div>

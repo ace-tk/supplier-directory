@@ -182,7 +182,7 @@ export function ProjectsManager({ data, onChange }: { data: PortfolioViewModel; 
               <div className="aspect-video bg-muted relative">
                 {project.coverImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={project.coverImage} alt={project.title} className="w-full h-full object-cover" />
+                  <img loading="lazy" src={project.coverImage} alt={project.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No cover image</div>
                 )}
@@ -241,7 +241,7 @@ export function ProjectsManager({ data, onChange }: { data: PortfolioViewModel; 
               <div className="aspect-video rounded-lg border border-dashed border-border bg-muted overflow-hidden flex items-center justify-center relative">
                 {form.coverImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.coverImage} alt="Cover" className="w-full h-full object-cover" />
+                  <img loading="lazy" src={form.coverImage} alt="Cover" className="w-full h-full object-cover" />
                 ) : (
                   <button type="button" onClick={() => coverInputRef.current?.click()} disabled={uploadingCover} className="flex flex-col items-center gap-1 text-muted-foreground text-xs">
                     {uploadingCover ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
@@ -314,7 +314,7 @@ export function ProjectsManager({ data, onChange }: { data: PortfolioViewModel; 
                 {(form.galleryImages ?? []).map((img, i) => (
                   <div key={i} className="relative w-16 h-16 rounded-md overflow-hidden bg-muted group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <img loading="lazy" src={img} alt="" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeGalleryImage(i)}

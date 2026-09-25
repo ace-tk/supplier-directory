@@ -283,7 +283,7 @@ export function PortfolioEditor({ initialProfile }: { initialProfile: Freelancer
 
           {profile.portfolioItems.map((item) => (
             <div key={item.id} className="relative group aspect-square rounded-xl overflow-hidden bg-muted">
-              <img src={item.dataUrl} alt={item.caption ?? "Portfolio item"} className="w-full h-full object-cover" />
+              <img loading="lazy" src={item.dataUrl} alt={item.caption ?? "Portfolio item"} className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={() => handleRemoveImage(item.id)}

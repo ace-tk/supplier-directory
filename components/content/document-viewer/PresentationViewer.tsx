@@ -126,6 +126,7 @@ export function PresentationViewer({ file, variant = "compact" }: { file: DraftA
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={i}
+                  loading="lazy"
                   src={shape.dataUrl}
                   alt=""
                   className="absolute object-contain"

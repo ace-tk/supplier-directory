@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/session";
+import { getTemplatesForOwner } from "@/lib/content-queries";
 import { TemplateLibrary } from "@/components/content/TemplateLibrary";
 
 export default async function SupplierTemplateLibraryPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
@@ -7,5 +8,9 @@ export default async function SupplierTemplateLibraryPage({ searchParams }: { se
   if (!user) redirect("/login?from=/supplier/content/templates");
 
   const { category } = await searchParams;
-  return <TemplateLibrary basePath="/supplier/content" initialCategory={category} />;
+  // Fetched here (the same query TemplateLibrary's own getTemplatesAction()
+  // would otherwise call on mount) so the library renders with real data on
+  // first paint instead of an empty shell followed by a client round-trip.
+  const initialTemplates = await getTemplatesForOwner(user.id);
+  return <TemplateLibrary basePath="/supplier/content" initialCategory={category} initialTemplates={initialTemplates} />;
 }

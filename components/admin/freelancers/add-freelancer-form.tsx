@@ -167,7 +167,7 @@ export function AddFreelancerForm() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary text-lg font-semibold overflow-hidden">
                 {avatarPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarPreview} alt="Profile preview" className="w-full h-full object-cover" />
+                  <img loading="lazy" src={avatarPreview} alt="Profile preview" className="w-full h-full object-cover" />
                 ) : (
                   initials(name || "?")
                 )}

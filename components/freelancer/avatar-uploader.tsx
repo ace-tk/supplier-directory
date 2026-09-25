@@ -32,7 +32,7 @@ export function AvatarUploader({ name, avatar }: { name: string; avatar: string 
     <div className="relative shrink-0">
       <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 text-primary text-xl font-semibold overflow-hidden">
         {currentAvatar ? (
-          <img src={currentAvatar} alt={name} className="w-full h-full object-cover" />
+          <img loading="lazy" src={currentAvatar} alt={name} className="w-full h-full object-cover" />
         ) : (
           initialsFor(name)
         )}

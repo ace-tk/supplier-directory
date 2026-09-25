@@ -123,7 +123,7 @@ export function ReferencesSection() {
 
           {images.fields.map((field, index) => (
             <div key={field.id} className="relative group aspect-square rounded-xl overflow-hidden bg-muted">
-              <img src={field.dataUrl} alt="Reference" className="w-full h-full object-cover" />
+              <img loading="lazy" src={field.dataUrl} alt="Reference" className="w-full h-full object-cover" />
               <button
                 type="button"
                 onClick={() => images.remove(index)}

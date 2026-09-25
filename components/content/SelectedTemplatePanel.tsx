@@ -58,7 +58,7 @@ function TemplateDetails({ basePath, templateId }: { basePath: string; templateI
         <div className="aspect-video rounded-lg bg-muted overflow-hidden flex items-center justify-center">
           {item.featuredImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.featuredImageUrl} alt="" className="w-full h-full object-cover" />
+            <img loading="lazy" src={item.featuredImageUrl} alt="" className="w-full h-full object-cover" />
           ) : (
             <FileText className="h-6 w-6 text-muted-foreground" />
           )}

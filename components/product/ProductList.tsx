@@ -135,7 +135,7 @@ export function ProductList({ basePath, initialCatalog }: { basePath: string; in
       render: (r) =>
         r.images[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={r.images[0].dataUrl} alt="" className="w-9 h-9 rounded-lg object-cover border border-border" />
+          <img loading="lazy" src={r.images[0].dataUrl} alt="" className="w-9 h-9 rounded-lg object-cover border border-border" />
         ) : (
           <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
             <PackageSearch className="h-4 w-4" />

@@ -128,7 +128,7 @@ export default async function FreelancerProfilePage() {
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             {profile.portfolioItems.slice(0, 6).map((item) => (
               <div key={item.id} className="aspect-square rounded-lg overflow-hidden bg-muted">
-                <img src={item.dataUrl} alt={item.caption ?? "Portfolio item"} className="w-full h-full object-cover" />
+                <img loading="lazy" src={item.dataUrl} alt={item.caption ?? "Portfolio item"} className="w-full h-full object-cover" />
               </div>
             ))}
           </div>

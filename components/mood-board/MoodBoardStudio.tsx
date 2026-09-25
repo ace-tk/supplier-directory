@@ -434,7 +434,7 @@ export function MoodBoardStudio({
               <div className="w-8 h-8 rounded bg-muted overflow-hidden shrink-0">
                 {b.coverImage && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={b.coverImage} alt="" className="w-full h-full object-cover" />
+                  <img loading="lazy" src={b.coverImage} alt="" className="w-full h-full object-cover" />
                 )}
               </div>
               <div className="text-left">

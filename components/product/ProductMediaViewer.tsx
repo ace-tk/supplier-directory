@@ -100,7 +100,7 @@ export function ProductMediaViewer({ productId, productName, images }: { product
       <div className="w-full h-[420px] rounded-xl border border-border bg-muted/40 overflow-hidden relative">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover.dataUrl} alt={productName} className="w-full h-full object-contain" />
+          <img loading="lazy" src={cover.dataUrl} alt={productName} className="w-full h-full object-contain" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground">No images uploaded yet</div>
         )}
@@ -116,7 +116,7 @@ export function ProductMediaViewer({ productId, productName, images }: { product
               className="shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-border bg-muted"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.dataUrl} alt="" className="w-full h-full object-cover" />
+              <img loading="lazy" src={img.dataUrl} alt="" className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

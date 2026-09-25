@@ -143,7 +143,7 @@ export function TimelineMedia({ milestoneId, media, canEdit, onMediaChange }: Ti
             <div key={m.id} className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
               {m.kind === "IMAGE" ? (
                 // eslint-disable-next-line @next/next/no-img-element -- base64 data URLs aren't compatible with next/image optimization
-                <img src={m.dataUrl} alt={m.fileName} className="w-full h-full object-cover" />
+                <img loading="lazy" src={m.dataUrl} alt={m.fileName} className="w-full h-full object-cover" />
               ) : (
                 <video src={m.dataUrl} className="w-full h-full object-cover" muted />
               )}

@@ -30,7 +30,7 @@ export function TemplatePreviewDialog({
           </div>
           {item.featuredImageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.featuredImageUrl} alt={item.title} className="w-full aspect-video object-cover rounded-xl" />
+            <img loading="lazy" src={item.featuredImageUrl} alt={item.title} className="w-full aspect-video object-cover rounded-xl" />
           )}
           {item.bodyHtml.trim() ? (
             <div className="tiptap-content text-sm" dangerouslySetInnerHTML={{ __html: item.bodyHtml }} />

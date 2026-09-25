@@ -37,7 +37,7 @@ export function FileHoverPreview({ file, children }: { file: DraftAttachment; ch
         <div className="flex items-start gap-2.5">
           {isPdf(file.mimeType) && thumb ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumb.dataUrl} alt="" className="w-12 h-16 object-cover rounded border border-border shrink-0 bg-white" />
+            <img loading="lazy" src={thumb.dataUrl} alt="" className="w-12 h-16 object-cover rounded border border-border shrink-0 bg-white" />
           ) : (
             <div className="w-12 h-16 rounded border border-border bg-muted flex items-center justify-center shrink-0">
               <FileText className="h-4 w-4 text-muted-foreground" />

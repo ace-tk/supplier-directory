@@ -135,6 +135,7 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
+                  loading="lazy"
                   src={img.preview ?? img.url}
                   alt={img.name}
                   className="w-full h-full object-cover"
