@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { validateDocument } from "@/lib/file-validation";
 import { getUser } from "@/lib/session";
 import { submitManufacturingRequestSchema } from "@/lib/validations/design";
+import { persistDataUrl } from "@/lib/object-storage";
 import type { DesignSpecification, ManufacturingRequestRecord, DesignAttachmentEntry } from "@/types/design";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
@@ -139,7 +140,8 @@ export async function addManufacturingRequestAttachmentAction(
   const v = validateDocument(input.mimeType, input.sizeBytes, input.fileName);
   if (!v.valid) return { success: false, error: v.error! };
 
-  const attachment = await db.manufacturingRequestAttachment.create({ data: { requestId, ...input } });
+  const dataUrl = await persistDataUrl(input.dataUrl, "manufacturing-request-attachments");
+  const attachment = await db.manufacturingRequestAttachment.create({ data: { requestId, ...input, dataUrl } });
   return { success: true, data: mapAttachment(attachment) };
 }
 

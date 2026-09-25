@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
-import { getOrCreateCatalogForOwner } from "@/lib/catalog-queries";
+import { getOrCreateCatalogId } from "@/lib/catalog-queries";
 import { addRowAction } from "@/services/catalog";
 import { getMoqNumber, getPriceMin } from "@/lib/product-tags";
 
@@ -63,10 +63,10 @@ export async function createCatalogRowFromShopProductAction(productId: string): 
   const product = await db.product.findUnique({ where: { id: productId } });
   if (!product) return { success: false, error: "Product not found." };
 
-  const catalog = await getOrCreateCatalogForOwner(user.id);
+  const catalogId = await getOrCreateCatalogId(user.id);
 
   const existingRow = await db.catalogRow.findFirst({
-    where: { catalogId: catalog.id, sourceShopProductId: productId },
+    where: { catalogId, sourceShopProductId: productId },
     select: { id: true },
   });
   if (existingRow) return { success: true, data: { rowId: existingRow.id } };

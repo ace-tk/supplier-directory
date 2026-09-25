@@ -10,6 +10,7 @@
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateImage, extractDataUrlMeta } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import type {
   MoodBoardRecord,
   MoodBoardSummary,
@@ -295,8 +296,11 @@ export async function uploadAssetAction(input: {
   const v = validateImage(mimeType, sizeBytes, input.fileName);
   if (!v.valid) return { success: false, error: v.error! };
 
+  // mimeType/sizeBytes above are derived from the original payload before
+  // persisting, so they stay accurate even once dataUrl becomes a URL.
+  const dataUrl = await persistDataUrl(input.dataUrl, "mood-board");
   const created = await db.moodBoardAsset.create({
-    data: { ownerId: user.id, kind: input.kind, fileName: input.fileName, mimeType, sizeBytes, dataUrl: input.dataUrl },
+    data: { ownerId: user.id, kind: input.kind, fileName: input.fileName, mimeType, sizeBytes, dataUrl },
   });
   return {
     success: true,

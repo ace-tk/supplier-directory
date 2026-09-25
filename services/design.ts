@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { validateDocument } from "@/lib/file-validation";
 import { getUser } from "@/lib/session";
 import { saveDesignSchema } from "@/lib/validations/design";
+import { persistDataUrl } from "@/lib/object-storage";
 import type { DesignSpecification, ProductDesignRecord, DesignAttachmentEntry } from "@/types/design";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
@@ -151,7 +152,8 @@ export async function addDesignAttachmentAction(
   const v = validateDocument(input.mimeType, input.sizeBytes, input.fileName);
   if (!v.valid) return { success: false, error: v.error! };
 
-  const attachment = await db.productDesignAttachment.create({ data: { designId, ...input } });
+  const dataUrl = await persistDataUrl(input.dataUrl, "product-design-attachments");
+  const attachment = await db.productDesignAttachment.create({ data: { designId, ...input, dataUrl } });
   return { success: true, data: mapAttachment(attachment) };
 }
 

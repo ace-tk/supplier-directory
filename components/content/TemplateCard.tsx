@@ -34,7 +34,7 @@ export function TemplateCard({
       <div className="aspect-[4/3] rounded-lg bg-muted overflow-hidden flex items-center justify-center">
         {template.featuredImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={template.featuredImageUrl} alt="" className="w-full h-full object-cover" />
+          <img src={template.featuredImageUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <FileText className="h-6 w-6 text-muted-foreground" />
         )}

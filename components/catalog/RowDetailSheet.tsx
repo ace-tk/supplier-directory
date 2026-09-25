@@ -116,7 +116,7 @@ export function RowDetailSheet({ row, open, onOpenChange, onRowChange }: RowDeta
               <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
               {row.images.map((img) => (
                 <div key={img.id} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
-                  <img src={img.dataUrl} alt="Row" className="w-full h-full object-cover" />
+                  <img src={img.dataUrl} alt="Row" loading="lazy" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(img.id)}

@@ -1,13 +1,23 @@
 "use client";
 
 // Real CSV/Excel import & export for Catalog Management, via SheetJS (xlsx) —
-// one library cleanly covers both formats.
+// one library cleanly covers both formats. Lazily imported (mirrors the
+// same cached-promise pattern as lib/spreadsheet-client.ts) so the Catalog
+// page's initial bundle doesn't ship SheetJS before the user actually
+// clicks Export/Import.
 
-import * as XLSX from "xlsx";
 import { CATALOG_COLUMN_LABELS, CATALOG_EXPORT_COLUMNS, type CatalogRowRecord } from "@/types/catalog";
 import type { CatalogRowInput } from "@/lib/validations/catalog";
 
-export function exportRowsToFile(rows: CatalogRowRecord[], format: "csv" | "xlsx", fileName = "catalog") {
+let xlsxPromise: Promise<typeof import("xlsx")> | null = null;
+
+function getXlsx() {
+  if (!xlsxPromise) xlsxPromise = import("xlsx");
+  return xlsxPromise;
+}
+
+export async function exportRowsToFile(rows: CatalogRowRecord[], format: "csv" | "xlsx", fileName = "catalog") {
+  const XLSX = await getXlsx();
   const data = rows.map((row) => {
     const record: Record<string, string | number> = {};
     for (const col of CATALOG_EXPORT_COLUMNS) {
@@ -40,7 +50,8 @@ function normalizeHeader(header: string): keyof CatalogRowInput | null {
   return directMatch ?? null;
 }
 
-export function parseFileToRows(file: File): Promise<Partial<CatalogRowInput>[]> {
+export async function parseFileToRows(file: File): Promise<Partial<CatalogRowInput>[]> {
+  const XLSX = await getXlsx();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error);

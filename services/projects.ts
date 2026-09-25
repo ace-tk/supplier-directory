@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { notifyUsers } from "@/lib/notifications";
 import { validateImage, validateDocument } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import { createProjectSchema } from "@/lib/validations/project";
 import type { ProjectRecord } from "@/types/freelancer-portal";
 import type {
@@ -199,14 +200,20 @@ export async function createFullProjectAction(
   }
   const data = parsed.data;
 
-  const freelancer = await db.user.findUnique({ where: { id: input.freelancerUserId }, select: { id: true, role: true } });
+  // Independent reads — run together, then check in the same precedence
+  // order as before (freelancer error takes priority over chain error).
+  const [freelancer, chain] = await Promise.all([
+    db.user.findUnique({ where: { id: input.freelancerUserId }, select: { id: true, role: true } }),
+    data.supplyChainId
+      ? db.supplyChain.findUnique({ where: { id: data.supplyChainId }, select: { id: true } })
+      : Promise.resolve(null),
+  ]);
   if (!freelancer || freelancer.role !== "FREELANCER") {
     return { success: false, error: "Selected freelancer was not found." };
   }
 
-  if (data.supplyChainId) {
-    const chain = await db.supplyChain.findUnique({ where: { id: data.supplyChainId }, select: { id: true } });
-    if (!chain) return { success: false, error: "Selected supply chain was not found." };
+  if (data.supplyChainId && !chain) {
+    return { success: false, error: "Selected supply chain was not found." };
   }
 
   for (const img of data.referenceImages) {
@@ -217,6 +224,22 @@ export async function createFullProjectAction(
     const v = validateDocument(doc.mimeType, doc.sizeBytes);
     if (!v.valid) return { success: false, error: v.error! };
   }
+
+  const referenceImages = await Promise.all(
+    data.referenceImages.map(async (img, i) => ({
+      dataUrl: await persistDataUrl(img.dataUrl, "project-reference-images"),
+      caption: img.caption?.trim() || null,
+      order: i,
+    }))
+  );
+  const documents = await Promise.all(
+    data.documents.map(async (doc) => ({
+      fileName: doc.fileName,
+      mimeType: doc.mimeType,
+      sizeBytes: doc.sizeBytes,
+      dataUrl: await persistDataUrl(doc.dataUrl, "project-documents"),
+    }))
+  );
 
   const project = await db.project.create({
     data: {
@@ -248,19 +271,10 @@ export async function createFullProjectAction(
         create: data.referenceLinks.map((r, i) => ({ platform: r.platform, url: r.url.trim(), order: i })),
       },
       referenceImages: {
-        create: data.referenceImages.map((img, i) => ({
-          dataUrl: img.dataUrl,
-          caption: img.caption?.trim() || null,
-          order: i,
-        })),
+        create: referenceImages,
       },
       documents: {
-        create: data.documents.map((doc) => ({
-          fileName: doc.fileName,
-          mimeType: doc.mimeType,
-          sizeBytes: doc.sizeBytes,
-          dataUrl: doc.dataUrl,
-        })),
+        create: documents,
       },
       items: {
         create: data.items.map((it, i) => ({

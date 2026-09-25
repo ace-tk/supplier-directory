@@ -6,6 +6,7 @@ import { logMilestoneActivity } from "@/lib/milestone-activity";
 import { getAccessForMilestone } from "@/lib/supply-chain-queries";
 import { canEditMilestone } from "@/lib/supply-chain-permissions";
 import { validateImage, validateVideo } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import type { ActionResult } from "@/services/supply-chain";
 import type { MediaKind } from "@/types/supply-chain";
 
@@ -25,6 +26,7 @@ export async function uploadMilestoneMediaAction(
   const validation = file.kind === "IMAGE" ? validateImage(file.mimeType, file.sizeBytes) : validateVideo(file.mimeType, file.sizeBytes);
   if (!validation.valid) return { success: false, error: validation.error! };
 
+  const dataUrl = await persistDataUrl(file.dataUrl, "supply-chain-media");
   const media = await db.milestoneMedia.create({
     data: {
       milestoneId,
@@ -32,7 +34,7 @@ export async function uploadMilestoneMediaAction(
       fileName: file.fileName,
       mimeType: file.mimeType,
       sizeBytes: file.sizeBytes,
-      dataUrl: file.dataUrl,
+      dataUrl,
       uploadedById: user.id,
     },
   });

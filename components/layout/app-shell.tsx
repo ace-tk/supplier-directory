@@ -1,10 +1,10 @@
 import { getUser } from "@/lib/session";
+import { getCurrentWorkspaceAccess } from "@/lib/team-auth";
 import { Sidebar } from "@/components/navigation/sidebar";
 import { TopNavbar } from "@/components/navigation/top-navbar";
 import { SessionProvider } from "@/components/shared/session-provider";
 import type { PortalKey } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { db } from "@/lib/db";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -14,10 +14,12 @@ interface AppShellProps {
 
 export async function AppShell({ children, className, portal }: AppShellProps) {
   const user = await getUser();
-  const membership = user && user.role !== "ADMIN" ? await db.workspaceMember.findFirst({
-    where: { userId: user.id, status: "ACTIVE" }, select: { permissions: true },
-  }) : null;
-  const permissions = user?.role === "ADMIN" ? ["*"] : (membership?.permissions ?? []);
+  // Reuses the same cached getCurrentWorkspaceAccess() that the (dashboard)
+  // layout and every module layout's hasTeamPermission() call already use,
+  // so within one request this membership lookup runs at most once instead
+  // of being re-queried by each of them independently.
+  const access = user && user.role !== "ADMIN" ? await getCurrentWorkspaceAccess() : null;
+  const permissions = user?.role === "ADMIN" ? ["*"] : (access?.permissions ?? []);
 
   return (
     <SessionProvider user={user}>

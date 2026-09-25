@@ -202,9 +202,9 @@ const COLUMN_HEADERS = [
   "Price Before GST", "GST %", "Price", "Currency", "Shipping", "Misc.", "Lead Time", "Status", "Warehouse", "",
 ];
 
-export function CatalogTable({ basePath }: { basePath: string }) {
-  const [catalog, setCatalog] = useState<CatalogRecord | null>(null);
-  const [loading, setLoading] = useState(true);
+export function CatalogTable({ basePath, initialCatalog }: { basePath: string; initialCatalog?: CatalogRecord }) {
+  const [catalog, setCatalog] = useState<CatalogRecord | null>(initialCatalog ?? null);
+  const [loading, setLoading] = useState(!initialCatalog);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
@@ -224,7 +224,12 @@ export function CatalogTable({ basePath }: { basePath: string }) {
   }
 
   useEffect(() => {
-    refresh();
+    // When the Server Component already fetched the catalog (initialCatalog),
+    // skip the redundant client round-trip on first mount — refresh() is
+    // still used everywhere else (add/import/etc.) for exactly the same
+    // getCatalogAction() call as before.
+    if (!initialCatalog) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const rows = catalog?.rows ?? [];

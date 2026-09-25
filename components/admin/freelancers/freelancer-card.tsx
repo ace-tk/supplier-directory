@@ -164,7 +164,7 @@ export function FreelancerCard({
         <div className="w-24 h-24 rounded-xl overflow-hidden bg-muted shrink-0 flex items-center justify-center">
           {freelancer.avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={freelancer.avatar} alt={freelancer.name} className="w-full h-full object-cover" />
+            <img src={freelancer.avatar} alt={freelancer.name} loading="lazy" className="w-full h-full object-cover" />
           ) : (
             <span className="text-xl font-semibold text-muted-foreground">{initials(freelancer.name)}</span>
           )}
@@ -249,7 +249,7 @@ export function FreelancerCard({
             <div className="grid grid-cols-3 gap-1.5 flex-1">
               {visibleThumbs.map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={pageStart + i} src={src} alt="" className="w-full aspect-square rounded-lg object-cover bg-muted" />
+                <img key={pageStart + i} src={src} alt="" loading="lazy" className="w-full aspect-square rounded-lg object-cover bg-muted" />
               ))}
             </div>
             {totalPortfolioImages > THUMBS_PER_PAGE && (

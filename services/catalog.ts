@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateImage, validateDocument } from "@/lib/file-validation";
 import { catalogRowInputSchema, type CatalogRowInput } from "@/lib/validations/catalog";
-import { getOrCreateCatalogForOwner, mapRow } from "@/lib/catalog-queries";
+import { getOrCreateCatalogForOwner, getOrCreateCatalogId, mapRow } from "@/lib/catalog-queries";
+import { persistDataUrl } from "@/lib/object-storage";
 import { computeCatalogPriceAfterGst } from "@/lib/catalog-ui";
 import type { CatalogRecord, CatalogRowRecord, ProductImageView } from "@/types/catalog";
 
@@ -66,19 +67,19 @@ export async function addRowAction(input?: Partial<CatalogRowInput>): Promise<Ac
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
 
-  const catalog = await getOrCreateCatalogForOwner(user.id);
+  const catalogId = await getOrCreateCatalogId(user.id);
   const parsed = catalogRowInputSchema.safeParse(input ?? {});
   if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
   const locationError = await normalizeLocationFields(user.id, parsed.data);
   if (locationError) return { success: false, error: locationError.error };
 
-  const maxOrder = await db.catalogRow.aggregate({ where: { catalogId: catalog.id }, _max: { order: true } });
+  const maxOrder = await db.catalogRow.aggregate({ where: { catalogId }, _max: { order: true } });
   const row = await db.catalogRow.create({
     data: {
       ...parsed.data,
       priceAfterGst: computeCatalogPriceAfterGst(parsed.data.priceBeforeGst, parsed.data.gstPercent),
-      catalogId: catalog.id,
+      catalogId,
       order: (maxOrder._max.order ?? -1) + 1,
     },
     include: { images: true, attachments: true, assignedWarehouse: { select: { name: true } }, assignedRetailStore: { select: { name: true } } },
@@ -207,8 +208,9 @@ export async function reorderRowsAction(rowIds: string[]): Promise<ActionResult<
   const user = await requireUser();
   if (!user) return { success: false, error: "You must be signed in." };
 
-  const catalog = await getOrCreateCatalogForOwner(user.id);
-  const ownedIds = new Set(catalog.rows.map((r) => r.id));
+  const catalogId = await getOrCreateCatalogId(user.id);
+  const ownedRows = await db.catalogRow.findMany({ where: { catalogId }, select: { id: true } });
+  const ownedIds = new Set(ownedRows.map((r) => r.id));
   if (!rowIds.every((id) => ownedIds.has(id))) return { success: false, error: "Row not found." };
 
   await db.$transaction(rowIds.map((id, index) => db.catalogRow.update({ where: { id }, data: { order: index } })));
@@ -228,9 +230,10 @@ export async function addRowImageAction(
   const v = validateImage(input.mimeType, input.sizeBytes);
   if (!v.valid) return { success: false, error: v.error! };
 
+  const dataUrl = await persistDataUrl(input.dataUrl, "catalog");
   const count = await db.catalogRowImage.count({ where: { rowId } });
   const image = await db.catalogRowImage.create({
-    data: { rowId, dataUrl: input.dataUrl, order: count, view: input.view ?? "OTHER" },
+    data: { rowId, dataUrl, order: count, view: input.view ?? "OTHER" },
   });
   return { success: true, data: { id: image.id, dataUrl: image.dataUrl, order: image.order, view: image.view } };
 }
@@ -300,7 +303,8 @@ export async function addRowAttachmentAction(
   const v = validateDocument(input.mimeType, input.sizeBytes);
   if (!v.valid) return { success: false, error: v.error! };
 
-  const attachment = await db.catalogRowAttachment.create({ data: { rowId, ...input } });
+  const dataUrl = await persistDataUrl(input.dataUrl, "catalog-attachments");
+  const attachment = await db.catalogRowAttachment.create({ data: { rowId, ...input, dataUrl } });
   return {
     success: true,
     data: {
@@ -333,14 +337,14 @@ export async function importRowsAction(rows: Partial<CatalogRowInput>[]): Promis
   if (rows.length === 0) return { success: false, error: "No rows to import." };
   if (rows.length > 500) return { success: false, error: "Import is limited to 500 rows at a time." };
 
-  const catalog = await getOrCreateCatalogForOwner(user.id);
-  const maxOrder = await db.catalogRow.aggregate({ where: { catalogId: catalog.id }, _max: { order: true } });
+  const catalogId = await getOrCreateCatalogId(user.id);
+  const maxOrder = await db.catalogRow.aggregate({ where: { catalogId }, _max: { order: true } });
   let cursor = (maxOrder._max.order ?? -1) + 1;
 
   const validRows = rows
     .map((r) => catalogRowInputSchema.safeParse(r))
     .filter((r): r is { success: true; data: CatalogRowInput } => r.success)
-    .map((r) => ({ ...r.data, catalogId: catalog.id, order: cursor++ }));
+    .map((r) => ({ ...r.data, catalogId, order: cursor++ }));
 
   if (validRows.length === 0) return { success: false, error: "No valid rows found in the file." };
 

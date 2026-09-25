@@ -6,6 +6,7 @@ import { logMilestoneActivity } from "@/lib/milestone-activity";
 import { getAccessForMilestone } from "@/lib/supply-chain-queries";
 import { canEditMilestone } from "@/lib/supply-chain-permissions";
 import { validateDocument } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import type { ActionResult } from "@/services/supply-chain";
 
 export async function uploadMilestoneAttachmentAction(
@@ -24,13 +25,14 @@ export async function uploadMilestoneAttachmentAction(
   const validation = validateDocument(file.mimeType, file.sizeBytes);
   if (!validation.valid) return { success: false, error: validation.error! };
 
+  const dataUrl = await persistDataUrl(file.dataUrl, "supply-chain-attachments");
   const attachment = await db.milestoneAttachment.create({
     data: {
       milestoneId,
       fileName: file.fileName,
       mimeType: file.mimeType,
       sizeBytes: file.sizeBytes,
-      dataUrl: file.dataUrl,
+      dataUrl,
       uploadedById: user.id,
     },
   });

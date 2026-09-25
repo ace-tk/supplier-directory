@@ -87,3 +87,17 @@ export async function getOrCreateCatalogForOwner(ownerId: string): Promise<Catal
   const created = await fetchCatalogRaw(ownerId);
   return mapCatalog(created!);
 }
+
+/**
+ * Narrow variant of getOrCreateCatalogForOwner for callers that only need
+ * the catalog's id (e.g. to attach a new row, or run an aggregate scoped to
+ * it) — avoids hydrating every row plus each row's images/attachments just
+ * to read `.id`. Same idempotent create-on-first-access semantics.
+ */
+export async function getOrCreateCatalogId(ownerId: string): Promise<string> {
+  const existing = await db.catalog.findUnique({ where: { ownerId }, select: { id: true } });
+  if (existing) return existing.id;
+
+  const created = await db.catalog.create({ data: { ownerId }, select: { id: true } });
+  return created.id;
+}

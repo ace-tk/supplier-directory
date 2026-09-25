@@ -9,8 +9,9 @@
 
 import { db } from "@/lib/db";
 import { validateImage, extractDataUrlMeta } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import { getUser } from "@/lib/session";
-import { getOrCreateCatalogForOwner } from "@/lib/catalog-queries";
+import { getOrCreateCatalogId } from "@/lib/catalog-queries";
 import { addRowAction } from "@/services/catalog";
 import { saveWishDraftSchema } from "@/lib/validations/wishes";
 import type { ProductWishRecord, ProductWishStatus } from "@/types/wishes";
@@ -110,6 +111,10 @@ export async function saveWishDraftAction(input: unknown): Promise<ActionResult<
     if (!v.valid) return { success: false, error: v.error! };
   }
 
+  const images = await Promise.all(
+    data.images.map(async (img, i) => ({ dataUrl: await persistDataUrl(img.dataUrl, "wishes"), order: i }))
+  );
+
   const baseData = {
     name: data.name,
     // Required, non-nullable columns — a brand-new/still-editing draft may
@@ -142,7 +147,7 @@ export async function saveWishDraftAction(input: unknown): Promise<ActionResult<
         where: { id: data.id },
         data: {
           ...baseData,
-          images: { create: data.images.map((img, i) => ({ dataUrl: img.dataUrl, order: i })) },
+          images: { create: images },
         },
       }),
     ]);
@@ -154,7 +159,7 @@ export async function saveWishDraftAction(input: unknown): Promise<ActionResult<
     data: {
       ...baseData,
       ownerId: user.id,
-      images: { create: data.images.map((img, i) => ({ dataUrl: img.dataUrl, order: i })) },
+      images: { create: images },
     },
     include: wishInclude,
   });
@@ -222,10 +227,10 @@ export async function manufactureThisWishAction(wishId: string): Promise<ActionR
   const wish = await fetchWishRaw(wishId);
   if (!wish || wish.ownerId !== user.id) return { success: false, error: "Wish not found." };
 
-  const catalog = await getOrCreateCatalogForOwner(user.id);
+  const catalogId = await getOrCreateCatalogId(user.id);
 
   const existingRow = await db.catalogRow.findFirst({
-    where: { catalogId: catalog.id, sourceWishId: wishId },
+    where: { catalogId, sourceWishId: wishId },
     select: { id: true },
   });
   if (existingRow) return { success: true, data: { rowId: existingRow.id } };

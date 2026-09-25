@@ -9,7 +9,7 @@
 
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
-import { getOrCreateCatalogForOwner } from "@/lib/catalog-queries";
+import { getOrCreateCatalogId } from "@/lib/catalog-queries";
 import { addRowAction } from "@/services/catalog";
 import type { MoodBoardItemContent } from "@/types/mood-board";
 
@@ -25,10 +25,10 @@ async function bridgeBoardToCatalogRow(boardId: string, ownerId: string) {
   const board = await requireOwnedBoardWithItems(boardId, ownerId);
   if (!board) return { success: false as const, error: "Board not found." };
 
-  const catalog = await getOrCreateCatalogForOwner(ownerId);
+  const catalogId = await getOrCreateCatalogId(ownerId);
 
   const existingRow = await db.catalogRow.findFirst({
-    where: { catalogId: catalog.id, sourceMoodBoardId: boardId },
+    where: { catalogId, sourceMoodBoardId: boardId },
     select: { id: true },
   });
   if (existingRow) return { success: true as const, data: { rowId: existingRow.id } };

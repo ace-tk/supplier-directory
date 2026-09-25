@@ -130,7 +130,11 @@ async function getShareRole(chainId: string, userId: string) {
 export async function getAccessibleSupplyChains(userId: string, role: string): Promise<SupplyChainRecord[]> {
   const chains =
     role === "ADMIN"
-      ? await db.supplyChain.findMany({ include: chainInclude, orderBy: { updatedAt: "desc" } })
+      ? // Safety cap, not real pagination — the Admin view renders this list
+        // in one shot with no page controls today, so this only stops the
+        // platform-wide, deep-include (milestones+participants+user) query
+        // from growing unbounded; current volume is far below this ceiling.
+        await db.supplyChain.findMany({ include: chainInclude, orderBy: { updatedAt: "desc" }, take: 500 })
       : await db.supplyChain.findMany({
           where: {
             OR: [
@@ -152,10 +156,10 @@ export async function getSupplyChainWithAccess(
   userId: string,
   role: Role
 ): Promise<{ chain: SupplyChainRecord; access: SupplyChainAccess } | null> {
-  const raw = await fetchChainRaw(id);
+  // Independent reads — neither depends on the other's result.
+  const [raw, shareRole] = await Promise.all([fetchChainRaw(id), getShareRole(id, userId)]);
   if (!raw) return null;
 
-  const shareRole = await getShareRole(id, userId);
   const access = resolveSupplyChainAccess({ userId, userRole: role, chain: { ownerId: raw.ownerId }, shareRole });
   if (!access.canView) return null;
 
@@ -179,10 +183,14 @@ export async function getMilestoneDetail(
   });
   if (!milestone) return null;
 
-  const chain = await db.supplyChain.findUnique({ where: { id: milestone.supplyChainId } });
+  // Independent reads — both only need milestone.supplyChainId, which is
+  // already known, so neither depends on the other's result.
+  const [chain, shareRole] = await Promise.all([
+    db.supplyChain.findUnique({ where: { id: milestone.supplyChainId } }),
+    getShareRole(milestone.supplyChainId, userId),
+  ]);
   if (!chain) return null;
 
-  const shareRole = await getShareRole(chain.id, userId);
   const access = resolveSupplyChainAccess({ userId, userRole: role, chain: { ownerId: chain.ownerId }, shareRole });
   if (!access.canView) return null;
 

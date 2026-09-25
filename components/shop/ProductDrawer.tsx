@@ -124,7 +124,7 @@ export function ProductDrawer({
                           activeImage === idx ? "border-primary" : "border-transparent hover:border-border"
                         )}
                       >
-                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>

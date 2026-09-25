@@ -3,7 +3,14 @@ import { SUPPLIERS as SEED_SUPPLIERS } from "@/data/suppliers";
 import { PRODUCTS as SEED_PRODUCTS } from "@/data/products";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 
+// Cheap existence check first — without it this would run a 39-row
+// createMany (with conflict-checking) on every single GET to /api/suppliers
+// and /api/products forever, not just on the very first request. Mirrors
+// the count()===0 gate already used by app/api/crm/conversations/route.ts.
 export async function ensureSuppliersSeeded() {
+  const existingCount = await db.supplierListing.count();
+  if (existingCount > 0) return;
+
   await db.supplierListing.createMany({
     data: SEED_SUPPLIERS.map((s) => ({
       id: s.id,
@@ -37,6 +44,10 @@ export async function ensureSuppliersSeeded() {
 
 export async function ensureProductsSeeded() {
   await ensureSuppliersSeeded();
+
+  const existingCount = await db.product.count();
+  if (existingCount > 0) return;
+
   await db.product.createMany({
     data: SEED_PRODUCTS,
     skipDuplicates: true,

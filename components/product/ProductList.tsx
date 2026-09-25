@@ -58,10 +58,10 @@ export function locationLabel(row: CatalogRowRecord): string {
  * page (/{basePath}/{id}) rather than the old RowDetailSheet — that page
  * now owns viewing + Design Your Own / Manufacture Your Own entry points.
  */
-export function ProductList({ basePath }: { basePath: string }) {
+export function ProductList({ basePath, initialCatalog }: { basePath: string; initialCatalog?: CatalogRecord }) {
   const router = useRouter();
-  const [catalog, setCatalog] = useState<CatalogRecord | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [catalog, setCatalog] = useState<CatalogRecord | null>(initialCatalog ?? null);
+  const [loading, setLoading] = useState(!initialCatalog);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All Categories");
@@ -78,7 +78,11 @@ export function ProductList({ basePath }: { basePath: string }) {
   }
 
   useEffect(() => {
-    refresh();
+    // When the Server Component already fetched the catalog (initialCatalog),
+    // skip the redundant client round-trip on first mount — refresh() is
+    // still used everywhere else for exactly the same getCatalogAction() call.
+    if (!initialCatalog) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const rows = catalog?.rows ?? [];

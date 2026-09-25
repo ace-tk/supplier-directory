@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { AuthSession, SessionUser } from "@/types/auth";
@@ -32,7 +33,12 @@ export async function createSession(
   return token;
 }
 
-export async function getSession(): Promise<AuthSession | null> {
+// Wrapped in React's cache() so repeated calls within the same request
+// (root layout, module layout, AppShell, the page itself, etc. each
+// currently call getSession()/getUser() independently) dedupe to a single
+// cookie read + JWT verification instead of re-verifying the token on
+// every call. Scoped per request only — never shared across users/requests.
+export const getSession = cache(async (): Promise<AuthSession | null> => {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -50,14 +56,14 @@ export async function getSession(): Promise<AuthSession | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
 }
 
-export async function getUser(): Promise<SessionUser | null> {
+export const getUser = cache(async (): Promise<SessionUser | null> => {
   const session = await getSession();
   return session?.user ?? null;
-}
+});

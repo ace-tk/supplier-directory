@@ -11,9 +11,10 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { getUser } from "@/lib/session";
 import { hashPassword } from "@/lib/auth";
 import { validateImage, extractDataUrlMeta } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import { preparePasswordResetToken } from "@/lib/password-reset";
 import { createFreelancerSchema, type CreateFreelancerFormValues } from "@/lib/validations/freelancer-admin";
-import { getAllFreelancerProfiles, getAllProjects, getPortfolioPreviewsForFreelancers } from "@/lib/freelancer-queries";
+import { getFreelancerRosterForAdminList, getAllProjects, getPortfolioPreviewsForFreelancers } from "@/lib/freelancer-queries";
 import type { FreelancerRecord, PaymentStatus, Availability } from "@/types/freelancer";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
@@ -35,7 +36,7 @@ const PAYMENT_STATUS_MAP: Record<string, PaymentStatus> = {
 };
 
 export async function getFreelancers(): Promise<FreelancerRecord[]> {
-  const [profiles, projects] = await Promise.all([getAllFreelancerProfiles(), getAllProjects()]);
+  const [profiles, projects] = await Promise.all([getFreelancerRosterForAdminList(), getAllProjects()]);
   const portfolioPreviews = await getPortfolioPreviewsForFreelancers(profiles.map((p) => p.id));
 
   return profiles.map((p) => {
@@ -52,7 +53,7 @@ export async function getFreelancers(): Promise<FreelancerRecord[]> {
       phone: p.phone,
       linkedinUrl: p.linkedinUrl,
       instagramUrl: p.instagramUrl,
-      role: p.experience[0]?.role ?? null,
+      role: p.firstExperienceRole,
       bio: p.bio,
       skills: p.skills,
       assignedClients,
@@ -140,6 +141,7 @@ export async function createFreelancerAction(
   const randomPassword = crypto.randomBytes(32).toString("hex");
   const hashedPassword = await hashPassword(randomPassword);
   const activation = preparePasswordResetToken();
+  const avatar = await persistDataUrl(data.avatarDataUrl, "avatars");
 
   try {
     const user = await db.user.create({
@@ -148,7 +150,7 @@ export async function createFreelancerAction(
         email: data.email.trim(),
         password: hashedPassword,
         role: "FREELANCER",
-        avatar: data.avatarDataUrl || null,
+        avatar: avatar || null,
         passwordResetTokens: {
           create: {
             tokenHash: activation.tokenHash,

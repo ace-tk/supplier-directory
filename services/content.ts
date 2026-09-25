@@ -5,6 +5,7 @@ import { getUser } from "@/lib/session";
 import { validateImage, validateDocumentOrImage } from "@/lib/file-validation";
 import { saveContentSchema } from "@/lib/validations/content";
 import { getContentItemForOwner, getContentListForOwner, getTemplatesForOwner, getContentStorageUsageForOwner } from "@/lib/content-queries";
+import { persistDataUrl } from "@/lib/object-storage";
 import type { ContentItemRecord, ContentItemSummary } from "@/types/content";
 import type { ContentStatus, ContentType, ContentLanguage, ContentTone, ContentAudience } from "@/lib/generated/prisma/enums";
 
@@ -80,6 +81,20 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
     }
   }
 
+  // Move new uploads off base64-in-Postgres and into object storage where
+  // configured (see lib/object-storage.ts) — falls back to storing the
+  // data: URL unchanged when it isn't, so nothing breaks before credentials
+  // exist. Validation above already ran against the original payload.
+  const featuredImageUrl = await persistDataUrl(data.featuredImageUrl, "content");
+  const attachments = await Promise.all(
+    data.attachments.map(async (a) => ({
+      fileName: a.fileName,
+      mimeType: a.mimeType,
+      sizeBytes: a.sizeBytes,
+      dataUrl: await persistDataUrl(a.dataUrl, "content-attachments"),
+    }))
+  );
+
   if (data.id) {
     const existing = await db.contentItem.findUnique({ where: { id: data.id }, select: { ownerId: true } });
     if (!existing || existing.ownerId !== user.id) return { success: false, error: "Content not found." };
@@ -90,7 +105,7 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
         title: data.title.trim(),
         category: data.category?.trim() || null,
         tags: data.tags,
-        featuredImageUrl: data.featuredImageUrl || null,
+        featuredImageUrl: featuredImageUrl || null,
         bodyHtml: data.bodyHtml,
         status: input.status,
         publishedAt: input.status === "PUBLISHED" ? new Date() : undefined,
@@ -102,12 +117,7 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
         isTemplate: data.isTemplate,
         attachments: {
           deleteMany: {},
-          create: data.attachments.map((a) => ({
-            fileName: a.fileName,
-            mimeType: a.mimeType,
-            sizeBytes: a.sizeBytes,
-            dataUrl: a.dataUrl,
-          })),
+          create: attachments,
         },
       },
     });
@@ -120,7 +130,7 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
       title: data.title.trim(),
       category: data.category?.trim() || null,
       tags: data.tags,
-      featuredImageUrl: data.featuredImageUrl || null,
+      featuredImageUrl: featuredImageUrl || null,
       bodyHtml: data.bodyHtml,
       status: input.status,
       publishedAt: input.status === "PUBLISHED" ? new Date() : null,
@@ -132,12 +142,7 @@ export async function saveContentAction(input: SaveContentPayload): Promise<Acti
       isTemplate: data.isTemplate ?? false,
       ownerId: user.id,
       attachments: {
-        create: data.attachments.map((a) => ({
-          fileName: a.fileName,
-          mimeType: a.mimeType,
-          sizeBytes: a.sizeBytes,
-          dataUrl: a.dataUrl,
-        })),
+        create: attachments,
       },
     },
     select: { id: true },

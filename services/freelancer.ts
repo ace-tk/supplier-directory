@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateImage, validateDocument } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import { getFreelancerProfile, getFreelancerDashboardStats } from "@/lib/freelancer-queries";
 import type { FreelancerProfile, FreelancerDashboardStats } from "@/types/freelancer-portal";
 
@@ -82,7 +83,8 @@ export async function updateAvatarAction(dataUrl: string): Promise<ActionResult<
   const validation = validateImage(mimeType, sizeBytes);
   if (!validation.valid) return { success: false, error: validation.error! };
 
-  await db.user.update({ where: { id: user.id }, data: { avatar: dataUrl } });
+  const avatar = await persistDataUrl(dataUrl, "avatars");
+  await db.user.update({ where: { id: user.id }, data: { avatar } });
   return { success: true, data: undefined };
 }
 
@@ -101,9 +103,10 @@ export async function addPortfolioItemAction(input: {
   const freelancer = await db.freelancer.findUnique({ where: { userId: user.id }, select: { id: true } });
   if (!freelancer) return { success: false, error: "Freelancer profile not found." };
 
+  const dataUrl = await persistDataUrl(input.dataUrl, "freelancer-portfolio");
   const count = await db.freelancerPortfolioItem.count({ where: { freelancerId: freelancer.id } });
   await db.freelancerPortfolioItem.create({
-    data: { freelancerId: freelancer.id, dataUrl: input.dataUrl, caption: input.caption?.trim() || null, order: count },
+    data: { freelancerId: freelancer.id, dataUrl, caption: input.caption?.trim() || null, order: count },
   });
 
   const profile = await getFreelancerProfile(user.id);
@@ -135,9 +138,10 @@ export async function uploadResumeAction(input: {
   const validation = validateDocument(input.mimeType, input.sizeBytes);
   if (!validation.valid) return { success: false, error: validation.error! };
 
+  const resumeDataUrl = await persistDataUrl(input.dataUrl, "freelancer-resumes");
   await db.freelancer.update({
     where: { userId: user.id },
-    data: { resumeFileName: input.fileName, resumeDataUrl: input.dataUrl },
+    data: { resumeFileName: input.fileName, resumeDataUrl },
   });
 
   const profile = await getFreelancerProfile(user.id);

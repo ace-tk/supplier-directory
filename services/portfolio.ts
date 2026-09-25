@@ -11,6 +11,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { getUser } from "@/lib/session";
 import { validateImage, validateDocumentOrImage } from "@/lib/file-validation";
 import { extractDataUrlMeta } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import { isTemplateSelectable } from "@/lib/portfolio-templates";
 import { ensurePortfolio, getOwnPortfolioViewModel } from "@/lib/portfolio-queries";
 import type { PortfolioViewModel, PortfolioProcessStep, PortfolioTestimonial, PortfolioClient } from "@/types/portfolio";
@@ -90,6 +91,16 @@ export async function saveDraftAction(input: UpdatePortfolioContentInput): Promi
   const freelancerId = await requireOwnFreelancerId(user.id);
   if (!freelancerId) return { success: false, error: "Freelancer profile not found." };
 
+  // clients/testimonials are JSON arrays (FreelancerPortfolio.clients/
+  // testimonials) that can each embed a base64 logo/avatar — move those off
+  // base64-in-Postgres the same way every dedicated dataUrl column does.
+  const clients = input.clients
+    ? await Promise.all(input.clients.map(async (c) => ({ ...c, logo: await persistDataUrl(c.logo, "portfolio-clients") })))
+    : undefined;
+  const testimonials = input.testimonials
+    ? await Promise.all(input.testimonials.map(async (t) => ({ ...t, avatar: await persistDataUrl(t.avatar, "portfolio-testimonials") })))
+    : undefined;
+
   await ensurePortfolio(freelancerId);
   await db.freelancerPortfolio.update({
     where: { freelancerId },
@@ -101,8 +112,8 @@ export async function saveDraftAction(input: UpdatePortfolioContentInput): Promi
       website: input.website !== undefined ? input.website.trim() || null : undefined,
       experienceYears: input.experienceYears !== undefined ? input.experienceYears : undefined,
       processSteps: input.processSteps !== undefined ? (input.processSteps as unknown as Prisma.InputJsonValue) : undefined,
-      testimonials: input.testimonials !== undefined ? (input.testimonials as unknown as Prisma.InputJsonValue) : undefined,
-      clients: input.clients !== undefined ? (input.clients as unknown as Prisma.InputJsonValue) : undefined,
+      testimonials: testimonials !== undefined ? (testimonials as unknown as Prisma.InputJsonValue) : undefined,
+      clients: clients !== undefined ? (clients as unknown as Prisma.InputJsonValue) : undefined,
     },
   });
 
@@ -180,6 +191,9 @@ export async function addProjectAction(input: PortfolioProjectInput): Promise<Ac
   const freelancerId = await requireOwnFreelancerId(user.id);
   if (!freelancerId) return { success: false, error: "Freelancer profile not found." };
 
+  const coverImage = await persistDataUrl(input.coverImage, "portfolio-projects");
+  const galleryImages = await Promise.all((input.galleryImages ?? []).map((img) => persistDataUrl(img, "portfolio-projects")));
+
   const portfolioId = await ensurePortfolio(freelancerId);
   const count = await db.portfolioProject.count({ where: { portfolioId } });
 
@@ -189,8 +203,8 @@ export async function addProjectAction(input: PortfolioProjectInput): Promise<Ac
       title: input.title.trim(),
       category: input.category?.trim() || null,
       description: input.description?.trim() || null,
-      coverImage: input.coverImage || null,
-      galleryImages: input.galleryImages ?? [],
+      coverImage: coverImage || null,
+      galleryImages,
       projectUrl: input.projectUrl?.trim() || null,
       clientName: input.clientName?.trim() || null,
       year: input.year ?? null,
@@ -222,14 +236,17 @@ export async function updateProjectAction(
   const freelancerId = await requireOwnFreelancerId(user.id);
   if (!freelancerId) return { success: false, error: "Freelancer profile not found." };
 
+  const coverImage = await persistDataUrl(input.coverImage, "portfolio-projects");
+  const galleryImages = await Promise.all((input.galleryImages ?? []).map((img) => persistDataUrl(img, "portfolio-projects")));
+
   await db.portfolioProject.updateMany({
     where: { id: projectId, portfolio: { freelancerId } },
     data: {
       title: input.title.trim(),
       category: input.category?.trim() || null,
       description: input.description?.trim() || null,
-      coverImage: input.coverImage || null,
-      galleryImages: input.galleryImages ?? [],
+      coverImage: coverImage || null,
+      galleryImages,
       projectUrl: input.projectUrl?.trim() || null,
       clientName: input.clientName?.trim() || null,
       year: input.year ?? null,
@@ -290,6 +307,7 @@ export async function addBoardAction(input: PortfolioBoardInput): Promise<Action
   const freelancerId = await requireOwnFreelancerId(user.id);
   if (!freelancerId) return { success: false, error: "Freelancer profile not found." };
 
+  const coverImage = await persistDataUrl(input.coverImage, "portfolio-boards");
   const portfolioId = await ensurePortfolio(freelancerId);
   const count = await db.portfolioBoard.count({ where: { portfolioId } });
 
@@ -298,7 +316,7 @@ export async function addBoardAction(input: PortfolioBoardInput): Promise<Action
       portfolioId,
       title: input.title.trim(),
       description: input.description?.trim() || null,
-      coverImage: input.coverImage || null,
+      coverImage: coverImage || null,
       position: count,
     },
   });
@@ -320,12 +338,13 @@ export async function updateBoardAction(
   const freelancerId = await requireOwnFreelancerId(user.id);
   if (!freelancerId) return { success: false, error: "Freelancer profile not found." };
 
+  const coverImage = await persistDataUrl(input.coverImage, "portfolio-boards");
   await db.portfolioBoard.updateMany({
     where: { id: boardId, portfolio: { freelancerId } },
     data: {
       title: input.title.trim(),
       description: input.description?.trim() || null,
-      coverImage: input.coverImage || null,
+      coverImage: coverImage || null,
     },
   });
 
@@ -364,20 +383,21 @@ export async function addPinAction(boardId: string, input: PortfolioPinInput): P
   const board = await db.portfolioBoard.findFirst({ where: { id: boardId, portfolio: { freelancerId } }, select: { id: true } });
   if (!board) return { success: false, error: "Board not found." };
 
+  const image = await persistDataUrl(input.image, "portfolio-pins");
   const count = await db.portfolioPin.count({ where: { boardId } });
   await db.portfolioPin.create({
     data: {
       boardId,
       title: input.title?.trim() || null,
       description: input.description?.trim() || null,
-      image: input.image,
+      image,
       externalUrl: input.externalUrl?.trim() || null,
       position: count,
     },
   });
 
   if (count === 0) {
-    await db.portfolioBoard.update({ where: { id: boardId }, data: { coverImage: input.image } });
+    await db.portfolioBoard.update({ where: { id: boardId }, data: { coverImage: image } });
   }
 
   return { success: true, data: await reload(user.id) };

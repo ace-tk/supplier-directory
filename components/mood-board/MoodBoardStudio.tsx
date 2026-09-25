@@ -3,11 +3,6 @@
 import { useRef, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-// html2canvas-pro (not the original html2canvas) — this app's Tailwind v4
-// theme uses oklch() CSS colors throughout, which the original library
-// can't parse and hangs on indefinitely; this fork adds oklch/oklab
-// support with an identical API.
-import html2canvas from "html2canvas-pro";
 import {
   Library,
   LayoutGrid,
@@ -334,6 +329,13 @@ export function MoodBoardStudio({
     if (!canvasWrapRef.current) return;
     setExporting(true);
     try {
+      // html2canvas-pro (not the original html2canvas) — this app's Tailwind
+      // v4 theme uses oklch() CSS colors throughout, which the original
+      // library can't parse and hangs on indefinitely; this fork adds
+      // oklch/oklab support with an identical API. Lazily imported so the
+      // Mood Board page's initial bundle doesn't ship it before the user
+      // actually clicks Export.
+      const { default: html2canvas } = await import("html2canvas-pro");
       const canvas = await html2canvas(canvasWrapRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
       const link = document.createElement("a");
       link.href = canvas.toDataURL("image/png");

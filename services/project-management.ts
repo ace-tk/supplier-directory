@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
 import { validateDocumentOrImage } from "@/lib/file-validation";
+import { persistDataUrl } from "@/lib/object-storage";
 import { hasTeamPermission } from "@/lib/team-auth";
 import type {
   ProjectClientRecord,
@@ -350,7 +351,8 @@ export async function addProjectFileAction(projectId: string, input: { title: st
   if (!user || !(await canAccessProject(projectId, user.id, user.role))) return { success: false, error: "Access denied." };
   const validation = validateDocumentOrImage(input.mimeType, input.sizeBytes, input.fileName);
   if (!validation.valid) return { success: false, error: validation.error! };
-  await db.projectResource.create({ data: { projectId, addedById: user.id, title: input.title.trim() || input.fileName, type: "FILE", fileName: input.fileName, mimeType: input.mimeType, sizeBytes: input.sizeBytes, dataUrl: input.dataUrl, note: input.note?.trim() || null } });
+  const dataUrl = await persistDataUrl(input.dataUrl, "project-resources");
+  await db.projectResource.create({ data: { projectId, addedById: user.id, title: input.title.trim() || input.fileName, type: "FILE", fileName: input.fileName, mimeType: input.mimeType, sizeBytes: input.sizeBytes, dataUrl, note: input.note?.trim() || null } });
   await db.projectActivity.create({ data: { projectId, actorId: user.id, type: "RESOURCE_ADDED", detail: `Uploaded “${input.fileName}”` } });
   refreshProject(projectId);
   return { success: true, data: undefined };

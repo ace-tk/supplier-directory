@@ -49,10 +49,17 @@ import { cn } from "@/lib/utils";
 
 type TabValue = "ALL" | ContentStatus | "TEMPLATES";
 
-export function ContentDashboard({ basePath }: { basePath: string }) {
-  const [items, setItems] = useState<ContentItemSummary[]>([]);
-  const [templates, setTemplates] = useState<ContentItemSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+interface ContentDashboardProps {
+  basePath: string;
+  initialItems?: ContentItemSummary[];
+  initialTemplates?: ContentItemSummary[];
+}
+
+export function ContentDashboard({ basePath, initialItems, initialTemplates }: ContentDashboardProps) {
+  const hasInitialData = initialItems !== undefined && initialTemplates !== undefined;
+  const [items, setItems] = useState<ContentItemSummary[]>(initialItems ?? []);
+  const [templates, setTemplates] = useState<ContentItemSummary[]>(initialTemplates ?? []);
+  const [loading, setLoading] = useState(!hasInitialData);
   const [tab, setTab] = useState<TabValue>("ALL");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
@@ -72,7 +79,12 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
   }
 
   useEffect(() => {
-    refresh();
+    // When the Server Component already fetched both lists (initialItems/
+    // initialTemplates), skip the redundant client round-trip on first
+    // mount — refresh() is still used everywhere else (delete/rename/etc.)
+    // for exactly the same getContentListAction()/getTemplatesAction() calls.
+    if (!hasInitialData) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const counts = useMemo(
@@ -220,7 +232,7 @@ export function ContentDashboard({ basePath }: { basePath: string }) {
             <div key={item.id} className="group rounded-xl border border-border bg-card overflow-hidden hover:shadow-card hover:border-border/80 transition-all flex flex-col">
               <div className="aspect-video bg-muted overflow-hidden">
                 {item.featuredImageUrl ? (
-                  <img src={item.featuredImageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  <img src={item.featuredImageUrl} alt={item.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <FileText className="h-8 w-8 text-muted-foreground/40" />

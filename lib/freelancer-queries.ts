@@ -10,6 +10,9 @@ import type {
   FreelancerTaskRecord,
   ProposalRecord,
   FreelancerDashboardStats,
+  FreelancerAvailability,
+  FreelancerStatus,
+  PaymentStatus,
 } from "@/types/freelancer-portal";
 
 const profileInclude = {
@@ -72,8 +75,82 @@ export async function getFreelancerProfile(userId: string): Promise<FreelancerPr
 }
 
 export async function getAllFreelancerProfiles(): Promise<FreelancerProfile[]> {
-  const rows = await db.freelancer.findMany({ include: profileInclude, orderBy: { createdAt: "desc" } });
+  // Safety cap, not real pagination — the Admin Freelancers list renders
+  // this in one shot with no page controls today, so this only stops the
+  // query from growing unbounded as more freelancers sign up; current
+  // volume is far below this ceiling.
+  const rows = await db.freelancer.findMany({ include: profileInclude, orderBy: { createdAt: "desc" }, take: 500 });
   return rows.map(mapFreelancer);
+}
+
+export interface FreelancerRosterEntry {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  location: string | null;
+  phone: string | null;
+  linkedinUrl: string | null;
+  instagramUrl: string | null;
+  bio: string | null;
+  skills: string[];
+  paymentStatus: PaymentStatus;
+  performanceScore: number;
+  availability: FreelancerAvailability;
+  status: FreelancerStatus;
+  firstExperienceRole: string | null;
+}
+
+/**
+ * Narrow variant of getAllFreelancerProfiles() for the Admin Freelancers
+ * roster (services/freelancer-service.ts's getFreelancers(), its only
+ * caller) — that view never reads portfolioItems or resumeDataUrl, so
+ * `select`-ing just the fields it actually maps avoids hydrating every
+ * freelancer's full base64 portfolio gallery and resume on every visit to
+ * this list. getAllFreelancerProfiles() above is untouched and still used
+ * wherever the full profile (portfolio/resume included) is genuinely needed.
+ */
+export async function getFreelancerRosterForAdminList(): Promise<FreelancerRosterEntry[]> {
+  const rows = await db.freelancer.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 500,
+    select: {
+      id: true,
+      userId: true,
+      location: true,
+      phone: true,
+      bio: true,
+      skills: true,
+      linkedinUrl: true,
+      instagramUrl: true,
+      availability: true,
+      status: true,
+      paymentStatus: true,
+      performanceScore: true,
+      user: { select: { name: true, email: true, avatar: true } },
+      experience: { orderBy: { order: "asc" }, take: 1, select: { role: true } },
+    },
+  });
+
+  return rows.map((f) => ({
+    id: f.id,
+    userId: f.userId,
+    name: f.user.name,
+    email: f.user.email,
+    avatar: f.user.avatar,
+    location: f.location,
+    phone: f.phone,
+    linkedinUrl: f.linkedinUrl,
+    instagramUrl: f.instagramUrl,
+    bio: f.bio,
+    skills: f.skills,
+    paymentStatus: f.paymentStatus,
+    performanceScore: f.performanceScore,
+    availability: f.availability,
+    status: f.status,
+    firstExperienceRole: f.experience[0]?.role ?? null,
+  }));
 }
 
 /**
@@ -154,10 +231,12 @@ export async function getProjectsForFreelancer(userId: string): Promise<ProjectR
 }
 
 export async function getAllProjects(): Promise<ProjectRecord[]> {
+  // Safety cap, not real pagination — see getAllFreelancerProfiles above.
   const rows = await db.project.findMany({
     where: { isDraft: false },
     include: { freelancer: { select: { name: true } }, _count: { select: { tasks: true } } },
     orderBy: { updatedAt: "desc" },
+    take: 500,
   });
   return rows.map(mapProject);
 }
@@ -231,9 +310,11 @@ export async function getProposalsForFreelancer(userId: string): Promise<Proposa
 }
 
 export async function getAllProposals(): Promise<ProposalRecord[]> {
+  // Safety cap, not real pagination — see getAllFreelancerProfiles above.
   const rows = await db.proposal.findMany({
     include: { freelancer: { select: { name: true } }, createdBy: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
+    take: 500,
   });
   return rows.map(mapProposal);
 }
