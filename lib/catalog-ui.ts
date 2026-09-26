@@ -69,3 +69,17 @@ export function generateProductSku(
   }
   return sku;
 }
+
+/**
+ * Category suggestions + existing SKUs (for generateProductSku's collision
+ * check) that ProductForm derives from the owner's catalog rows. Shared so
+ * the product edit pages — which already load the full catalog server-side
+ * to find the row — can pass these in instead of ProductForm re-fetching
+ * the same catalog via getCatalogAction() on mount.
+ */
+export function getProductFormSuggestions(rows: { category: string | null; sku: string | null }[]) {
+  return {
+    categories: [...new Set(rows.map((row) => row.category).filter((c): c is string => !!c))],
+    skus: rows.map((row) => row.sku).filter((s): s is string => !!s),
+  };
+}

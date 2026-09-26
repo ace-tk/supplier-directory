@@ -42,12 +42,32 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    getNotificationsAction().then((result) => {
-      setNotifications(result.notifications);
-      setUnreadCount(result.unreadCount);
-    });
-    const interval = setInterval(refresh, 30000);
-    return () => clearInterval(interval);
+    // Next.js dispatches Server Actions one at a time per client, so firing
+    // this on the first commit queued it ahead of the page's own mount-time
+    // actions on every authenticated page. Waiting for the browser to go
+    // idle lets the page's data go first; the badge still loads live data.
+    let cancelled = false;
+    const load = () => {
+      getNotificationsAction().then((result) => {
+        if (cancelled) return;
+        setNotifications(result.notifications);
+        setUnreadCount(result.unreadCount);
+      });
+    };
+    const idleId = typeof window.requestIdleCallback === "function" ? window.requestIdleCallback(load, { timeout: 1500 }) : null;
+    const timeoutId = idleId === null ? window.setTimeout(load, 200) : null;
+
+    // Background tabs can't see the badge — skip those ticks (and their
+    // queued Server Action) instead of polling a hidden page.
+    const interval = setInterval(() => {
+      if (!document.hidden) refresh();
+    }, 30000);
+    return () => {
+      cancelled = true;
+      if (idleId !== null) window.cancelIdleCallback(idleId);
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
   }, [refresh]);
 
   async function handleOpenChange(open: boolean) {

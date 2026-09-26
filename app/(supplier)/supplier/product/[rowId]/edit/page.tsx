@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getUser } from "@/lib/session";
 import { getOrCreateCatalogForOwner } from "@/lib/catalog-queries";
 import { ProductForm } from "@/components/product/ProductForm";
+import { getProductFormSuggestions } from "@/lib/catalog-ui";
 
 export default async function EditSupplierProductPage({ params }: { params: Promise<{ rowId: string }> }) {
   const user = await getUser();
@@ -12,5 +13,7 @@ export default async function EditSupplierProductPage({ params }: { params: Prom
   const row = catalog.rows.find((r) => r.id === rowId);
   if (!row) notFound();
 
-  return <ProductForm basePath="/supplier/product" initialRow={row} />;
+  // Derived from the catalog already loaded above, so ProductForm doesn't
+  // re-fetch the same catalog on mount just to build these lists.
+  return <ProductForm basePath="/supplier/product" initialRow={row} initialSuggestions={getProductFormSuggestions(catalog.rows)} />;
 }

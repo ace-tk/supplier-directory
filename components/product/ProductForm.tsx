@@ -15,7 +15,7 @@ import { VariantsSection } from "./VariantsSection";
 import { ProductVisualWorkspace, type PendingImage, type ProductMetadataItem } from "./ProductVisualWorkspace";
 import { ProductLocationSection, type ProductLocationValue } from "./ProductLocationSection";
 import { ProductDescriptionGenerator } from "./ProductDescriptionGenerator";
-import { GST_RATE_OPTIONS, computeCatalogPriceAfterGst, generateProductSku } from "@/lib/catalog-ui";
+import { GST_RATE_OPTIONS, computeCatalogPriceAfterGst, generateProductSku, getProductFormSuggestions } from "@/lib/catalog-ui";
 import { getCatalogAction, addRowAction, updateRowAction, addRowImageAction } from "@/services/catalog";
 import { listWarehousesAction, listRetailStoresAction, type LocationOption } from "@/services/locations";
 import type { CatalogRowRecord, CatalogRowImageEntry, CatalogRowStatus } from "@/types/catalog";
@@ -94,25 +94,39 @@ const inputClass = "h-8 text-sm";
  * on the left, a large Product Visual Workspace (images, view tabs, real
  * metadata) on the right — replacing the previous single stacked form.
  */
-export function ProductForm({ basePath, initialRow }: { basePath: string; initialRow: CatalogRowRecord | null }) {
+export function ProductForm({
+  basePath,
+  initialRow,
+  initialSuggestions,
+}: {
+  basePath: string;
+  initialRow: CatalogRowRecord | null;
+  initialSuggestions?: ReturnType<typeof getProductFormSuggestions>;
+}) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => formFromRow(initialRow));
   const [images, setImages] = useState<CatalogRowImageEntry[]>(initialRow?.images ?? []);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
-  const [existingCategories, setExistingCategories] = useState<string[]>([]);
-  const [existingSkus, setExistingSkus] = useState<string[]>([]);
+  const [existingCategories, setExistingCategories] = useState<string[]>(initialSuggestions?.categories ?? []);
+  const [existingSkus, setExistingSkus] = useState<string[]>(initialSuggestions?.skus ?? []);
   const [warehouses, setWarehouses] = useState<LocationOption[]>([]);
   const [retailStores, setRetailStores] = useState<LocationOption[]>([]);
 
   useEffect(() => {
-    getCatalogAction().then((r) => {
-      if (!r.success) return;
-      setExistingCategories([...new Set(r.data.rows.map((row) => row.category).filter((c): c is string => !!c))]);
-      setExistingSkus(r.data.rows.map((row) => row.sku).filter((s): s is string => !!s));
-    });
+    // Edit pages already loaded this same catalog server-side and pass the
+    // derived lists in (initialSuggestions) — skip re-fetching it then.
+    if (!initialSuggestions) {
+      getCatalogAction().then((r) => {
+        if (!r.success) return;
+        const suggestions = getProductFormSuggestions(r.data.rows);
+        setExistingCategories(suggestions.categories);
+        setExistingSkus(suggestions.skus);
+      });
+    }
     listWarehousesAction().then((r) => r.success && setWarehouses(r.data));
     listRetailStoresAction().then((r) => r.success && setRetailStores(r.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function patch(p: Partial<FormState>) {
