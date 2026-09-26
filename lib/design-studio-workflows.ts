@@ -85,24 +85,24 @@ export const designStudioProposalCards: DesignStudioProposalCard[] = [
     id: "hit-collection-proposal",
     name: "Hit Collection Proposal",
     description: "Extend a bestseller into cohesive style variations while preserving its core design language.",
-    image: "/ai-studio/reference-images/hit-collection-proposal.webp",
+    image: "/ai-studio/reference-images/hit-collection-proposal.jpg",
   },
   {
     id: "collection-proposal",
     name: "Collection Proposal",
     description: "Build a cohesive collection proposal around a bestseller with aligned themes, categories and design language.",
-    image: "/ai-studio/reference-images/collection-proposal.webp",
+    image: "/ai-studio/reference-images/collection-proposal.jpg",
   },
   {
     id: "detail-to-design",
     name: "Detail to Design",
     description: "Turn a neckline, sleeve, pocket or other detail reference into multiple apparel concepts.",
-    image: "/ai-studio/reference-images/detail-to-design.webp",
+    image: "/ai-studio/reference-images/detail-to-design.jpg",
   },
   {
     id: "fabric-to-design",
     name: "Fabric to Design",
     description: "Create apparel concepts that match the color, texture and drape of a fabric reference.",
-    image: "/ai-studio/reference-images/fabric-to-design.webp",
+    image: "/ai-studio/reference-images/fabric-to-design.jpg",
   },
 ];
