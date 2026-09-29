@@ -49,7 +49,7 @@ export function EditorHeader({
   return (
     <div className="flex items-center gap-3 h-14 shrink-0 border-b border-border bg-card px-4">
       <Link href="/design-studio" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0">
-        <ArrowLeft className="w-4 h-4" /> AI Design Studio
+        <ArrowLeft className="w-4 h-4" /> AI Garment Studio
       </Link>
       <div className="h-4 w-px bg-border shrink-0" />
       <p className="text-sm font-semibold text-foreground shrink-0">Print → Embroidery</p>

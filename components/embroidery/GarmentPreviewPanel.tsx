@@ -81,7 +81,7 @@ export function GarmentPreviewPanel({
         <Button variant="outline" size="sm" className="w-full" onClick={() => setPickerOpen(true)}>
           <Shirt className="w-3.5 h-3.5" /> {state.garmentImage ? "Change garment" : "Choose a garment"}
         </Button>
-        <p className="mt-1 text-[11px] text-muted-foreground">From your saved AI Garment Studio designs.</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">From your saved Garment Studio designs.</p>
       </div>
 
       <div>
@@ -123,13 +123,13 @@ export function GarmentPreviewPanel({
           href={`/design-studio/garment/${state.garmentId}?tool=prints-logos&embroideryId=${embroideryDesignId}`}
           className="flex items-center justify-center gap-1.5 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-primary hover:bg-accent transition-colors"
         >
-          Apply in AI Garment Studio <ArrowRight className="w-3.5 h-3.5" />
+          Apply in Garment Studio <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       ) : (
         <p className="text-[11px] text-muted-foreground">
           {state.garmentId && embroideryDesignId && dirty
-            ? "Save your changes to apply this design in AI Garment Studio."
-            : "Save this project and choose a garment to apply it in AI Garment Studio."}
+            ? "Save your changes to apply this design in Garment Studio."
+            : "Save this project and choose a garment to apply it in Garment Studio."}
         </p>
       )}
 
@@ -154,14 +154,14 @@ function GarmentPickerDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Choose a garment</DialogTitle>
-          <DialogDescription>Pick a saved AI Garment Studio design to preview this embroidery on.</DialogDescription>
+          <DialogDescription>Pick a saved Garment Studio design to preview this embroidery on.</DialogDescription>
         </DialogHeader>
         {garments === null ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : garments.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">No saved garments yet — create one in AI Garment Studio.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">No saved garments yet — create one in Garment Studio.</p>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-80 overflow-y-auto scrollbar-thin">
             {garments.map((g) => (

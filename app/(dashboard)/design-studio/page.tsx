@@ -44,7 +44,7 @@ export default async function AiDesignStudioHomePage() {
         <div className="relative flex flex-col gap-4">
           <div className="flex items-center gap-2 text-primary">
             <Sparkles className="h-4 w-4" />
-            <span className="text-xs font-semibold uppercase tracking-widest">AI Design Studio</span>
+            <span className="text-xs font-semibold uppercase tracking-widest">AI Garment Studio</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground max-w-xl">
             Create, transform and prepare fashion designs with AI.
@@ -154,7 +154,7 @@ export default async function AiDesignStudioHomePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-base font-semibold text-foreground">Pattern Library</h2>
-            <p className="text-sm text-muted-foreground">Saved patterns, ready to reuse in AI Garment Studio.</p>
+            <p className="text-sm text-muted-foreground">Saved patterns, ready to reuse in Garment Studio.</p>
           </div>
           <Link href="/design-studio/pattern-library" className="flex items-center gap-1 text-xs font-medium text-primary hover:underline shrink-0">
             View all <ArrowRight className="h-3 w-3" />

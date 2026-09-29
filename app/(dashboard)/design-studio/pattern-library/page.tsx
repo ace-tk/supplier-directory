@@ -48,7 +48,7 @@ export default function PatternLibraryPage() {
     <div>
       <StudioNav />
       <div className="mt-6">
-        <PageHeader title="Pattern Library" description="Saved seamless patterns from Repeat Print Maker — reuse them here or apply them directly in AI Garment Studio's Patterns tool." />
+        <PageHeader title="Pattern Library" description="Saved seamless patterns from Repeat Print Maker — reuse them here or apply them directly in Garment Studio's Patterns tool." />
       </div>
 
       {patterns === null ? (

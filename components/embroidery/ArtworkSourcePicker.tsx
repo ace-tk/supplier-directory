@@ -54,7 +54,7 @@ export function ArtworkSourcePicker({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Choose artwork</DialogTitle>
-            <DialogDescription>Reuse something already in AI Design Studio.</DialogDescription>
+            <DialogDescription>Reuse something already in AI Garment Studio.</DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="patterns">
             <TabsList className="w-full">
@@ -62,7 +62,7 @@ export function ArtworkSourcePicker({
                 <Grid3x3 className="w-3.5 h-3.5" /> Pattern Library
               </TabsTrigger>
               <TabsTrigger value="garments" className="flex-1">
-                <Shirt className="w-3.5 h-3.5" /> AI Garment Studio
+                <Shirt className="w-3.5 h-3.5" /> Garment Studio
               </TabsTrigger>
             </TabsList>
             <TabsContent value="patterns" className="pt-3">
@@ -75,7 +75,7 @@ export function ArtworkSourcePicker({
             <TabsContent value="garments" className="pt-3">
               <ImageGrid
                 items={garments?.map((g) => ({ id: g.id, image: g.image, name: g.name })) ?? null}
-                emptyLabel="No saved garments yet — create one in AI Garment Studio."
+                emptyLabel="No saved garments yet — create one in Garment Studio."
                 onPick={handlePick}
               />
             </TabsContent>

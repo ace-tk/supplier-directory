@@ -27,7 +27,7 @@ export const designStudioWorkflows: DesignStudioWorkflow[] = [
   },
   {
     id: "ai-garment-studio",
-    name: "AI Garment Studio",
+    name: "Garment Studio",
     description: "Generate garments with AI and edit them region by region.",
     href: "/design-studio/garment",
     icon: Shirt,

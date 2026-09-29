@@ -295,7 +295,7 @@ export default function GarmentEditorPage({
           onClick={() => router.push("/design-studio/garment")}
           className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> AI Garment Studio
+          <ArrowLeft className="w-4 h-4" /> Garment Studio
         </button>
         <button
           type="button"

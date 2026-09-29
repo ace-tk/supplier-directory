@@ -12,7 +12,7 @@ export function IntegrationsSection({ integrations }: IntegrationsProps) {
     {
       icon: Sparkles,
       name: "OpenAI",
-      description: "Powers Content, Product description, Mood Board, Repeat Print and AI Garment Studio generation.",
+      description: "Powers Content, Product description, Mood Board, Repeat Print and Garment Studio generation.",
       connected: integrations.openai,
       manageNote: "Configured via the OPENAI_API_KEY environment variable.",
     },

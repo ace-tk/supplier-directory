@@ -16,7 +16,7 @@ const CATEGORY_LABELS: Record<NotificationPreferenceCategory, { label: string; d
   BUYER_ACTIVITY: { label: "Buyer activity", description: "New buyer leads and requirement activity." },
   CAMPAIGN_ACTIVITY: { label: "Campaign activity", description: "Marketing campaign status and scheduling." },
   TEAM_INVITATIONS: { label: "Team invitations", description: "Invitations sent or accepted in your workspace." },
-  AI_DESIGN_COMPLETION: { label: "AI / design completion", description: "When an AI Garment Studio or Repeat Print generation finishes." },
+  AI_DESIGN_COMPLETION: { label: "AI / design completion", description: "When a Garment Studio or Repeat Print generation finishes." },
 };
 
 interface Preference {

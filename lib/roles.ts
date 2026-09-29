@@ -139,14 +139,14 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   },
   {
     group: "Shop",
-    items: [
-      { label: "Shop", href: "/shop", icon: ShoppingBag },
-      { label: "Mood Board", href: "/mood-board", icon: Palette },
-    ],
+    items: [{ label: "Shop", href: "/shop", icon: ShoppingBag }],
   },
   {
     group: "Design Studio",
-    items: [{ label: "AI Design Studio", href: "/design-studio", icon: Sparkles }],
+    items: [
+      { label: "AI Garment Studio", href: "/design-studio", icon: Sparkles },
+      { label: "Mood Board", href: "/mood-board", icon: Palette },
+    ],
   },
   {
     group: "Commerce",

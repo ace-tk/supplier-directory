@@ -22,13 +22,13 @@ export default function GarmentStudioHomePage() {
           onClick={() => router.push("/design-studio")}
           className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> AI Design Studio
+          <ArrowLeft className="w-4 h-4" /> AI Garment Studio
         </button>
       </div>
 
       <div className="flex flex-1 min-h-0">
         <div className="w-[360px] shrink-0 border-r border-border bg-card px-5 py-5 flex flex-col min-h-0">
-          <h1 className="text-base font-semibold text-foreground mb-4 shrink-0">AI Garment Studio</h1>
+          <h1 className="text-base font-semibold text-foreground mb-4 shrink-0">Garment Studio</h1>
           <GarmentInput
             onGenerated={(id) => {
               setRefreshKey((k) => k + 1);

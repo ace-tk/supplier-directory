@@ -22,7 +22,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
   { id: "team", label: "Team Management", description: "Members, roles and workspace access." },
   { id: "invoices-expenses", label: "Invoices & Expenses", description: "Billing records and spend tracking." },
   { id: "marketing", label: "Marketing", description: "Campaigns across email and WhatsApp." },
-  { id: "design-studio", label: "AI Design Studio", description: "Repeat Print Maker, AI Garment Studio and Pattern Library." },
+  { id: "design-studio", label: "AI Garment Studio", description: "Repeat Print Maker, Garment Studio and Pattern Library." },
   { id: "mood-board", label: "Mood Board", description: "Visual collections for a project or client." },
   { id: "account-settings", label: "Account & Settings", description: "Workspace, security and preferences." },
 ];
@@ -131,8 +131,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "design-studio-garment",
     category: "design-studio",
-    title: "Using AI Garment Studio",
-    body: "AI Garment Studio generates garment visualizations from your inputs using AI image generation. Use the editor sidebar to adjust prompts and options, then generate and refine results. The Patterns tool can also pull directly from My Pattern Library instead of a fresh upload.",
+    title: "Using Garment Studio",
+    body: "Garment Studio generates garment visualizations from your inputs using AI image generation. Use the editor sidebar to adjust prompts and options, then generate and refine results. The Patterns tool can also pull directly from My Pattern Library instead of a fresh upload.",
     keywords: ["garment", "ai", "design studio", "generate"],
     popular: true,
   },
@@ -140,7 +140,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     id: "design-studio-pattern-library",
     category: "design-studio",
     title: "Using Pattern Library",
-    body: "Pattern Library collects every seamless print saved from Repeat Print Maker in one place inside AI Design Studio. Open a saved pattern to continue editing it in Repeat Print Maker, or apply it directly to a garment from AI Garment Studio's Patterns tool.",
+    body: "Pattern Library collects every seamless print saved from Repeat Print Maker in one place inside AI Garment Studio. Open a saved pattern to continue editing it in Repeat Print Maker, or apply it directly to a garment from Garment Studio's Patterns tool.",
     keywords: ["pattern library", "saved patterns", "design studio"],
   },
   {
