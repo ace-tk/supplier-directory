@@ -62,6 +62,8 @@ export const garmentStudioSections: GarmentStudioSection[] = [
       { title: "Image to Design", description: "Create new style options from an existing garment image.", image: img("image-to-design.jpg") },
       // TODO: route
       { title: "Voice to Design", description: "Describe an idea out loud and turn your spoken brief into quick apparel concept images.", image: img("voice-to-design.jpg"), voice: true },
+      // TODO: route
+      { title: "Pattern to Garment", description: "Transform garment pattern pieces into a complete stitched garment visualization while preserving the original pattern structure and design.", image: img("pattern-to-garment.svg") },
     ],
   },
   {

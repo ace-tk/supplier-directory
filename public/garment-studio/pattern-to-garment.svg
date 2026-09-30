@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 762 508" width="762" height="508" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!-- UI placeholder for the "Pattern to Garment" card: cut pattern pieces
+       (front, back, sleeves) becoming a stitched garment. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F3EEE6"/>
+      <stop offset="1" stop-color="#E7DFD3"/>
+    </linearGradient>
+    <linearGradient id="fabric" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4A6A96"/>
+      <stop offset="1" stop-color="#34507A"/>
+    </linearGradient>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#D9CFBF" stroke-width="1"/>
+    </pattern>
+    <marker id="grain" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#9C7A5B"/>
+    </marker>
+    <marker id="arrowHead" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#6B5642"/>
+    </marker>
+    <!-- Bodice outline (150 x 210), shared by front and back. -->
+    <path id="bodiceFront" d="M0 18 L45 0 Q75 44 105 0 L150 18 Q126 46 138 78 L146 210 L4 210 L12 78 Q24 46 0 18 Z"/>
+    <path id="bodiceBack" d="M0 18 L45 0 Q75 14 105 0 L150 18 Q126 46 138 78 L146 210 L4 210 L12 78 Q24 46 0 18 Z"/>
+    <path id="sleeve" d="M0 92 L12 30 Q65 -20 118 30 L130 92 Z"/>
+  </defs>
+
+  <rect width="762" height="508" fill="url(#bg)"/>
+  <!-- Cutting mat under the pattern pieces -->
+  <rect x="24" y="44" width="360" height="424" rx="14" fill="#EDE5D8"/>
+  <rect x="24" y="44" width="360" height="424" rx="14" fill="url(#grid)" opacity="0.8"/>
+
+  <g fill="#FFFCF5" stroke="#9C7A5B" stroke-width="2" stroke-linejoin="round">
+    <!-- FRONT -->
+    <g transform="translate(40 76)">
+      <use href="#bodiceFront" filter="drop-shadow(0 2px 2px rgba(80,60,40,.18))"/>
+      <use href="#bodiceFront" fill="none" stroke="#C4A484" stroke-width="1.4" stroke-dasharray="5 4" transform="translate(75 105) scale(.9) translate(-75 -105)"/>
+      <path d="M72 206l3-8 3 8" fill="#9C7A5B" stroke="none"/>
+      <line x1="75" y1="136" x2="75" y2="192" stroke-width="1.6" marker-start="url(#grain)" marker-end="url(#grain)"/>
+      <text x="75" y="96" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="#7A5C44" stroke="none" paint-order="stroke">FRONT</text>
+      <text x="75" y="114" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="#A88B70" stroke="none">CUT 1 ON FOLD</text>
+    </g>
+    <!-- BACK -->
+    <g transform="translate(214 76)">
+      <use href="#bodiceBack" filter="drop-shadow(0 2px 2px rgba(80,60,40,.18))"/>
+      <use href="#bodiceBack" fill="none" stroke="#C4A484" stroke-width="1.4" stroke-dasharray="5 4" transform="translate(75 105) scale(.9) translate(-75 -105)"/>
+      <path d="M69 206l3-8 3 8M78 206l3-8 3 8" fill="#9C7A5B" stroke="none"/>
+      <line x1="75" y1="136" x2="75" y2="192" stroke-width="1.6" marker-start="url(#grain)" marker-end="url(#grain)"/>
+      <text x="75" y="96" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="2" fill="#7A5C44" stroke="none">BACK</text>
+      <text x="75" y="114" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="#A88B70" stroke="none">CUT 1 ON FOLD</text>
+    </g>
+    <!-- SLEEVES -->
+    <g transform="translate(50 332)">
+      <use href="#sleeve" filter="drop-shadow(0 2px 2px rgba(80,60,40,.18))"/>
+      <use href="#sleeve" fill="none" stroke="#C4A484" stroke-width="1.4" stroke-dasharray="5 4" transform="translate(65 55) scale(.86) translate(-65 -55)"/>
+      <text x="65" y="68" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="2" fill="#7A5C44" stroke="none">SLEEVE</text>
+      <text x="65" y="83" text-anchor="middle" font-size="9.5" letter-spacing="1.5" fill="#A88B70" stroke="none">CUT 2</text>
+    </g>
+    <g transform="translate(222 350) rotate(-8 65 46)">
+      <use href="#sleeve" filter="drop-shadow(0 2px 2px rgba(80,60,40,.18))"/>
+      <use href="#sleeve" fill="none" stroke="#C4A484" stroke-width="1.4" stroke-dasharray="5 4" transform="translate(65 55) scale(.86) translate(-65 -55)"/>
+      <text x="65" y="68" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="2" fill="#7A5C44" stroke="none">SLEEVE</text>
+      <text x="65" y="83" text-anchor="middle" font-size="9.5" letter-spacing="1.5" fill="#A88B70" stroke="none">CUT 2</text>
+    </g>
+  </g>
+
+  <!-- Transform arrow -->
+  <path d="M398 262 C 420 232, 446 232, 462 256" fill="none" stroke="#6B5642" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowHead)"/>
+
+  <!-- Stitched garment -->
+  <ellipse cx="610" cy="440" rx="118" ry="12" fill="#000" opacity="0.08"/>
+  <g transform="translate(485 118)">
+    <path d="M80 0 Q125 42 170 0 L226 18 L252 92 L208 106 L201 94 L205 306 L45 306 L49 94 L42 106 L-2 92 L24 18 Z" fill="url(#fabric)" stroke="#2A4066" stroke-width="2" stroke-linejoin="round"/>
+    <!-- Seams / stitching -->
+    <g fill="none" stroke="#DCE6F5" stroke-width="1.6" stroke-dasharray="4 4" stroke-linecap="round" opacity="0.9">
+      <path d="M86 8 Q125 44 164 8"/>
+      <path d="M84 6 L30 24"/>
+      <path d="M166 6 L220 24"/>
+      <path d="M220 24 Q206 58 201 94"/>
+      <path d="M30 24 Q44 58 49 94"/>
+      <path d="M201 100 L204 296"/>
+      <path d="M49 100 L46 296"/>
+      <path d="M6 84 L44 97"/>
+      <path d="M244 84 L206 97"/>
+      <path d="M50 294 L200 294"/>
+    </g>
+    <path d="M80 0 Q125 50 170 0" fill="none" stroke="#2A4066" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
+  </g>
+
+  <!-- Labels -->
+  <g font-size="14" font-weight="600">
+    <rect x="40" y="18" width="136" height="30" rx="15" fill="#FFFFFF" opacity="0.94"/>
+    <text x="108" y="38" text-anchor="middle" fill="#3B2F25">Pattern pieces</text>
+    <rect x="533" y="70" width="154" height="30" rx="15" fill="#FFFFFF" opacity="0.94"/>
+    <text x="610" y="90" text-anchor="middle" fill="#3B2F25">Stitched garment</text>
+  </g>
+</svg>
