@@ -1,4 +1,5 @@
 import { designStudioWorkflows } from "@/lib/design-studio-workflows";
+import { isPatternStudioEnabled } from "@/features/pattern-print-studio/flag";
 
 export interface GarmentStudioCard {
   title: string;
@@ -37,6 +38,10 @@ export const garmentStudioSections: GarmentStudioSection[] = [
       { title: "Pattern Library", description: "Browse, reuse and apply your saved seamless patterns.", image: img("pattern-library.jpg"), href: workflowHref("pattern-library") },
       { title: "Print → Embroidery", description: "Convert artwork into an embroidery concept and preview it on a garment.", image: img("print-embroidery.jpg"), href: workflowHref("print-to-embroidery") },
       { title: "Embroidery Assets", description: "A home for embroidery-ready assets, with detailed categorization coming later.", image: img("embroidery-assets.jpg"), href: workflowHref("embroidery-assets") },
+      // Behind NEXT_PUBLIC_FEATURE_PATTERN_STUDIO; not in the hero pill nav.
+      ...(isPatternStudioEnabled()
+        ? [{ title: "Pattern Print Studio", description: "Lay out pattern pieces for every size on a real-size page, with rulers, guides, grid and exact measurements.", image: img("pattern-print-studio.svg"), href: "/design-studio/pattern-print-studio" }]
+        : []),
     ],
   },
   {

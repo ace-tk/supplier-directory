@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 762 508" width="762" height="508" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!-- Card illustration: a CorelDRAW-style workspace (rulers, grid, wide page with leggings pieces S–XL). -->
+  <defs>
+    <pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#e3e7ef" stroke-width="1"/></pattern>
+    <filter id="s" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="2" dy="3" stdDeviation="4" flood-opacity=".18"/></filter>
+    <path id="leg" d="M0 0 L46 0 Q52 60 50 120 Q47 190 40 250 L12 250 Q4 190 2 120 Q-3 60 0 0 Z"/>
+  </defs>
+  <rect width="762" height="508" fill="#e3e5ea"/>
+  <!-- rulers -->
+  <rect x="0" y="0" width="762" height="26" fill="#f6f7f9"/><rect x="0" y="0" width="26" height="508" fill="#f6f7f9"/>
+  <g stroke="#7b8494" stroke-width="1">
+    <path d="M26 26H762M26 26V508"/>
+    <path d="M66 26v-14M106 26v-7M146 26v-14M186 26v-7M226 26v-14M266 26v-7M306 26v-14M346 26v-7M386 26v-14M426 26v-7M466 26v-14M506 26v-7M546 26v-14M586 26v-7M626 26v-14M666 26v-7M706 26v-14M746 26v-7"/>
+    <path d="M26 66h-14M26 106h-7M26 146h-14M26 186h-7M26 226h-14M26 266h-7M26 306h-14M26 346h-7M26 386h-14M26 426h-7M26 466h-14"/>
+  </g>
+  <g font-size="10" fill="#5b6472"><text x="69" y="12">16</text><text x="149" y="12">32</text><text x="229" y="12">48</text><text x="309" y="12">64</text><text x="389" y="12">80</text><text x="469" y="12">96</text><text x="549" y="12">112</text><text x="629" y="12">128</text></g>
+  <!-- page -->
+  <rect x="56" y="96" width="680" height="320" fill="#fff" filter="url(#s)"/>
+  <rect x="56" y="96" width="680" height="320" fill="url(#g)"/>
+  <rect x="56" y="96" width="680" height="320" fill="none" stroke="#9aa3b2"/>
+  <!-- guideline -->
+  <path d="M26 380H762" stroke="#2563eb" stroke-dasharray="6 4"/>
+  <!-- leggings pieces S..XL, growing -->
+  <g fill="#eef3fb" stroke="#1f2a44" stroke-width="2">
+    <use href="#leg" transform="translate(96 126) scale(.92)"/>
+    <use href="#leg" transform="translate(176 122) scale(.96)"/>
+    <use href="#leg" transform="translate(262 118) scale(1)"/>
+    <use href="#leg" transform="translate(352 114) scale(1.04)"/>
+    <use href="#leg" transform="translate(446 110) scale(1.08)"/>
+  </g>
+  <g font-size="15" font-weight="700" fill="#1f2a44" text-anchor="middle"><text x="117" y="402">S</text><text x="199" y="402">M</text><text x="285" y="402">L</text><text x="377" y="402">XL</text><text x="473" y="402">2XL</text></g>
+  <!-- selected piece with handles -->
+  <g fill="#111827" stroke="#fff"><rect x="542" y="104" width="9" height="9"/><rect x="615" y="104" width="9" height="9"/><rect x="542" y="384" width="9" height="9"/><rect x="615" y="384" width="9" height="9"/><rect x="578" y="104" width="9" height="9"/><rect x="578" y="384" width="9" height="9"/></g>
+  <rect x="546" y="108" width="74" height="281" fill="none" stroke="#2563eb" stroke-dasharray="4 3"/>
+  <use href="#leg" transform="translate(556 112) scale(1.12)" fill="#dbe7fb" stroke="#1f2a44" stroke-width="2"/>
+  <text x="583" y="402" font-size="15" font-weight="700" fill="#1f2a44" text-anchor="middle">3XL</text>
+  <!-- property bar chip -->
+  <rect x="470" y="40" width="262" height="34" rx="8" fill="#fff" stroke="#d5dae3"/>
+  <text x="484" y="62" font-size="13" fill="#1f2a44" font-family="ui-monospace, Menlo, monospace">W 6.250 in  H 14.040 in</text>
+</svg>
