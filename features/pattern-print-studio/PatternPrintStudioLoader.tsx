@@ -13,6 +13,6 @@ const PatternPrintStudio = dynamic(() => import("./PatternPrintStudio"), {
   ),
 });
 
-export function PatternPrintStudioLoader() {
-  return <PatternPrintStudio />;
+export function PatternPrintStudioLoader({ exportApi }: { exportApi?: string }) {
+  return <PatternPrintStudio exportApi={exportApi} />;
 }

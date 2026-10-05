@@ -27,6 +27,8 @@ import type { SnapSettings, ToolId } from "./engine/types";
 import { formatUnits, UNIT_LABEL } from "./engine/units";
 import { CalibrateDialog, ImportDialog, NewDocumentDialog, type PendingImport } from "./ui/Dialogs";
 import { AlignPanel, ObjectsPanel, ShapingPanel, Toolbox } from "./ui/Panels";
+import { ExportDialog } from "./ui/ExportDialog";
+import { DEFAULT_EXPORT_API } from "./export/client";
 import { PiecesPanel } from "./ui/PiecesPanel";
 import { ProductionPanel, SeamBar } from "./ui/ProductionPanel";
 import { PropertyBar } from "./ui/PropertyBar";
@@ -84,7 +86,7 @@ function ClipBar({ editor, clip, onResult }: { editor: Editor; clip: ClipState; 
   );
 }
 
-export default function PatternPrintStudio() {
+export default function PatternPrintStudio({ exportApi = DEFAULT_EXPORT_API }: { exportApi?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +96,7 @@ export default function PatternPrintStudio() {
   const state = useSyncExternalStore(editor?.subscribe ?? noopSubscribe, editor?.getState ?? nullState, nullState) as EditorState | null;
 
   const [panel, setPanel] = useState<PanelId>("objects");
+  const [exportOpen, setExportOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [calibrateOpen, setCalibrateOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -256,7 +259,7 @@ export default function PatternPrintStudio() {
         if (lower === "s") return handled(), save();
         if (lower === "o") return handled(), openInputRef.current?.click();
         if (lower === "i") return handled(), importInputRef.current?.click();
-        if (lower === "e") return handled(), exportPageSvg();
+        if (lower === "e") return handled(), setExportOpen(true);
         if (k === "=" || k === "+") return handled(), editor.zoomBy(2);
         if (k === "-") return handled(), editor.zoomBy(0.5);
         if (k === "0") return handled(), editor.setZoomPct(100);
@@ -307,7 +310,7 @@ export default function PatternPrintStudio() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [editor, save, exportPageSvg, report]);
+  }, [editor, save, report]);
 
   const unit = state?.settings.units ?? "in";
   const textClient = textAt && editor ? editor.projectToClient(textAt) : null;
@@ -348,9 +351,10 @@ export default function PatternPrintStudio() {
               <DropdownMenuItem onClick={() => importInputRef.current?.click()}>
                 Import SVG / PDF / image… <DropdownMenuShortcut>Ctrl+I</DropdownMenuShortcut>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportPageSvg}>
-                Export page as SVG <DropdownMenuShortcut>Ctrl+E</DropdownMenuShortcut>
+              <DropdownMenuItem onClick={() => setExportOpen(true)}>
+                Export… <DropdownMenuShortcut>Ctrl+E</DropdownMenuShortcut>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportPageSvg}>Export page as SVG</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <DropdownMenu>
@@ -605,6 +609,8 @@ export default function PatternPrintStudio() {
         )}
         <span className="ml-auto">{draftSavedAt ? `Draft autosaved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Autosaves a draft every 30s"}</span>
       </div>
+
+      {editor && state && <ExportDialog open={exportOpen} onOpenChange={setExportOpen} editor={editor} state={state} api={exportApi} />}
 
       {/* PowerClip mini toolbar, under the active frame (like CorelDRAW) */}
       {editor && state?.seam.preview && <SeamBar editor={editor} seam={state.seam} unit={unit} onResult={report} />}

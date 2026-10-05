@@ -4,6 +4,8 @@ import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
 import { edgeBetweenCorners, seamTransform, unrotate, type Rigid } from "./bleed";
+import { gate } from "../export/gate";
+import { areaLabel, rectsTouch, sizesArea, unionRects, type ExportArea, type Rect as ExportRect } from "../export/options";
 import { History } from "./history";
 import { namePieces, parseSizeLabel, pieceAnchor, pieceLabel, repeatForCopy, sizeOrder, sizeScale, sizeTransform, type AnchorMode, type ApplyOptions, type PieceTag, type ScaleMode } from "./pieces";
 import { bleedOf, bleedOutline, setViewBleed, clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, syncRepeatHolder, tileHolderOf, unwrapPowerClip, wrapInPowerClip, type ClipLink, type PowerClipSettings } from "./powerclip";
@@ -143,7 +145,7 @@ export interface SeamState {
   preview: { dx: number; dy: number; canNudge: boolean } | null;
 }
 
-export type PreflightKind = "empty" | "gap" | "dpi" | "open" | "untagged" | "link";
+export type PreflightKind = "missing" | "empty" | "gap" | "dpi" | "open" | "untagged" | "link";
 
 /** One line of the pre-flight report. */
 export interface PreflightIssue {
@@ -155,9 +157,23 @@ export interface PreflightIssue {
   /** Item to zoom to. */
   id: string | null;
   open?: OpenPathInfo;
+  /** Effective DPI of the print (kind "dpi"). */
+  dpi?: number;
+  /** The open outline holds a print (kind "open"). */
+  hasPrint?: boolean;
+}
+
+/** What the Export dialog can offer as an area. */
+export interface ExportAreas {
+  page: ExportRect;
+  /** One entry per size tag, smallest size first: everything belonging to that size, bleed included. */
+  sizes: { size: string; rect: ExportRect; pieces: number }[];
+  /** Box around the selected objects (bleed included), or null if nothing is selected. */
+  selection: ExportRect | null;
 }
 
 export const PREFLIGHT_LABEL: Record<PreflightKind, string> = {
+  missing: "Missing original images",
   empty: "Pieces with no print",
   gap: "White-gap risk",
   dpi: "Low DPI prints",
@@ -1348,8 +1364,21 @@ export class Editor {
     }
     let best: Item | null = null;
     let bestRank = Infinity;
+    // The print being placed often lies over the outline, and then it is what the pointer "hits" first.
+    // So also look for a closed outline whose line passes under the pointer, whatever is on top of it.
+    let onLine: Item | null = null;
+    let onLineDist = HIT_PX * this.px;
+    const reach = new ps.Rectangle(p.x - onLineDist, p.y - onLineDist, onLineDist * 2, onLineDist * 2);
     for (const it of this.contentLayer.getItems({ match: (i: Item) => i instanceof ps.CompoundPath || (i instanceof ps.Path && !(i.parent instanceof ps.CompoundPath)) })) {
-      if (skip(it) || !isClosedOutline(ps, it) || !it.bounds.contains(p) || !(it as paper.Path).contains(p)) continue;
+      if (skip(it) || !isClosedOutline(ps, it)) continue;
+      if (!it.dashArray?.length && it.bounds.intersects(reach)) {
+        const d = (it as paper.Path).getNearestPoint(p).getDistance(p);
+        if (d <= onLineDist) {
+          onLineDist = d;
+          onLine = it;
+        }
+      }
+      if (!it.bounds.contains(p) || !(it as paper.Path).contains(p)) continue;
       // Solid outlines first, then the smallest.
       const rank = Math.abs((it as paper.Path).area) + (it.dashArray?.length ? 1e9 : 0);
       if (rank < bestRank) {
@@ -1357,6 +1386,7 @@ export class Editor {
         best = it;
       }
     }
+    if (onLine) return { frame: onLine };
     return best ? { frame: best } : null;
   }
 
@@ -2465,6 +2495,12 @@ export class Editor {
       return `Untagged piece${root && root !== f && !isPowerClip(root) && root.name ? ` in ${root.name}` : ""}`;
     };
     const pieces = this.pieceOutlines().filter((f) => f.isInserted());
+    // A bitmap whose original file is not in the document cannot be exported at all.
+    for (const r of this.contentLayer.getItems({ class: ps.Raster }) as paper.Raster[]) {
+      if (this.assets.get(r.data?.assetId)?.dataUrl) continue;
+      const pc = clipOwner(r);
+      out.push({ kind: "missing", level: "error", label: pc ? nameOf(frameOf(pc)) : r.name || "Bitmap", message: `The original image file${r.name ? ` "${r.name}"` : ""} is missing from this document. Import it again.`, id: this.idOf(pc ?? r) });
+    }
     for (const f of pieces) {
       const pc = this.clipOfFrame(f);
       if (!pc || !contentsOf(pc).length) out.push({ kind: "empty", level: "error", label: nameOf(f), message: "No print inside this piece.", id: this.idOf(f) });
@@ -2486,14 +2522,14 @@ export class Editor {
         if (raw === null) continue;
         const dpi = r ? raw / (r.scale / 100) : raw;
         const level = dpiLevel(dpi);
-        if (level !== "ok") out.push({ kind: "dpi", level: level === "bad" ? "error" : "warning", label, message: `${it.name || "Bitmap"} prints at ${Math.round(dpi)} DPI${level === "bad" ? " — too low for production" : " — low"}.`, id: this.idOf(pc) });
+        if (level !== "ok") out.push({ kind: "dpi", level: level === "bad" ? "error" : "warning", label, message: `${it.name || "Bitmap"} prints at ${Math.round(dpi)} DPI${level === "bad" ? " — too low for production" : " — low"}.`, id: this.idOf(pc), dpi });
       }
     }
     for (const o of this.listOpenPaths()) {
       const path = this.shape.itemAt(o.address);
       // Grain lines, notches and stitch lines are meant to be open. An outline that comes almost all the way back to its start is not.
       if (path instanceof ps.Path && (path.dashArray?.length || o.gap > path.length * 0.25)) continue;
-      out.push({ kind: "open", level: "error", label: o.label, message: `Open outline: ${o.nodes} nodes, the ends are ${u(o.gap)} apart. It cannot hold a print until it is closed.`, id: path ? this.idOf(path) : null, open: o });
+      out.push({ kind: "open", level: "error", label: o.label, message: `Open outline: ${o.nodes} nodes, the ends are ${u(o.gap)} apart. It cannot hold a print until it is closed.`, id: path ? this.idOf(path) : null, open: o, hasPrint: !!path && !!clipOwner(path) && contentsOf(clipOwner(path) as Item).length > 0 });
     }
     for (const f of pieces) if (!this.tagOf(f)) out.push({ kind: "untagged", level: "warning", label: nameOf(f), message: `No Size / Piece tag (${u(f.bounds.width)} × ${u(f.bounds.height)}).`, id: this.idOf(f) });
     for (const p of this.listPieces()) if (p.differs) out.push({ kind: "link", level: "warning", label: pieceLabel({ size: p.size, piece: p.piece }), message: `Linked to ${p.linkedTo}, but its print was changed by hand. Re-sync or unlink it.`, id: p.id });
@@ -2516,6 +2552,67 @@ export class Editor {
     this.fitRect(b.expand(Math.max(b.width, b.height) * 0.15 + 0.5));
     this.drawOverlay();
     this.emit();
+  }
+
+  // ---------------------------------------------------------------- production export (Phase 4)
+  /** A page-level object's box including the bleed of every print in it. */
+  private exportBox(it: Item): ExportRect {
+    let b = it.bounds;
+    const pcs = isPowerClip(it) ? [it] : it instanceof this.ps.Group ? (it.getItems({ match: isPowerClip }) as paper.Group[]) : [];
+    for (const pc of pcs) {
+      const f = frameOf(pc);
+      if (f) b = b.unite(f.bounds.expand(bleedOf(this.ps, pc) * 2));
+    }
+    return rectOf(b);
+  }
+
+  /** The areas the Export dialog offers: the page, each size (from the piece tags) and the current selection. */
+  exportAreas(): ExportAreas {
+    const blocks = new Map<string, { rects: ExportRect[]; pieces: number }>();
+    for (const f of this.pieceOutlines()) {
+      const tag = this.tagOf(f);
+      if (!tag?.size || !f.isInserted()) continue;
+      let block = blocks.get(tag.size);
+      if (!block) blocks.set(tag.size, (block = { rects: [], pieces: 0 }));
+      block.pieces++;
+      // The whole size block (its labels and marks too) when the piece sits in a group; otherwise the piece itself.
+      const root = this.rootOf(f);
+      const pc = this.clipOfFrame(f);
+      block.rects.push(root && root !== f && root !== pc ? this.exportBox(root) : this.exportBox(pc ?? f));
+    }
+    const sizes = [...blocks.entries()].map(([size, b]) => ({ size, rect: unionRects(b.rects) as ExportRect, pieces: b.pieces })).sort((a, b) => sizeOrder(a.size) - sizeOrder(b.size) || a.size.localeCompare(b.size));
+    const roots = [...new Set(this.selected.map((i) => this.rootOf(i)).filter((i): i is Item => !!i))];
+    return { page: { x: 0, y: 0, w: this.page.width, h: this.page.height }, sizes, selection: unionRects(roots.map((r) => this.exportBox(r))) };
+  }
+
+  /** The export area for a choice made in the dialog, or null if that choice is empty (no sizes ticked, nothing selected). */
+  exportArea(kind: ExportArea["kind"], sizes: string[] = []): ExportArea | null {
+    const a = this.exportAreas();
+    const rect = kind === "page" ? a.page : kind === "selection" ? a.selection : sizesArea(a.sizes, sizes);
+    if (!rect || !(rect.w > 0) || !(rect.h > 0)) return null;
+    const ordered = a.sizes.map((s) => s.size).filter((s) => sizes.includes(s));
+    return { kind, label: areaLabel(kind, ordered), rect };
+  }
+
+  /**
+   * Pre-flight for an export: the Phase 3 checks, limited to what lies in
+   * the export area, split into problems that block the export and ones
+   * that only warn.
+   */
+  exportPreflight(area: ExportRect, dpi: number): { errors: PreflightIssue[]; warnings: PreflightIssue[]; canExport: boolean } {
+    const inArea = (issue: PreflightIssue) => {
+      const it = issue.id ? this.findById(issue.id) : null;
+      if (!it) return true;
+      const pc = clipOwner(it);
+      return rectsTouch(rectOf((pc ? frameOf(pc) : it).bounds), area);
+    };
+    return gate(this.runPreflight().filter(inArea), dpi);
+  }
+
+  /** What an export is made from: the document without the image bytes (those are uploaded separately, once each). */
+  exportDocument(): { doc: { name: string; settings: Pick<DocSettings, "bleed" | "cutLines">; objects: SceneNode[] }; assets: RasterAsset[] } {
+    const d = this.toDocument();
+    return { doc: { name: d.name, settings: { bleed: d.settings.bleed, cutLines: d.settings.cutLines }, objects: d.objects }, assets: d.assets };
   }
 
   // ---------------------------------------------------------------- trace bitmap

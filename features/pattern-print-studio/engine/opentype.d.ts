@@ -12,6 +12,7 @@ declare module "opentype.js" {
   }
   export interface Path {
     commands: PathCommand[];
+    toPathData(decimalPlaces?: number): string;
   }
   export interface Font {
     unitsPerEm: number;

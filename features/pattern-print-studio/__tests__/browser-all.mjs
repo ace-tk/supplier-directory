@@ -1,4 +1,4 @@
-// Phase 3 final check: EVERY browser suite in one run (Phase 1 + 2 regression, then 3A–3E), followed by the
+// EVERY browser suite in one run (Phase 1 + 2 regression, 3A–3E, then Phase 4), followed by the
 // performance measurement on the full 6-size leggings file with a repeat print in every piece.
 // Run on the temporary test page (see ../README.md, "Testing"):
 //   const r = await (await import('/browser-all.mjs')).default();  →  r.summary, r.failed, r.performance
@@ -13,6 +13,7 @@ const SUITES = [
   ['3C Repeat', 'browser-repeat'],
   ['3D Pieces', 'browser-pieces'],
   ['3E Production', 'browser-production'],
+  ['4A Export dialog', 'browser-export'],
 ];
 
 export async function performance3(ed) {
