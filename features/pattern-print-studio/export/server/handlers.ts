@@ -2,14 +2,12 @@
 // route files under app/api decide who may call them.
 
 import { createReadStream } from "node:fs";
-import { rm } from "node:fs/promises";
-import path from "node:path";
 import { Readable } from "node:stream";
-import { DPI_MAX, DPI_MIN, pixelSize, PREVIEW_DPI, safeNamePart, type ExportOptions, type Rect } from "../options";
+import { DPI_MAX, DPI_MIN, PREVIEW_DPI, type ExportOptions, type Rect } from "../options";
 import type { SceneDoc } from "../scene";
 import { usedAssets } from "../scene";
-import { assetPath, AssetUploadError, EXPORT_ROOT, hasAsset, isHash, saveAsset } from "./asset-store";
-import { ExportError, prepareScene, renderPng, renderTiff } from "./render";
+import { assetPath, AssetUploadError, hasAsset, isHash, saveAsset } from "./asset-store";
+import { ExportError, prepareScene, renderPng } from "./render";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
@@ -106,51 +104,68 @@ export async function preview(request: Request): Promise<Response> {
   }
 }
 
-/** Step 4B: TIFFs are made while the request waits, so they are kept small. Full-size exports run as background jobs (4C). */
-export const DIRECT_DPI_MIN = 20;
-export const DIRECT_DPI_MAX = 72;
-const DIRECT_MAX_PIXELS = 40e6;
+// ---------------------------------------------------------------- export jobs
+// (imported lazily: jobs.ts imports this file for request validation)
+const jobsModule = () => import("./jobs");
 
-/**
- * POST: a low-resolution TIFF, rendered straight away and sent back as a
- * download. The same scene, rasteriser and TIFF writer as the full-size
- * export — used to check correctness before high resolutions are switched on.
- */
-export async function tiffNow(request: Request): Promise<Response> {
+const fail = async (err: unknown) => {
+  const { JobError } = await jobsModule();
+  if (err instanceof JobError) return json({ error: err.message, ...err.extra }, err.status);
+  return json({ error: "The export service had a problem. Please try again." }, 500);
+};
+
+/** GET: the last 20 exports of a document. */
+export async function jobsList(api: string, userId: string, request: Request): Promise<Response> {
+  try {
+    const { listJobs } = await jobsModule();
+    return json({ jobs: await listJobs(api, userId, new URL(request.url).searchParams.get("doc") ?? "") });
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** POST: start an export (or a calibration test) as a background job. */
+export async function jobsCreate(api: string, userId: string, request: Request): Promise<Response> {
   let body: unknown;
   try {
     body = await request.json();
   } catch {
     return json({ error: "Bad request." }, 400);
   }
-  const problem = validateExportRequest(body);
-  if (problem) return json({ error: problem }, 400);
-  const req = body as ExportRequest & { fileName?: string };
-  const dpi = req.options.dpi;
-  if (dpi < DIRECT_DPI_MIN || dpi > DIRECT_DPI_MAX) return json({ error: `A direct export must be between ${DIRECT_DPI_MIN} and ${DIRECT_DPI_MAX} DPI.` }, 400);
-  const px = pixelSize(req.area, dpi);
-  if (px.width * px.height > DIRECT_MAX_PIXELS) return json({ error: "This area is too large for a direct export." }, 400);
-  const missing = await missingAssets(req);
-  if (missing.length) return json({ error: "Some original images have not been uploaded yet.", missing }, 409);
-  const file = path.join(EXPORT_ROOT, "out", `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.tif`);
   try {
-    const t0 = Date.now();
-    const scene = await prepareScene(renderInputOf(req, dpi));
-    const out = await renderTiff(scene, file, { dpi, transparent: req.options.background === "transparent", signal: request.signal });
-    const stream = createReadStream(file);
-    stream.on("close", () => void rm(file, { force: true }));
-    const name = safeNamePart((req.fileName ?? "export").replace(/\.tiff?$/i, ""), "export") + ".tif";
-    return new Response(Readable.toWeb(stream) as ReadableStream, {
-      headers: {
-        "Content-Type": "image/tiff",
-        "Content-Length": String(out.bytes),
-        "Content-Disposition": `attachment; filename="${name}"`,
-        "X-Pps-Export": JSON.stringify({ width: out.width, height: out.height, dpi, bytes: out.bytes, strips: out.strips, tiles: scene.tiles, warnings: scene.warnings, ms: Date.now() - t0 }),
-      },
-    });
+    const { createJob } = await jobsModule();
+    return json({ job: await createJob(api, userId, body as Parameters<typeof createJob>[2]) }, 202);
   } catch (err) {
-    await rm(file, { force: true });
-    if (err instanceof ExportError) return json({ error: err.message }, 422);
-    return json({ error: "The export could not be rendered." }, 500);
+    return fail(err);
   }
+}
+
+/** POST cancel / retry, GET link (a fresh signed download link). */
+export async function jobAction(api: string, userId: string, id: string, action: string, request: Request): Promise<Response> {
+  const docId = new URL(request.url).searchParams.get("doc") ?? "";
+  try {
+    const jobs = await jobsModule();
+    if (action === "cancel") {
+      const job = await jobs.cancelJob(api, userId, docId, id);
+      return job ? json({ job }) : json({ error: "Export not found." }, 404);
+    }
+    if (action === "retry") return json({ job: await jobs.retryJob(api, userId, docId, id) }, 202);
+    if (action === "link") {
+      const job = await jobs.getJob(api, userId, docId, id);
+      return job?.download ? json({ download: job.download }) : json({ error: "This export has no file to download." }, 404);
+    }
+    return json({ error: "Not found." }, 404);
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+/** GET: the finished file, for anyone holding a valid, unexpired signed link. */
+export async function jobDownload(id: string, request: Request): Promise<Response> {
+  const { resolveDownload } = await jobsModule();
+  const found = await resolveDownload(id, new URL(request.url).searchParams);
+  if (!found) return json({ error: "This download link is not valid any more. Ask for a new link in the export list." }, 403);
+  return new Response(Readable.toWeb(createReadStream(found.file)) as ReadableStream, {
+    headers: { "Content-Type": "image/tiff", "Content-Length": String(found.bytes), "Content-Disposition": `attachment; filename="${found.fileName}"`, "Cache-Control": "private, no-store" },
+  });
 }

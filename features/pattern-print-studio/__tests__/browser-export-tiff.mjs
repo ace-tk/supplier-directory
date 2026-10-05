@@ -1,4 +1,5 @@
-// Browser test for Phase 4B: a real TIFF from the export renderer at 40 DPI, through the dialog.
+// Browser test for Phase 4B: the full leggings sheet rendered to TIFF at 40 DPI on the server, checked with the
+// verification script (plain + mirrored) and compared with the editor's own picture.
 // Run like the other suites (see ../README.md); the page must be able to reach the export API.
 const tick = () => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
 const ticks = async (n = 12) => { for (let i = 0; i < n; i++) await tick(); };
@@ -35,42 +36,22 @@ export async function buildLayout(ed) {
   return { P, piece, item, pcOf };
 }
 
+const API = '/api/pps-test-export';
+
 export default async function run() {
   const ed = window.__pps, ps = ed.ps;
   const R = []; const ok = (name, pass, info) => R.push(`${pass ? 'PASS' : 'FAIL'} 4B ${name}${info !== undefined ? ' — ' + info : ''}`);
-  const key = (k, o = {}) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...o }));
-  const dlg = () => document.querySelector('[role=dialog]');
-  const q = (sel) => dlg() && dlg().querySelector(sel); const qa = (sel) => (dlg() ? [...dlg().querySelectorAll(sel)] : []);
-  const dbtn = (t) => qa('button').find((b) => b.textContent.trim().startsWith(t));
-  const box = (t) => { const l = qa('label').find((x) => x.textContent.trim().startsWith(t)); return l && l.querySelector('input'); };
   const report = {};
   try {
   const { P } = await buildLayout(ed);
   ok('the full layout is ready: 24 pieces, 19 with prints', P().length === 24 && P().filter((p) => p.hasPrint).length === 19, `${P().filter((p) => p.hasPrint).length} printed`);
 
-  // ---------------------------------------------------------------- "Test export at 40 DPI" from the dialog
-  key('e', { ctrlKey: true }); await until(() => dlg() && /Export for production/.test(dlg().textContent)); await ticks(20);
-  ok('the test-export button waits for "Export anyway" while there are warnings', dbtn('Test export at 40 DPI').disabled && !!box('Export anyway'));
-  box('Export anyway').click(); await ticks(20);
-  const downloads = []; const realClick = HTMLAnchorElement.prototype.click; const realCreate = URL.createObjectURL; let lastBlob = null;
-  URL.createObjectURL = (b) => { lastBlob = b; return realCreate.call(URL, b); };
-  HTMLAnchorElement.prototype.click = function () { if (this.download) downloads.push({ name: this.download, blob: lastBlob }); else realClick.call(this); };
-  dbtn('Test export at 40 DPI').click();
-  const done = await until(() => downloads.length || q('[role=alert]'), 120000); await ticks(20);
-  HTMLAnchorElement.prototype.click = realClick; URL.createObjectURL = realCreate;
-  const d = downloads[0];
-  ok('a TIFF comes back and is handed to the browser as a download', done && !!d && d.blob.type === 'image/tiff' && d.blob.size > 100000, d ? `${d.name}, ${(d.blob.size / 1e6).toFixed(2)} MB` : (q('[role=alert]') || {}).textContent);
-  ok('file name: {document}_{area}_{dpi}dpi_{date_time}.tif', !!d && /^Leggings-Floral_All-sizes_40dpi_\d{4}-\d\d-\d\d_\d{4}\.tif$/.test(d.name), d && d.name);
-  if (d) { const head = new Uint8Array(await d.blob.slice(0, 4).arrayBuffer()); ok('it really is a TIFF (file signature)', (head[0] === 0x49 && head[1] === 0x49 && head[2] === 42) || (head[0] === 0x4d && head[1] === 0x4d && head[3] === 42), [...head].join(' ')); }
-  ok('the dialog reports the size: 6,550 × 1,508 px for the whole page at 40 DPI', /6550 × 1508 px/.test(q('[data-export-status]').textContent), q('[data-export-status]').textContent.trim());
-  dbtn('Close').click(); await until(() => !dlg());
-
   // ---------------------------------------------------------------- server checks: verification script + editor comparison
   const DPI = 40; ed.fitPage(); await ticks(20); ps.view.update();
   const raster = ed.contentLayer.rasterize({ resolution: 72 * DPI, insert: false }); const b = raster.bounds; // where the picture really sits (it includes strokes and bleed)
   const { doc, assets } = ed.exportDocument();
-  // originals were already uploaded by the dialog; the request only needs their hashes
-  const hashes = []; for (const a of assets) { const blob = await (await fetch(a.dataUrl)).blob(); const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))].map((x) => x.toString(16).padStart(2, '0')).join(''); hashes.push({ id: a.id, hash: h, name: a.name }); }
+  // upload the originals (once each, under their SHA-256), as the dialog does
+  const hashes = []; for (const a of assets) { const blob = await (await fetch(a.dataUrl)).blob(); const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))].map((x) => x.toString(16).padStart(2, '0')).join(''); const head = await fetch(`${API}/assets/${h}`, { method: 'HEAD' }); if (!head.ok) await fetch(`${API}/assets/${h}`, { method: 'PUT', body: blob }); hashes.push({ id: a.id, hash: h, name: a.name }); }
   const area = ed.exportArea('page').rect;
   const check = async (tag, options, withEditor) => (await fetch('/api/pps-test-export/tiff-check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tag, request: { doc, assets: hashes, area, options: { format: 'tiff', dpi: DPI, mirror: false, cutLines: false, cutLineWidthPt: 0.5, sizeLabels: false, background: 'white', ...options } }, editor: withEditor ? { png: raster.toDataURL(), x: b.x, y: b.y } : undefined }) })).json();
   // These checks need the developer-only helper route that runs the verification script and the comparison on the server.

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Editor, EditorState, PreflightIssue } from "../engine/Editor";
-import { requestPreview, requestTiff, saveBlob, uploadOriginals, type PreviewResult } from "../export/client";
+import { requestPreview, startExport, uploadOriginals, type ExportJob, type PreviewResult } from "../export/client";
 import { BUILT_IN_PRESETS, clampDpi, DEFAULT_EXPORT, DPI_MAX, DPI_MIN, estimateExport, exportFileName, formatBytes, formatDuration, type AreaKind, type ExportOptions, type ExportPreset } from "../export/options";
 import { usedAssets } from "../export/scene";
 import { formatUnits, UNIT_LABEL } from "../engine/units";
@@ -40,7 +40,7 @@ function IssueList({ title, issues, tone, onShow }: { title: string; issues: Pre
   );
 }
 
-function ExportBody({ editor, state, api, onClose }: { editor: Editor; state: EditorState; api: string; onClose: () => void }) {
+function ExportBody({ editor, state, api, onClose, onStarted }: { editor: Editor; state: EditorState; api: string; onClose: () => void; onStarted: (job: ExportJob) => void }) {
   const unit = state.settings.units;
   // The document cannot change while this dialog is open, so the areas are worked out once.
   const areas = useMemo(() => editor.exportAreas(), [editor]);
@@ -121,28 +121,23 @@ function ExportBody({ editor, state, api, onClose }: { editor: Editor; state: Ed
     }
   }
 
-  /** Step 4B: a real TIFF from the export renderer at 40 DPI, to check sizes and correctness before full resolution is switched on. */
-  const TEST_DPI = 40;
-  const [testing, setTesting] = useState<string | null>(null);
-  const [tested, setTested] = useState<string | null>(null);
-  async function testExport() {
+  const [starting, setStarting] = useState<string | null>(null);
+  /** Starts the full-size export as a background job and closes the dialog — the user keeps working. */
+  async function startJob() {
     if (!area) return;
     setError(null);
-    setTested(null);
     try {
-      const { doc, assets } = editor.exportDocument();
+      const { docId, doc, assets } = editor.exportDocument();
       const used = usedAssets(doc);
-      setTesting("Sending original images…");
-      const list = await uploadOriginals(api, assets, used);
-      setTesting("Rendering the TIFF…");
-      const name = exportFileName(state.docName, area.label, TEST_DPI, new Date(), "tiff");
-      const out = await requestTiff(api, { doc, assets: list, area: area.rect, options: { ...opts, format: "tiff", dpi: TEST_DPI }, fileName: name });
-      saveBlob(out.blob, name);
-      setTested(`${name} — ${out.info.width} × ${out.info.height} px, ${formatBytes(out.info.bytes)}, made in ${(out.info.ms / 1000).toFixed(1)} s`);
+      setStarting(used.length ? "Sending original images…" : "Starting…");
+      const list = await uploadOriginals(api, assets, used, (done, total) => setStarting(`Sending original images… ${done}/${total}`));
+      setStarting("Starting…");
+      const job = await startExport(api, { docId, areaLabel: area.label, request: { doc, assets: list, area: area.rect, options: opts } });
+      onStarted(job);
+      onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The export could not be made.");
-    } finally {
-      setTesting(null);
+      setError(err instanceof Error ? err.message : "The export could not be started.");
+      setStarting(null);
     }
   }
 
@@ -351,16 +346,13 @@ function ExportBody({ editor, state, api, onClose }: { editor: Editor; state: Ed
 
       <DialogFooter>
         <span className="mr-auto self-center text-xs text-muted-foreground" role="status" data-export-status>
-          {testing ?? (tested ? `Downloaded ${tested}` : blocked ? (area ? "Fix the problems marked in red to export." : "Choose an area to export.") : needsConfirm ? "Tick “Export anyway” to export with warnings." : "Ready. Full-size export (150 / 300 DPI) arrives in step 4C; the 40 DPI test file uses the same renderer.")}
+          {starting ?? (blocked ? (area ? "Fix the problems marked in red to export." : "Choose an area to export.") : needsConfirm ? "Tick “Export anyway” to export with warnings." : opts.format === "pdf" ? "PDF export arrives in step 4D." : "Ready. The export runs in the background; you can keep working.")}
         </span>
         <Button variant="outline" onClick={onClose}>
           Close
         </Button>
-        <Button variant="outline" disabled={blocked || needsConfirm || !!testing || opts.format !== "tiff"} onClick={testExport} title="A real TIFF from the export renderer, at 40 DPI, to check sizes and correctness">
-          {testing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-          Test export at 40 DPI
-        </Button>
-        <Button disabled title="Full-size export is built in step 4C">
+        <Button disabled={blocked || needsConfirm || !!starting || opts.format !== "tiff"} onClick={startJob} title={opts.format === "pdf" ? "PDF export is built in step 4D" : "Start the export in the background"}>
+          {starting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
           Export {opts.format === "pdf" ? "PDF" : "TIFF"}
         </Button>
       </DialogFooter>
@@ -369,11 +361,11 @@ function ExportBody({ editor, state, api, onClose }: { editor: Editor; state: Ed
 }
 
 /** File → Export (Ctrl+E). */
-export function ExportDialog({ open, onOpenChange, editor, state, api }: { open: boolean; onOpenChange: (o: boolean) => void; editor: Editor; state: EditorState; api: string }) {
+export function ExportDialog({ open, onOpenChange, editor, state, api, onStarted }: { open: boolean; onOpenChange: (o: boolean) => void; editor: Editor; state: EditorState; api: string; onStarted: (job: ExportJob) => void }) {
   // The body only mounts while open, so it starts fresh (and re-runs pre-flight) every time.
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {open && <ExportBody editor={editor} state={state} api={api} onClose={() => onOpenChange(false)} />}
+      {open && <ExportBody editor={editor} state={state} api={api} onClose={() => onOpenChange(false)} onStarted={onStarted} />}
     </Dialog>
   );
 }

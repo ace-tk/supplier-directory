@@ -31,6 +31,8 @@ export const DOC_VERSION = 2;
 export interface DocFile {
   format: typeof DOC_FORMAT;
   version: number;
+  /** Stays with the document for its whole life (new on File > New); its exports are listed under it. Absent in files saved before Phase 4. */
+  id?: string;
   name: string;
   page: PageSize;
   settings: DocSettings;
@@ -193,6 +195,7 @@ interface SeamEdge {
 
 export interface EditorState {
   docName: string;
+  docId: string;
   page: PageSize;
   settings: DocSettings;
   origin: Origin;
@@ -317,6 +320,7 @@ export class Editor {
   private originAtPageCorner = true;
   private guides: Guide[] = [];
   private docName = "Untitled";
+  private docId = newId("d");
   private tool: ToolId = "pick";
   private zoomPct = 100;
   private calibration = 1;
@@ -465,6 +469,7 @@ export class Editor {
     const single = this.selected.length === 1 ? this.selected[0] : null;
     return {
       docName: this.docName,
+      docId: this.docId,
       page: { ...this.page },
       settings: this.settings,
       origin: { ...this.origin },
@@ -2611,9 +2616,9 @@ export class Editor {
   }
 
   /** What an export is made from: the document without the image bytes (those are uploaded separately, once each). */
-  exportDocument(): { doc: { name: string; settings: Pick<DocSettings, "bleed" | "cutLines">; objects: SceneNode[] }; assets: RasterAsset[] } {
+  exportDocument(): { docId: string; doc: { name: string; settings: Pick<DocSettings, "bleed" | "cutLines">; objects: SceneNode[] }; assets: RasterAsset[] } {
     const d = this.toDocument();
-    return { doc: { name: d.name, settings: { bleed: d.settings.bleed, cutLines: d.settings.cutLines }, objects: d.objects }, assets: d.assets };
+    return { docId: this.docId, doc: { name: d.name, settings: { bleed: d.settings.bleed, cutLines: d.settings.cutLines }, objects: d.objects }, assets: d.assets };
   }
 
   // ---------------------------------------------------------------- trace bitmap
@@ -3181,6 +3186,7 @@ export class Editor {
     return {
       format: DOC_FORMAT,
       version: DOC_VERSION,
+      id: this.docId,
       name: this.docName,
       page: { ...this.page },
       settings: structuredClone(this.settings),
@@ -3198,6 +3204,7 @@ export class Editor {
     this.assets.clear();
     await this.assets.addAll(doc.assets ?? []);
     this.docName = doc.name || "Untitled";
+    this.docId = typeof doc.id === "string" && /^[A-Za-z0-9_-]{6,64}$/.test(doc.id) ? doc.id : newId("d");
     this.page = { ...doc.page };
     this.settings = { ...structuredClone(DEFAULT_SETTINGS), ...doc.settings };
     this.settings.bleed = { ...DEFAULT_SETTINGS.bleed, ...(doc.settings?.bleed ?? {}) };
@@ -3245,6 +3252,7 @@ export class Editor {
     this.selected = [];
     this.guides = [];
     this.docName = name;
+    this.docId = newId("d");
     this.settings = { ...structuredClone(DEFAULT_SETTINGS), units };
     setViewBleed(this.ps, this.settings.bleed);
     this.resetSeam();

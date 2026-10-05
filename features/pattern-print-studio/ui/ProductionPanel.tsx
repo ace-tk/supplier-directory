@@ -12,7 +12,7 @@ type Result = { ok: boolean; message: string };
 const KINDS = Object.keys(PREFLIGHT_LABEL) as PreflightKind[];
 
 /** Production safety: bleed, seam match preview, and the pre-flight check. */
-export function ProductionPanel({ editor, state, onResult }: { editor: Editor; state: EditorState; onResult: (r: Result) => void }) {
+export function ProductionPanel({ editor, state, onResult, children }: { editor: Editor; state: EditorState; onResult: (r: Result) => void; children?: React.ReactNode }) {
   const unit = state.settings.units;
   const bleed = state.settings.bleed;
   const clip = state.clip;
@@ -112,6 +112,7 @@ export function ProductionPanel({ editor, state, onResult }: { editor: Editor; s
           </div>
         )}
       </section>
+      {children}
     </div>
   );
 }

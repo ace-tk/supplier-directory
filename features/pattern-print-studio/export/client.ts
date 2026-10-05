@@ -71,27 +71,63 @@ export async function requestPreview(api: string, body: { doc: SceneDoc; assets:
   return (await res.json()) as PreviewResult;
 }
 
-export interface TiffDownload {
-  blob: Blob;
+// ---------------------------------------------------------------- export jobs
+export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
+
+/** One export in the list (mirrors the server's JobView). */
+export interface ExportJob {
+  id: string;
+  docId: string;
+  kind: "export" | "calibration";
   fileName: string;
-  info: { width: number; height: number; dpi: number; bytes: number; strips: number; tiles: number; warnings: string[]; ms: number };
+  area: string;
+  dpi: number;
+  widthPx: number;
+  heightPx: number;
+  status: JobStatus;
+  step: "waiting" | "preparing" | "rendering" | "stitching" | "compressing" | "saving" | "done";
+  progress: number;
+  createdAt: number;
+  finishedAt?: number;
+  bytes?: number;
+  seconds?: number;
+  peakMemoryMb?: number;
+  error?: string;
+  download?: { url: string; expiresAt: number };
 }
 
-/** A low-resolution TIFF made straight away by the export renderer (step 4B; full-size exports are background jobs). */
-export async function requestTiff(api: string, body: { doc: SceneDoc; assets: { id: string; hash: string; name: string }[]; area: Rect; options: ExportOptions; fileName: string }, signal?: AbortSignal): Promise<TiffDownload> {
-  const res = await fetch(`${api}/tiff`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
-  if (!res.ok) throw new Error(await message(res, "The export could not be made."));
-  return { blob: await res.blob(), fileName: body.fileName, info: JSON.parse(res.headers.get("X-Pps-Export") ?? "{}") };
-}
+export const isActive = (j: ExportJob) => j.status === "queued" || j.status === "running";
 
-/** Hands a file to the browser's download. */
-export function saveBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
+export const STEP_LABEL: Record<ExportJob["step"], string> = { waiting: "Waiting in line", preparing: "Preparing images", rendering: "Rendering", stitching: "Stitching", compressing: "Compressing", saving: "Saving", done: "Done" };
+
+async function call<T>(url: string, init: RequestInit | undefined, fallback: string): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(await message(res, fallback));
+  return (await res.json()) as T;
+}
+const post = (body?: unknown): RequestInit => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+
+export const listExports = async (api: string, docId: string) => (await call<{ jobs: ExportJob[] }>(`${api}/jobs?doc=${encodeURIComponent(docId)}`, undefined, "The export list could not be loaded.")).jobs;
+
+/** Starts a full-size export as a background job. */
+export const startExport = async (api: string, body: { docId: string; areaLabel: string; request: { doc: SceneDoc; assets: { id: string; hash: string; name: string }[]; area: Rect; options: ExportOptions } }) =>
+  (await call<{ job: ExportJob }>(`${api}/jobs`, post({ kind: "export", ...body }), "The export could not be started.")).job;
+
+/** Starts the 10 × 10 in calibration test. */
+export const startCalibration = async (api: string, body: { docId: string; docName: string; dpi: number }) => (await call<{ job: ExportJob }>(`${api}/jobs`, post({ kind: "calibration", ...body }), "The calibration test could not be started.")).job;
+
+export const cancelExport = (api: string, job: ExportJob) => call<{ job: ExportJob }>(`${api}/jobs/${job.id}/cancel?doc=${encodeURIComponent(job.docId)}`, post(), "The export could not be cancelled.");
+export const retryExport = async (api: string, job: ExportJob) => (await call<{ job: ExportJob }>(`${api}/jobs/${job.id}/retry?doc=${encodeURIComponent(job.docId)}`, post(), "The export could not be retried.")).job;
+/** A fresh signed download link (the old one may have expired). */
+export const freshLink = async (api: string, job: ExportJob) => (await call<{ download: { url: string; expiresAt: number } }>(`${api}/jobs/${job.id}/link?doc=${encodeURIComponent(job.docId)}`, undefined, "A new download link could not be made.")).download;
+
+/** Opens a download in the browser without leaving the page. */
+export function openDownload(url: string, fileName: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+

@@ -15,6 +15,7 @@ const SUITES = [
   ['3E Production', 'browser-production'],
   ['4A Export dialog', 'browser-export'],
   ['4B TIFF render', 'browser-export-tiff'],
+  ['4C Export jobs', 'browser-export-jobs'],
 ];
 
 export async function performance3(ed) {

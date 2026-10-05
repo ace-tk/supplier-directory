@@ -10,3 +10,11 @@ export async function refuseExportCall(): Promise<Response | null> {
   if (!(await getSession())) return Response.json({ error: "Please sign in again." }, { status: 401 });
   return null;
 }
+
+/** The signed-in user's id, or a refusal. */
+export async function exportCaller(): Promise<{ userId: string } | { refused: Response }> {
+  if (!isPatternStudioEnabled()) return { refused: Response.json({ error: "Not found." }, { status: 404 }) };
+  const session = await getSession();
+  if (!session?.user?.id) return { refused: Response.json({ error: "Please sign in again." }, { status: 401 }) };
+  return { userId: session.user.id };
+}

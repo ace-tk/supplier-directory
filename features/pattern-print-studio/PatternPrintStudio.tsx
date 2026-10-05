@@ -28,6 +28,8 @@ import { formatUnits, UNIT_LABEL } from "./engine/units";
 import { CalibrateDialog, ImportDialog, NewDocumentDialog, type PendingImport } from "./ui/Dialogs";
 import { AlignPanel, ObjectsPanel, ShapingPanel, Toolbox } from "./ui/Panels";
 import { ExportDialog } from "./ui/ExportDialog";
+import { ExportProgressChip, ExportsPanel } from "./ui/ExportsPanel";
+import { useExportJobs } from "./ui/useExportJobs";
 import { DEFAULT_EXPORT_API } from "./export/client";
 import { PiecesPanel } from "./ui/PiecesPanel";
 import { ProductionPanel, SeamBar } from "./ui/ProductionPanel";
@@ -97,6 +99,7 @@ export default function PatternPrintStudio({ exportApi = DEFAULT_EXPORT_API }: {
 
   const [panel, setPanel] = useState<PanelId>("objects");
   const [exportOpen, setExportOpen] = useState(false);
+  const exportsOf = useExportJobs(exportApi, state?.docId ?? null);
   const [newOpen, setNewOpen] = useState(false);
   const [calibrateOpen, setCalibrateOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -579,7 +582,7 @@ export default function PatternPrintStudio({ exportApi = DEFAULT_EXPORT_API }: {
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : panel === "align" ? <AlignPanel editor={editor} state={state} /> : panel === "shaping" ? <ShapingPanel editor={editor} state={state} onResult={report} /> : panel === "pieces" ? <PiecesPanel editor={editor} state={state} onResult={report} /> : <ProductionPanel editor={editor} state={state} onResult={report} />)}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : panel === "align" ? <AlignPanel editor={editor} state={state} /> : panel === "shaping" ? <ShapingPanel editor={editor} state={state} onResult={report} /> : panel === "pieces" ? <PiecesPanel editor={editor} state={state} onResult={report} /> : <ProductionPanel editor={editor} state={state} onResult={report}><ExportsPanel api={exportApi} docId={state.docId} docName={state.docName} exports={exportsOf} onOpenExport={() => setExportOpen(true)} /></ProductionPanel>)}</div>
         </div>
       </div>
 
@@ -610,7 +613,20 @@ export default function PatternPrintStudio({ exportApi = DEFAULT_EXPORT_API }: {
         <span className="ml-auto">{draftSavedAt ? `Draft autosaved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Autosaves a draft every 30s"}</span>
       </div>
 
-      {editor && state && <ExportDialog open={exportOpen} onOpenChange={setExportOpen} editor={editor} state={state} api={exportApi} />}
+      {editor && state && (
+        <ExportDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          editor={editor}
+          state={state}
+          api={exportApi}
+          onStarted={(job) => {
+            exportsOf.track(job);
+            toast.info(`Export started: ${job.fileName}. You can keep working.`);
+          }}
+        />
+      )}
+      {editor && <ExportProgressChip api={exportApi} exports={exportsOf} />}
 
       {/* PowerClip mini toolbar, under the active frame (like CorelDRAW) */}
       {editor && state?.seam.preview && <SeamBar editor={editor} seam={state.seam} unit={unit} onResult={report} />}

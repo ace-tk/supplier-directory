@@ -162,7 +162,8 @@ export async function renderTiff(scene: ExportScene, file: string, opts: { dpi: 
     }
     const t1 = Date.now();
     stop();
-    opts.onProgress?.("compressing", 0);
+    // With a single strip, drawing and compressing are one pass — there is no separate step to report.
+    if (count > 1) opts.onProgress?.("compressing", 0);
     const info = await finish(source)
       .withIccProfile("srgb")
       .tiff({ compression: "lzw", predictor: "horizontal", xres: opts.dpi / 25.4, yres: opts.dpi / 25.4, resolutionUnit: "inch", bigtiff: bigTiff })
