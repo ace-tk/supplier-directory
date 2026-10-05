@@ -1,4 +1,5 @@
 import type paper from "paper/dist/paper-core";
+import type { RepeatSettings } from "./repeat";
 
 type PaperScope = typeof paper;
 type Item = paper.Item;
@@ -9,6 +10,8 @@ type Item = paper.Item;
  *
  * On the canvas a PowerClip is a Group (data.pc = settings) with:
  *   [clip group]  data.pcClip — a clipped Group: [mask, ...contents]
+ *   [tile holder] data.pcTile — only with Repeat fill: the one tile's artwork, kept hidden;
+ *                 the clip group then holds generated copies of it (data.pcRepeat)
  *   [frame]       the real outline, the same path the Shape tool edits
  * The mask is a generated copy of the frame (data.derived) and is never
  * saved; only the frame, the contents and the settings are.
@@ -16,6 +19,8 @@ type Item = paper.Item;
 export interface PowerClipSettings {
   /** Contents move, rotate and scale with the frame. Off: the frame moves and the print stays. */
   lock: boolean;
+  /** Repeat fill: the contents are ONE tile, repeated to cover the frame. Only these numbers are saved, never the tiles. */
+  repeat?: RepeatSettings;
 }
 
 export const DEFAULT_CLIP: PowerClipSettings = { lock: true };
@@ -25,10 +30,16 @@ export const isPowerClip = (item: Item | null | undefined): item is paper.Group 
 export const clipGroupOf = (pc: Item) => pc.children.find((c) => c.data?.pcClip) as paper.Group;
 
 /** The outline. Looked up by role, not position: the Shape tool may replace it (path ⇄ compound path). */
-export const frameOf = (pc: Item) => pc.children.find((c) => !c.data?.pcClip && !c.data?.derived) as paper.Path | paper.CompoundPath;
+export const frameOf = (pc: Item) => pc.children.find((c) => !c.data?.pcClip && !c.data?.pcTile && !c.data?.derived) as paper.Path | paper.CompoundPath;
 
-/** The prints inside, bottom to top. */
-export const contentsOf = (pc: Item): Item[] => clipGroupOf(pc).children.filter((c) => !c.data?.derived);
+/** With Repeat fill: the hidden group holding the tile's artwork. */
+export const tileHolderOf = (pc: Item) => (pc.children.find((c) => c.data?.pcTile) as paper.Group | undefined) ?? null;
+
+/** The prints inside, bottom to top (with Repeat fill: the artwork of the one tile). */
+export const contentsOf = (pc: Item): Item[] => {
+  const holder = tileHolderOf(pc);
+  return holder ? [...holder.children] : clipGroupOf(pc).children.filter((c) => !c.data?.derived);
+};
 
 /** True for generated helpers (clip mask, edit-mode veil) that are not part of the document. */
 export const isDerived = (item: Item | null | undefined) => !!item?.data?.derived;
@@ -41,8 +52,31 @@ export function clipOwner(item: Item | null | undefined): paper.Group | null {
 
 /** True if the item is (inside) the contents of a PowerClip rather than a frame or a free object. */
 export function insideClipContents(item: Item | null | undefined): boolean {
-  for (let it = item; it; it = it.parent) if (it.data?.pcClip) return true;
+  for (let it = item; it; it = it.parent) if (it.data?.pcClip || it.data?.pcTile) return true;
   return false;
+}
+
+/**
+ * Moves the contents between the clip group (a normal print) and the hidden
+ * tile holder (Repeat fill), to match the PowerClip's settings. The
+ * generated tiles themselves are built by the editor, which knows the view.
+ */
+export function syncRepeatHolder(ps: PaperScope, pc: Item) {
+  const clip = clipGroupOf(pc);
+  const holder = tileHolderOf(pc);
+  const wanted = !!pc.data.pc.repeat;
+  if (wanted && !holder) {
+    const h = new ps.Group({ insert: false });
+    h.data = { pcTile: true };
+    h.addChildren(clip.children.filter((c) => !c.data?.derived));
+    h.visible = false;
+    h.insertAbove(clip);
+  } else if (!wanted && holder) {
+    for (const c of [...clip.children]) if (c.data?.pcRepeat) c.remove();
+    clip.addChildren([...holder.children]);
+    holder.remove();
+    syncMask(ps, pc, clip.clipped);
+  }
 }
 
 /** Only closed paths can be frames. */
@@ -84,6 +118,7 @@ export function assemblePowerClip(ps: PaperScope, frame: Item, contents: Item[],
   pc.addChild(clip);
   pc.addChild(frame);
   syncMask(ps, pc);
+  syncRepeatHolder(ps, pc);
   return pc;
 }
 
@@ -102,6 +137,7 @@ export function wrapInPowerClip(ps: PaperScope, frame: Item, contents: Item[], s
   clip.addChildren(contents);
   pc.addChild(frame);
   syncMask(ps, pc);
+  syncRepeatHolder(ps, pc);
   return pc;
 }
 

@@ -260,7 +260,8 @@ export default function PatternPrintStudio() {
       // Esc: cancel "place inside", then finish editing a PowerClip's contents, then the usual.
       if (k === "Escape" && (editor.cancelPlaceInside() || editor.finishClipEdit())) return;
       if (k === "Escape") return shapeTool && editor.clearNodeSelection() ? undefined : st.tool !== "pick" ? editor.setTool("pick") : editor.clearSelection();
-      if (k.startsWith("Arrow") && (shapeTool ? !!st.nodeEdit?.selected : st.selectionCount)) {
+      // Arrows nudge the selection — or, while editing a repeat fill (nothing is selected then), the repeat itself.
+      if (k.startsWith("Arrow") && (shapeTool ? !!st.nodeEdit?.selected : st.selectionCount || (st.clip?.editing && st.clip.repeat))) {
         e.preventDefault();
         const step = st.settings.nudge * (e.shiftKey ? 10 : 1);
         const dx = k === "ArrowLeft" ? -step : k === "ArrowRight" ? step : 0;
@@ -568,7 +569,7 @@ export default function PatternPrintStudio() {
         </span>
         {state?.snapLabel && <span className="text-fuchsia-600">↳ {state.snapLabel}</span>}
         {state?.placing && <span className="font-medium text-primary">Click a pattern outline to place the print inside · Esc cancels</span>}
-        {state?.clip?.editing && <span className="font-medium text-primary">Editing PowerClip contents · Esc or click outside to finish</span>}
+        {state?.clip?.editing && <span className="font-medium text-primary">{state.clip.repeat ? "Editing repeat fill · drag inside the frame to shift it · Esc or click outside to finish" : "Editing PowerClip contents · Esc or click outside to finish"}</span>}
         {state?.nodeEdit ? (
           <span>
             {state.nodeEdit.hint

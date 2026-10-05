@@ -4,7 +4,8 @@ import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
 import { History } from "./history";
-import { clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, unwrapPowerClip, wrapInPowerClip } from "./powerclip";
+import { clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, syncRepeatHolder, tileHolderOf, unwrapPowerClip, wrapInPowerClip } from "./powerclip";
+import { cellMatrix, countCells, coverInRepeatSpace, defaultRepeat, deltaInRepeatSpace, repeatCells, repeatSteps, type RepeatSettings } from "./repeat";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
 import { anchorOf, dpiLevel, effectiveDpi, fillScale, fitScale } from "./clip-fit";
 import type { NodeType } from "./node-geometry";
@@ -82,6 +83,10 @@ export interface ClipState {
   lock: boolean;
   /** Number of prints inside. */
   count: number;
+  /** Repeat fill settings, when on. */
+  repeat: RepeatSettings | null;
+  /** Repeat tiles currently drawn, and how many were left out because the tile is too small at this zoom. */
+  tiles: { drawn: number; skipped: number } | null;
   /** Where the bar goes: bottom-centre of the frame, page inches. */
   anchor: { x: number; y: number };
 }
@@ -163,7 +168,8 @@ type DragState =
   | { kind: "guide"; guideId: string; orientation: Orientation; created: boolean; targets: SnapTargets }
   | { kind: "origin"; targets: SnapTargets }
   | { kind: "shape" }
-  | { kind: "rdrag"; startClient: paper.Point; moved: boolean };
+  | { kind: "rdrag"; startClient: paper.Point; moved: boolean }
+  | { kind: "repeat"; start: paper.Point; baseX: number; baseY: number; moved: boolean };
 
 const HANDLE_PX = 7;
 const HIT_PX = 5;
@@ -171,6 +177,8 @@ const SELECT_COLOR = "#2563eb";
 const GUIDE_COLOR = "#2563eb";
 const GUIDE_SELECTED_COLOR = "#dc2626";
 const NEW_SHAPE_STROKE = 0.01; // inches
+/** Most repeat tiles drawn for one piece at a time; beyond this the tile is too small to matter at that zoom. */
+const MAX_TILES = 6000;
 const CALIBRATION_KEY = "pps.screenCalibration";
 
 function rectOf(b: paper.Rectangle): Rect {
@@ -232,6 +240,10 @@ export class Editor {
   private clipMenu: { x: number; y: number; frame: Item; contents: Item[] } | null = null;
   private clipList: paper.Group[] | null = null;
   private lastOpenOutline: Item | null = null;
+  /** Repeat fill: cached tile definitions (per tile holder), clips whose tiles must be rebuilt, and tile counts for the UI. */
+  private tileDefs = new WeakMap<Item, paper.SymbolDefinition>();
+  private dirtyRepeats = new Set<paper.Group>();
+  private repeatInfo = new WeakMap<Item, { tiles: number; skipped: number }>();
   /** While choosing a frame: the outline the print would go into (highlighted). */
   private frameHover: Item | null = null;
   /** Reports the outcome of pointer-driven PowerClip actions (shown as a toast). */
@@ -401,7 +413,8 @@ export class Editor {
     const frame = pc && frameOf(pc);
     if (!pc || !frame) return null;
     const b = frame.bounds;
-    return { id: this.idOf(pc), editing: pc === this.clipEdit, lock: !!pc.data.pc.lock, count: contentsOf(pc).length, anchor: { x: b.center.x, y: b.bottom } };
+    const info = this.repeatInfo.get(pc);
+    return { id: this.idOf(pc), editing: pc === this.clipEdit, lock: !!pc.data.pc.lock, count: contentsOf(pc).length, repeat: pc.data.pc.repeat ?? null, tiles: info ? { drawn: info.tiles, skipped: info.skipped } : null, anchor: { x: b.center.x, y: b.bottom } };
   }
 
   /** Re-render React (rAF-batched) after any state change. */
@@ -420,6 +433,8 @@ export class Editor {
     this.updatePageShadow();
     rebuildGrid(this.ps, this.gridLayer, this.settings.grid, this.origin, this.ps.view.bounds, this.ps.view.zoom);
     this.drawGuides();
+    // Repeat tiles are only built for what is on screen, so a pan or zoom needs them rebuilt.
+    this.refreshRepeats(true);
     this.drawOverlay();
     for (const l of this.viewListeners) l();
     this.emit();
@@ -472,11 +487,15 @@ export class Editor {
     return this.contentLayer.getItem({ match: (it: Item) => it.data?.id === id }) ?? null;
   }
   /** Applies a transform to an object. An unlocked PowerClip moves its frame only; the print stays where it is. */
-  private tf(it: Item, fn: (target: Item) => void) {
+  private tf(it: Item, fn: (target: Item) => void, info?: { rotate?: number; sx?: number; sy?: number }) {
     if (isPowerClip(it) && !it.data.pc.lock) {
       fn(frameOf(it));
       syncMask(this.ps, it, it !== this.clipEdit);
-    } else fn(it);
+      if (it.data.pc.repeat) this.dirtyRepeats.add(it);
+    } else {
+      fn(it);
+      if (info) this.fixRepeatsAfterTransform(it, info);
+    }
   }
   private markChanged() {
     this.unsaved = true;
@@ -486,6 +505,9 @@ export class Editor {
   commit() {
     this.shapingDirty = true;
     this.clipList = null;
+    // Contents may have changed: tile definitions are rebuilt from the artwork.
+    this.tileDefs = new WeakMap();
+    this.refreshRepeats(true);
     if (this.tool === "shape") this.shape.validate();
     if (this.history.push(this.snapshot(), this.shape.meta())) this.markChanged();
     this.drawOverlay();
@@ -875,7 +897,11 @@ export class Editor {
     ctx.clearRect(0, 0, this.nodeCanvas.width, this.nodeCanvas.height);
     // A frame being node-edited: its clip follows the outline on every redraw.
     const edited = this.tool === "shape" ? clipOwner(this.shape.targetItem) : null;
-    if (edited) syncMask(this.ps, edited);
+    if (edited) {
+      syncMask(this.ps, edited);
+      if (edited.data.pc.repeat) this.dirtyRepeats.add(edited);
+    }
+    if (this.dirtyRepeats.size) this.refreshRepeats(false);
     this.drawCutLines(ctx, dpr);
     if (this.frameHover && (this.placing || this.drag?.kind === "rdrag") && this.frameHover.isInserted()) {
       // The outline the print is about to go into: blue if it can be a frame, amber if it is open.
@@ -1230,6 +1256,10 @@ export class Editor {
   private openClip(pc: paper.Group) {
     const ps = this.ps;
     const frame = frameOf(pc);
+    this.clipEdit = pc;
+    this.activeClip = pc;
+    // A repeat fill is adjusted in place (it has no single object to drag), so the frame keeps clipping it.
+    if (pc.data.pc.repeat) return;
     clipGroupOf(pc).clipped = false;
     // Veil: everything outside the frame is washed out; inside stays normal.
     const far = frame.bounds.expand(4000);
@@ -1253,7 +1283,7 @@ export class Editor {
     if (this.clipEdit) this.finishClipEdit();
     if (this.tool !== "pick") this.setTool("pick");
     this.openClip(pc);
-    this.selected = contentsOf(pc).filter((c) => c.visible && !c.locked);
+    this.selected = pc.data.pc.repeat ? [] : contentsOf(pc).filter((c) => c.visible && !c.locked);
     this.rotateMode = false;
     this.selectedGuideId = null;
     this.drawGuides();
@@ -1460,6 +1490,149 @@ export class Editor {
       const ref = mode === "top" ? 1 : 4;
       this.alignPrints(e.items, ref, anchorOf(F, ref));
     }
+    this.commit();
+  }
+
+  // ---------------------------------------------------------------- PowerClip: repeat fill
+  /**
+   * Rebuilds the generated tiles of one repeat PowerClip: one tile definition
+   * plus instances, only where the frame (plus bleed) is on screen. Nothing
+   * here is saved — it all comes from the repeat settings.
+   */
+  private rebuildRepeat(pc: paper.Group) {
+    const ps = this.ps;
+    const clip = clipGroupOf(pc);
+    for (const c of [...clip.children]) if (c.data?.pcRepeat) c.remove();
+    const r = pc.data.pc.repeat as RepeatSettings | undefined;
+    const holder = tileHolderOf(pc);
+    const mask = clip.children.find((c) => c.data?.pcMask);
+    if (!r || !holder || !mask || !holder.children.length) return;
+    const tb = holder.bounds;
+    if (!(tb.width > 0) || !(tb.height > 0)) return;
+    const tile = rectOf(tb);
+    // Only the part of the frame that is on screen (a little more, so panning does not show the edge).
+    const view = this.ps.view.bounds;
+    const visible = mask.bounds.intersect(view.expand(Math.max(view.width, view.height) * 0.1));
+    const rep = new ps.Group({ insert: false });
+    rep.data = { derived: true, pcRepeat: true };
+    clip.insertChild(1, rep);
+    this.repeatInfo.delete(pc);
+    if (visible.width <= 0 || visible.height <= 0) return;
+    const cover = coverInRepeatSpace(r, tile, rectOf(visible));
+    const total = countCells(r, cover);
+    if (total > MAX_TILES) {
+      // Too small a tile for this zoom to draw one by one: show nothing rather than freeze; zooming in brings it back.
+      this.repeatInfo.set(pc, { tiles: 0, skipped: total });
+      return;
+    }
+    let def = this.tileDefs.get(holder);
+    if (!def) {
+      const art = new ps.Group({ insert: false });
+      for (const c of holder.children) art.addChild(c.clone({ insert: false, deep: true }));
+      def = new ps.SymbolDefinition(art, true);
+      this.tileDefs.set(holder, def);
+    }
+    // Touching tiles get a half-screen-pixel overlap each side, which hides antialiasing hairlines between them.
+    const { tw, th } = repeatSteps(r);
+    const seamless = r.gapX <= 0 && r.gapY <= 0;
+    const grow = seamless ? Math.min(1 / this.ps.view.zoom, tw / 50, th / 50) : 0;
+    const cells = repeatCells(r, { x: tile.x, y: tile.y }, cover);
+    const items: Item[] = [];
+    for (const cell of cells) {
+      const inst = new ps.SymbolItem(def);
+      const m = cellMatrix(r, tile, cell, grow);
+      inst.matrix = new ps.Matrix(m[0], m[1], m[2], m[3], m[4], m[5]);
+      items.push(inst);
+    }
+    rep.addChildren(items);
+    this.repeatInfo.set(pc, { tiles: items.length, skipped: 0 });
+  }
+
+  /** Rebuilds every repeat that needs it: all of them after a view or document change, or just the ones marked dirty. */
+  private refreshRepeats(all: boolean) {
+    const list = all ? this.clips().filter((pc) => pc.data.pc.repeat && pc.isInserted()) : [...this.dirtyRepeats].filter((pc) => pc.isInserted());
+    this.dirtyRepeats.clear();
+    for (const pc of list) this.rebuildRepeat(pc);
+  }
+
+  /**
+   * After an object was rotated or scaled: repeat PowerClips inside it keep
+   * their tile artwork upright and unscaled, and carry the change in the
+   * repeat's own rotation / tile size instead — so the pattern turns and
+   * grows with the piece, and stays parametric.
+   */
+  private fixRepeatsAfterTransform(it: Item, info: { rotate?: number; sx?: number; sy?: number }) {
+    const pcs = isPowerClip(it) ? [it] : it instanceof this.ps.Group ? (it.getItems({ match: isPowerClip }) as paper.Group[]) : [];
+    for (const pc of pcs) {
+      const r = pc.data.pc.repeat as RepeatSettings | undefined;
+      const holder = tileHolderOf(pc);
+      if (!r || !holder) continue;
+      const c = holder.bounds.center;
+      const next = { ...r };
+      if (info.rotate) {
+        holder.rotate(info.rotate, c); // undo the turn on the artwork (it was turned counter-clockwise by info.rotate)
+        next.rotation = r.rotation + info.rotate;
+      }
+      if (info.sx !== undefined) {
+        const sx = info.sx;
+        const sy = info.sy ?? info.sx;
+        if (sx && sy) holder.scale(1 / sx, 1 / sy, c);
+        next.tileW = r.tileW * Math.abs(sx);
+        next.tileH = r.tileH * Math.abs(sy);
+        next.gapX = r.gapX * Math.abs(sx);
+        next.gapY = r.gapY * Math.abs(sy);
+        next.offsetX = r.offsetX * Math.abs(sx);
+        next.offsetY = r.offsetY * Math.abs(sy);
+      }
+      pc.data.pc = { ...pc.data.pc, repeat: next };
+      this.tileDefs.delete(holder);
+      this.dirtyRepeats.add(pc);
+    }
+  }
+
+  /**
+   * Repeat fill for the PowerClip being edited. `true` turns it on (one
+   * tile = the current contents at their own size), `null` turns it off, a
+   * patch changes settings. One undo step.
+   */
+  setClipRepeat(patch: Partial<RepeatSettings> | true | null) {
+    const pc = this.currentClip();
+    if (!pc) return;
+    const cur = pc.data.pc.repeat as RepeatSettings | undefined;
+    if (patch === null) {
+      if (!cur) return;
+      const { repeat: _off, ...rest } = pc.data.pc;
+      void _off;
+      pc.data.pc = rest;
+      syncRepeatHolder(this.ps, pc);
+      this.repeatInfo.delete(pc);
+      if (pc === this.clipEdit) {
+        // Back to a normal print: re-open it for editing so the single tile can be moved again.
+        this.clipEdit = null;
+        this.openClip(pc);
+        this.selected = contentsOf(pc);
+      }
+    } else {
+      let next: RepeatSettings;
+      if (!cur) {
+        const items = contentsOf(pc);
+        if (!items.length) return;
+        const b = items.map((i) => i.bounds).reduce((a, x) => a.unite(x));
+        if (!(b.width > 0) || !(b.height > 0)) return;
+        next = { ...defaultRepeat(b.width, b.height), ...(patch === true ? {} : patch) };
+        if (pc === this.clipEdit) {
+          // The single print stops being an object you drag; from now on dragging shifts the repeat.
+          for (const c of [...pc.children]) if (c.data?.pcVeil) c.remove();
+          this.selected = [];
+        }
+      } else next = { ...cur, ...(patch === true ? {} : patch) };
+      for (const k of ["tileW", "tileH", "scale"] as const) if (!(next[k] > 0) || !Number.isFinite(next[k])) return;
+      for (const k of ["gapX", "gapY", "offsetX", "offsetY", "rotation"] as const) if (!Number.isFinite(next[k])) return;
+      pc.data.pc = { ...pc.data.pc, repeat: next };
+      syncRepeatHolder(this.ps, pc);
+      syncMask(this.ps, pc);
+    }
+    this.dirtyRepeats.add(pc);
     this.commit();
   }
 
@@ -1678,6 +1851,12 @@ export class Editor {
 
   /** Nudge in display direction (dy positive = UP, like the rulers). */
   nudge(dxUnits: number, dyUp: number) {
+    const r = this.clipEdit?.data.pc.repeat as RepeatSettings | undefined;
+    if (r) {
+      // Editing a repeat: the arrows shift where it starts.
+      const d = deltaInRepeatSpace(r, dxUnits, -dyUp);
+      return this.setClipRepeat({ offsetX: r.offsetX + d.x, offsetY: r.offsetY + d.y });
+    }
     this.translateSelection(dxUnits, -dyUp);
   }
 
@@ -1704,7 +1883,7 @@ export class Editor {
         if (patch.w !== undefined) sy = sx;
         else sx = sy;
       }
-      if (Number.isFinite(sx) && Number.isFinite(sy) && sx !== 0 && sy !== 0) for (const it of this.selected) this.tf(it, (t) => t.scale(sx, sy, anchor));
+      if (Number.isFinite(sx) && Number.isFinite(sy) && sx !== 0 && sy !== 0) for (const it of this.selected) this.tf(it, (t) => t.scale(sx, sy, anchor), { sx, sy });
     }
     if (patch.x !== undefined || patch.y !== undefined) {
       const nb = this.selectionBounds()!;
@@ -1719,7 +1898,7 @@ export class Editor {
   flip(axis: "h" | "v") {
     const b = this.selectionBounds();
     if (!b) return;
-    for (const it of this.selected) this.tf(it, (t) => t.scale(axis === "h" ? -1 : 1, axis === "v" ? -1 : 1, b.center));
+    for (const it of this.selected) this.tf(it, (t) => t.scale(axis === "h" ? -1 : 1, axis === "v" ? -1 : 1, b.center), { sx: axis === "h" ? -1 : 1, sy: axis === "v" ? -1 : 1 });
     // A mirror turns a remembered rotation the other way.
     if (this.clipEdit) for (const it of this.selected) if (typeof it.data?.rot === "number") it.data.rot = -it.data.rot;
     this.commit();
@@ -1729,7 +1908,7 @@ export class Editor {
     const b = this.selectionBounds();
     if (!b || !degrees) return;
     // Screen/ruler convention: positive = counter-clockwise (y up).
-    for (const it of this.selected) this.tf(it, (t) => t.rotate(-degrees, b.center));
+    for (const it of this.selected) this.tf(it, (t) => t.rotate(-degrees, b.center), { rotate: degrees });
     this.trackRotation(this.selected, degrees);
     this.commit();
   }
@@ -2254,6 +2433,15 @@ export class Editor {
       return;
     }
 
+    // Editing a repeat fill: drag inside the frame to shift where the repeat starts; click outside to finish.
+    if (this.tool === "pick" && this.clipEdit?.data.pc.repeat) {
+      const r = this.clipEdit.data.pc.repeat as RepeatSettings;
+      if (!(frameOf(this.clipEdit) as paper.Path).contains(p)) return void this.finishClipEdit();
+      this.drag = { kind: "repeat", start: p, baseX: r.offsetX, baseY: r.offsetY, moved: false };
+      this.canvas.style.cursor = "move";
+      return;
+    }
+
     // pick tool
     const h = this.hitHandle(vp);
     if (h) {
@@ -2372,7 +2560,7 @@ export class Editor {
         const guard = (v: number) => (Math.abs(v) < 1e-4 ? (v < 0 ? -1e-4 : 1e-4) : v);
         sx = guard(sx);
         sy = guard(sy);
-        for (const it of this.selected) this.tf(it, (t) => t.scale(sx / d.sx, sy / d.sy, d.anchor));
+        for (const it of this.selected) this.tf(it, (t) => t.scale(sx / d.sx, sy / d.sy, d.anchor), { sx: sx / d.sx, sy: sy / d.sy });
         d.sx = sx;
         d.sy = sy;
         break;
@@ -2381,7 +2569,7 @@ export class Editor {
         let angle = p.subtract(d.center).angle - d.startAngle;
         if (e.ctrlKey || e.metaKey) angle = Math.round(angle / 15) * 15;
         const step = angle - d.applied;
-        for (const it of this.selected) this.tf(it, (t) => t.rotate(step, d.center));
+        for (const it of this.selected) this.tf(it, (t) => t.rotate(step, d.center), { rotate: -step });
         d.applied = angle;
         this.snapLabel = `${(-angle).toFixed(1)}°`;
         break;
@@ -2421,6 +2609,18 @@ export class Editor {
       case "rdrag":
         if (new ps.Point(e.clientX, e.clientY).getDistance(d.startClient) > 4) d.moved = true;
         return;
+      case "repeat": {
+        const pc = this.clipEdit;
+        const r = pc?.data.pc.repeat as RepeatSettings | undefined;
+        if (!pc || !r) break;
+        const move = p.subtract(d.start);
+        if (!d.moved && move.length / this.px < 3) return;
+        d.moved = true;
+        const off = deltaInRepeatSpace(r, move.x, move.y);
+        pc.data.pc = { ...pc.data.pc, repeat: { ...r, offsetX: d.baseX + off.x, offsetY: d.baseY + off.y } };
+        this.rebuildRepeat(pc); // live preview
+        break;
+      }
     }
     this.drawOverlay();
     this.emit();
@@ -2512,6 +2712,10 @@ export class Editor {
         break;
       case "shape":
         this.shape.pointerUp(e);
+        break;
+      case "repeat":
+        this.canvas.style.cursor = this.toolCursor();
+        if (d.moved) this.commit();
         break;
     }
     this.snapLabel = null;

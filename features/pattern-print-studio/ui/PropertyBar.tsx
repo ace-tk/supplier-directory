@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { DPI_BAD, DPI_WARN } from "../engine/clip-fit";
+import { REPEAT_TYPES, type RepeatType } from "../engine/repeat";
 import type { ClipFit, Editor, EditorState, RefPoint } from "../engine/Editor";
 import type { OpenPathInfo } from "../engine/shape-tool";
 import { NODE_TYPE_LABEL, type NodeType } from "../engine/node-geometry";
@@ -370,6 +371,10 @@ function ClipFields({ editor, state }: { editor: Editor; state: EditorState }) {
           {f.label}
         </TextBtn>
       ))}
+      <Sep />
+      <TextBtn title="Repeat fill: use this print as one tile and repeat it to cover the whole frame" onClick={() => editor.setClipRepeat(true)}>
+        Repeat fill
+      </TextBtn>
       {c.dpi !== null && (
         <>
           <Sep />
@@ -384,6 +389,92 @@ function ClipFields({ editor, state }: { editor: Editor; state: EditorState }) {
             {Math.round(c.dpi)} DPI{c.dpiLevel === "bad" ? " — print may look blurry" : c.dpiLevel === "low" ? " — low" : ""}
           </span>
         </>
+      )}
+    </>
+  );
+}
+
+/** Plain number input (percent, counts): shows the live value, commits on Enter or blur. */
+function NumberField({ label, value, decimals, suffix, onCommit, title }: { label: string; value: number; decimals: number; suffix?: string; onCommit: (v: number) => void; title: string }) {
+  const shown = value.toFixed(decimals);
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={title}>
+      <span className="font-medium">{label}</span>
+      <input
+        value={draft ?? shown}
+        aria-label={title}
+        onFocus={(e) => {
+          setDraft(shown);
+          e.currentTarget.select();
+        }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const v = draft === null ? NaN : parseFloat(draft);
+          setDraft(null);
+          if (Number.isFinite(v) && Math.abs(v - value) > 1e-9) onCommit(v);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setDraft(null);
+            e.stopPropagation();
+            e.currentTarget.blur();
+          }
+        }}
+        className="h-6 w-14 rounded border border-border bg-background px-1 text-right font-mono text-[11px] text-foreground tabular-nums outline-none focus:border-primary"
+      />
+      {suffix}
+    </label>
+  );
+}
+
+/** Editing a PowerClip with Repeat fill: the repeat's type, tile size, spacing, starting point, rotation and scale. */
+function RepeatFields({ editor, state }: { editor: Editor; state: EditorState }) {
+  const clip = state.clip!;
+  const r = clip.repeat!;
+  const unit = state.settings.units;
+  const linked = state.lockAspect;
+  return (
+    <>
+      <TextBtn title="Repeat fill is on — click to go back to a single print" active onClick={() => editor.setClipRepeat(null)}>
+        Repeat fill
+      </TextBtn>
+      <select
+        aria-label="Repeat type"
+        title={REPEAT_TYPES.find((t) => t.id === r.type)?.help}
+        value={r.type}
+        onChange={(e) => editor.setClipRepeat({ type: e.target.value as RepeatType })}
+        className="h-6 shrink-0 rounded border border-border bg-background px-1 text-[11px] outline-none"
+      >
+        {REPEAT_TYPES.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.label}
+          </option>
+        ))}
+      </select>
+      <span className="shrink-0 text-[11px] text-muted-foreground">Tile</span>
+      <LengthField label="W" inches={r.tileW} unit={unit} onCommit={(w) => w > 0 && editor.setClipRepeat(linked ? { tileW: w, tileH: (r.tileH * w) / r.tileW } : { tileW: w })} title="Tile width" />
+      <LengthField label="H" inches={r.tileH} unit={unit} onCommit={(h) => h > 0 && editor.setClipRepeat(linked ? { tileH: h, tileW: (r.tileW * h) / r.tileH } : { tileH: h })} title="Tile height" />
+      <IconBtn title={linked ? "Tile width and height linked — on" : "Tile width and height linked — off"} onClick={() => editor.setLockAspect(!linked)} active={linked}>
+        {linked ? <Link2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
+      </IconBtn>
+      <span className="shrink-0 text-[11px] text-muted-foreground" title="Space between tiles. 0 = seamless; negative = overlap">
+        Gap
+      </span>
+      <LengthField label="X" inches={r.gapX} unit={unit} onCommit={(gapX) => editor.setClipRepeat({ gapX })} title="Horizontal spacing between tiles (0 = seamless, negative = overlap)" />
+      <LengthField label="Y" inches={r.gapY} unit={unit} onCommit={(gapY) => editor.setClipRepeat({ gapY })} title="Vertical spacing between tiles (0 = seamless, negative = overlap)" />
+      <span className="shrink-0 text-[11px] text-muted-foreground" title="Where the repeat starts. You can also drag inside the frame.">
+        Offset
+      </span>
+      <LengthField label="X" inches={r.offsetX} unit={unit} onCommit={(offsetX) => editor.setClipRepeat({ offsetX })} title="Repeat offset X (or drag inside the frame)" />
+      <LengthField label="Y" inches={-r.offsetY} unit={unit} onCommit={(y) => editor.setClipRepeat({ offsetY: -y })} title="Repeat offset Y, up (or drag inside the frame)" />
+      <AngleField value={r.rotation} onCommit={(rotation) => editor.setClipRepeat({ rotation })} title="Rotation of the whole repeat in degrees (counter-clockwise)" />
+      <NumberField label="Scale" value={r.scale} decimals={1} suffix="%" onCommit={(scale) => scale > 0 && editor.setClipRepeat({ scale })} title="Scale of the whole repeat (tile and spacing), percent" />
+      {clip.tiles && (
+        <span className={cn("shrink-0 font-mono text-[11px] tabular-nums", clip.tiles.skipped ? "font-semibold text-amber-600" : "text-muted-foreground")} title="Tiles drawn for the part of this piece that is on screen">
+          {clip.tiles.skipped ? "Tile too small to draw at this zoom — zoom in" : `${clip.tiles.drawn} tiles`}
+        </span>
       )}
     </>
   );
@@ -427,6 +518,8 @@ export function PropertyBar({ editor, state }: { editor: Editor; state: EditorSt
 
       {state.nodeEdit ? (
         <NodeFields editor={editor} state={state} />
+      ) : state.clip?.editing && state.clip.repeat ? (
+        <RepeatFields editor={editor} state={state} />
       ) : state.clipContent ? (
         <ClipFields editor={editor} state={state} />
       ) : (

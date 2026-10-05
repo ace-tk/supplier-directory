@@ -1,5 +1,6 @@
 import type { DocFile } from "./Editor";
-import { pathData, type SceneNode, type StyleJSON } from "./serialize";
+import { cellMatrix, coverInRepeatSpace, repeatCells } from "./repeat";
+import { pathData, type CompoundNode, type PathNode, type SceneNode, type StyleJSON } from "./serialize";
 import type { RasterAsset } from "./types";
 
 const num = (v: number) => {
@@ -32,6 +33,25 @@ function common(n: SceneNode): string {
   return a;
 }
 
+/** Box around an outline's nodes and handles (always contains the outline). */
+function outlineBox(n: PathNode | CompoundNode) {
+  let l = Infinity;
+  let t = Infinity;
+  let r = -Infinity;
+  let b = -Infinity;
+  for (const p of n.t === "path" ? [n] : n.children) {
+    for (const s of p.segs) {
+      for (const [x, y] of [[s[0], s[1]], [s[0] + s[2], s[1] + s[3]], [s[0] + s[4], s[1] + s[5]]]) {
+        l = Math.min(l, x);
+        r = Math.max(r, x);
+        t = Math.min(t, y);
+        b = Math.max(b, y);
+      }
+    }
+  }
+  return { x: l, y: t, w: r - l, h: b - t };
+}
+
 const matrixAttr = (m: number[]) => ` transform="matrix(${m.map(num).join(" ")})"`;
 
 function writeNode(n: SceneNode, assets: Map<string, RasterAsset>, clipIds: { n: number }, out: string[]) {
@@ -62,7 +82,18 @@ function writeNode(n: SceneNode, assets: Map<string, RasterAsset>, clipIds: { n:
       const id = `clip${++clipIds.n}`;
       const d = n.frame.t === "path" ? pathData(n.frame) : n.frame.children.map((c) => pathData(c)).join("");
       out.push(`<g${common(n)} data-powerclip="true"><clipPath id="${id}"><path d="${d}"/></clipPath><g clip-path="url(#${id})">`);
-      for (const c of n.contents) writeNode(c, assets, clipIds, out);
+      if (n.pc.repeat && n.tile) {
+        // Repeat fill: the tile is written once and placed with <use> wherever it touches the frame.
+        const tile = { x: n.tile[0], y: n.tile[1], w: n.tile[2], h: n.tile[3] };
+        const tileId = `tile${clipIds.n}`;
+        out.push(`<defs><g id="${tileId}">`);
+        for (const c of n.contents) writeNode(c, assets, clipIds, out);
+        out.push("</g></defs>");
+        const cover = coverInRepeatSpace(n.pc.repeat, tile, outlineBox(n.frame));
+        for (const cell of repeatCells(n.pc.repeat, { x: tile.x, y: tile.y }, cover)) out.push(`<use href="#${tileId}"${matrixAttr(cellMatrix(n.pc.repeat, tile, cell))}/>`);
+      } else {
+        for (const c of n.contents) writeNode(c, assets, clipIds, out);
+      }
       out.push("</g>");
       writeNode(n.frame, assets, clipIds, out);
       out.push("</g>");

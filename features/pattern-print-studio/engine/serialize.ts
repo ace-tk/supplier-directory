@@ -4,7 +4,7 @@
 // file), never as pixel data, which keeps undo snapshots and saves cheap.
 
 import type paper from "paper/dist/paper-core";
-import { assemblePowerClip, contentsOf, frameOf, isPowerClip, type PowerClipSettings } from "./powerclip";
+import { assemblePowerClip, contentsOf, frameOf, isPowerClip, tileHolderOf, type PowerClipSettings } from "./powerclip";
 
 /** [x, y, handleIn.x, handleIn.y, handleOut.x, handleOut.y] — handles relative to the point. */
 export type Seg = [number, number, number, number, number, number];
@@ -75,6 +75,8 @@ export interface PowerClipNode extends NodeBase {
   pc: PowerClipSettings;
   frame: PathNode | CompoundNode;
   contents: SceneNode[];
+  /** With Repeat fill: the tile artwork's own box on the page (x, y, w, h). Re-derived on load; saved so exporters need no geometry code. */
+  tile?: [number, number, number, number];
 }
 
 export type SceneNode = PathNode | CompoundNode | GroupNode | TextNode | RasterNode | PowerClipNode;
@@ -174,7 +176,10 @@ export function toNode(ps: PaperScope, item: Item): SceneNode | null {
     const frame = frameOf(item);
     const f = frame ? toNode(ps, frame) : null;
     if (!f || (f.t !== "path" && f.t !== "compound")) return null;
-    return { t: "powerclip", ...baseOf(item), pc: { ...item.data.pc }, frame: f, contents: contentsOf(item).map((c) => toNode(ps, c)).filter((c): c is SceneNode => !!c) };
+    const node: PowerClipNode = { t: "powerclip", ...baseOf(item), pc: { ...item.data.pc }, frame: f, contents: contentsOf(item).map((c) => toNode(ps, c)).filter((c): c is SceneNode => !!c) };
+    const holder = tileHolderOf(item);
+    if (holder && item.data.pc.repeat) node.tile = [holder.bounds.x, holder.bounds.y, holder.bounds.width, holder.bounds.height];
+    return node;
   }
   if (item instanceof ps.Group) {
     const children = item.children.map((c) => toNode(ps, c)).filter((c): c is SceneNode => !!c);
