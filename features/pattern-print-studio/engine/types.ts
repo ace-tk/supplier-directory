@@ -34,6 +34,15 @@ export interface DocSettings {
   grid: GridSettings;
   snap: SnapSettings;
   guidesVisible: boolean;
+  /** PowerClip cut lines: each frame's outline drawn on top of its print (a view aid, not part of the artwork). */
+  cutLines: CutLineSettings;
+}
+
+export interface CutLineSettings {
+  visible: boolean;
+  color: string;
+  /** Inches. */
+  width: number;
 }
 
 export interface PageSize {
@@ -70,6 +79,8 @@ export const DEFAULT_SETTINGS: DocSettings = {
   grid: { visible: false, spacing: 1, subdivisions: 4 },
   snap: { grid: false, guides: true, objects: true, page: true },
   guidesVisible: true,
+  // 0.5 pt black, like CorelDRAW's hairline outline.
+  cutLines: { visible: true, color: "#000000", width: 0.5 / 72 },
 };
 
 /** Leggings program page (CorelDRAW): 163.75 × 37.694 in. */

@@ -57,6 +57,17 @@ function writeNode(n: SceneNode, assets: Map<string, RasterAsset>, clipIds: { n:
       }
       break;
     }
+    case "powerclip": {
+      // The print is clipped by the outline; the outline itself is written on top.
+      const id = `clip${++clipIds.n}`;
+      const d = n.frame.t === "path" ? pathData(n.frame) : n.frame.children.map((c) => pathData(c)).join("");
+      out.push(`<g${common(n)} data-powerclip="true"><clipPath id="${id}"><path d="${d}"/></clipPath><g clip-path="url(#${id})">`);
+      for (const c of n.contents) writeNode(c, assets, clipIds, out);
+      out.push("</g>");
+      writeNode(n.frame, assets, clipIds, out);
+      out.push("</g>");
+      break;
+    }
     case "text": {
       const anchor = n.justification === "center" ? "middle" : n.justification === "right" ? "end" : "start";
       out.push(

@@ -4,6 +4,7 @@ import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
 import { History } from "./history";
+import { clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, unwrapPowerClip, wrapInPowerClip } from "./powerclip";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
 import type { NodeType } from "./node-geometry";
 import { DEFAULT_SIMPLIFY_TOLERANCE, ShapeTool, type NodeEditState, type OpenPathInfo, type ShapeMeta } from "./shape-tool";
@@ -18,7 +19,8 @@ type Item = paper.Item;
 type Rect = { x: number; y: number; w: number; h: number };
 
 export const DOC_FORMAT = "supplybase.pattern-print-studio";
-export const DOC_VERSION = 1;
+// 2: PowerClips (Phase 3). Version 1 files open unchanged; older builds refuse a version 2 file rather than drop its prints.
+export const DOC_VERSION = 2;
 
 export interface DocFile {
   format: typeof DOC_FORMAT;
@@ -44,6 +46,21 @@ export interface ObjectEntry {
   visible: boolean;
   locked: boolean;
   selected: boolean;
+  /** 0 = on the page; deeper rows are PowerClips inside groups and the prints inside a PowerClip. */
+  depth: number;
+  role: "object" | "clip" | "content";
+}
+
+/** The PowerClip the floating Edit / Finish / Extract / Lock bar belongs to. */
+export interface ClipState {
+  id: string;
+  /** Its contents are being edited (the whole print is shown, faded outside the frame). */
+  editing: boolean;
+  lock: boolean;
+  /** Number of prints inside. */
+  count: number;
+  /** Where the bar goes: bottom-centre of the frame, page inches. */
+  anchor: { x: number; y: number };
 }
 
 export interface EditorState {
@@ -74,6 +91,12 @@ export interface EditorState {
   nodeEdit: NodeEditState | null;
   /** Shaping panel: the chosen operation and what its live preview found. */
   shaping: ShapingState | null;
+  /** The active PowerClip (selected, or being edited), if any. */
+  clip: ClipState | null;
+  /** "Place inside frame" is waiting for a click on an outline. */
+  placing: boolean;
+  /** After a right-mouse drag onto an outline: where to show the "PowerClip inside" menu (client px). */
+  clipMenu: { x: number; y: number } | null;
 }
 
 /** A bitmap ready to be traced: its ORIGINAL pixels (not the on-screen proxy) and its real size on the page. */
@@ -114,7 +137,8 @@ type DragState =
   | { kind: "zoomRect"; start: paper.Point; startClient: paper.Point }
   | { kind: "guide"; guideId: string; orientation: Orientation; created: boolean; targets: SnapTargets }
   | { kind: "origin"; targets: SnapTargets }
-  | { kind: "shape" };
+  | { kind: "shape" }
+  | { kind: "rdrag"; startClient: paper.Point; moved: boolean };
 
 const HANDLE_PX = 7;
 const HIT_PX = 5;
@@ -176,6 +200,17 @@ export class Editor {
   private shapingPlan: ShapingPlan | null = null;
   private shapingMessage = "";
   private shapingDirty = false;
+  /** PowerClip: the one the mini toolbar acts on, the one whose contents are being edited, and pending placements. */
+  private activeClip: paper.Group | null = null;
+  private clipEdit: paper.Group | null = null;
+  private placing: Item[] | null = null;
+  private clipMenu: { x: number; y: number; frame: Item; contents: Item[] } | null = null;
+  private clipList: paper.Group[] | null = null;
+  private lastOpenOutline: Item | null = null;
+  /** While choosing a frame: the outline the print would go into (highlighted). */
+  private frameHover: Item | null = null;
+  /** Reports the outcome of pointer-driven PowerClip actions (shown as a toast). */
+  onNotice: ((r: { ok: boolean; message: string; action?: "check-outlines" }) => void) | null = null;
   private fittedOnce = false;
 
   private state: EditorState;
@@ -215,7 +250,7 @@ export class Editor {
       ps,
       contentLayer: () => this.contentLayer,
       px: () => this.px,
-      topLevel: (item) => this.topLevel(item),
+      topLevel: (item) => this.rootOf(item),
       idOf: (item) => this.idOf(item),
       snapTargets: (skip, excludeBounds) => this.snapTargets(true, { skip, excludeBounds }),
       setSnap: (label, at) => {
@@ -286,17 +321,7 @@ export class Editor {
       selectedText: single instanceof this.ps.PointText ? { fontSize: Number(single.fontSize), content: single.content } : null,
       selectedGuideId: this.selectedGuideId,
       selectedBitmap: single instanceof this.ps.Raster,
-      objects: this.contentLayer.children
-        .slice()
-        .reverse()
-        .map((it) => ({
-          id: this.idOf(it),
-          name: it.name || this.kindOf(it),
-          kind: this.kindOf(it),
-          visible: it.visible,
-          locked: it.locked,
-          selected: this.selected.includes(it),
-        })),
+      objects: this.objectRows(),
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
       unsaved: this.unsaved,
@@ -307,7 +332,50 @@ export class Editor {
       rotateMode: this.rotateMode,
       nodeEdit: this.tool === "shape" ? this.shape.state() : null,
       shaping: this.shaping ? { ...this.shaping, ok: !!this.shapingPlan, message: this.shapingMessage } : null,
+      clip: this.clipState(),
+      placing: !!this.placing,
+      clipMenu: this.clipMenu ? { x: this.clipMenu.x, y: this.clipMenu.y } : null,
     };
+  }
+
+  /** Objects panel rows: page objects top-down, with PowerClips (also inside groups) and their prints nested under them. */
+  private objectRows(): ObjectEntry[] {
+    const rows: ObjectEntry[] = [];
+    const current = this.currentClip();
+    const row = (it: Item, depth: number, role: ObjectEntry["role"]) =>
+      rows.push({ id: this.idOf(it), name: it.name || this.kindOf(it), kind: this.kindOf(it), visible: it.visible, locked: it.locked, selected: this.selected.includes(it) || it === current, depth, role });
+    const walk = (it: Item, depth: number) => {
+      if (isPowerClip(it)) {
+        for (const c of contentsOf(it).reverse()) row(c, depth + 1, "content");
+      } else if (it instanceof this.ps.Group) {
+        for (const c of [...it.children].reverse()) {
+          if (!isPowerClip(c) && !(c instanceof this.ps.Group && c.getItem({ match: isPowerClip }))) continue;
+          row(c, depth + 1, isPowerClip(c) ? "clip" : "object");
+          walk(c, depth + 1);
+        }
+      }
+    };
+    for (const it of [...this.contentLayer.children].reverse()) {
+      row(it, 0, isPowerClip(it) ? "clip" : "object");
+      walk(it, 0);
+    }
+    return rows;
+  }
+
+  /** The PowerClip in focus: the one being edited, the one last clicked (still selected), or a lone selected PowerClip. */
+  private currentClip(): paper.Group | null {
+    if (this.clipEdit) return this.clipEdit;
+    const a = this.activeClip;
+    if (a && a.isInserted() && this.selected.includes(this.rootOf(a) as Item)) return a;
+    return this.selected.length === 1 && isPowerClip(this.selected[0]) ? this.selected[0] : null;
+  }
+
+  private clipState(): ClipState | null {
+    const pc = this.currentClip();
+    const frame = pc && frameOf(pc);
+    if (!pc || !frame) return null;
+    const b = frame.bounds;
+    return { id: this.idOf(pc), editing: pc === this.clipEdit, lock: !!pc.data.pc.lock, count: contentsOf(pc).length, anchor: { x: b.center.x, y: b.bottom } };
   }
 
   /** Re-render React (rAF-batched) after any state change. */
@@ -343,6 +411,7 @@ export class Editor {
   }
   private kindOf(item: Item): string {
     const ps = this.ps;
+    if (isPowerClip(item)) return `PowerClip (${contentsOf(item).length} inside)`;
     if (item instanceof ps.Group) return item.clipped ? "Clip group" : `Group of ${item.children.length}`;
     if (item instanceof ps.CompoundPath) return "Compound path";
     if (item instanceof ps.Path) return item.closed ? "Closed path" : "Path";
@@ -358,9 +427,30 @@ export class Editor {
     if (!this.selected.length) return null;
     return this.selected.map((i) => i.bounds).reduce((a, b) => a.unite(b));
   }
+  /** What the Pick tool works in: the page, or the inside of the PowerClip being edited. */
+  private get scope(): Item {
+    return this.clipEdit ? clipGroupOf(this.clipEdit) : this.contentLayer;
+  }
+  /** The selectable object an item belongs to, within the current scope. */
   private topLevel(item: Item | null): Item | null {
+    const scope = this.scope;
+    while (item && item.parent !== scope) item = item.parent;
+    return item;
+  }
+  /** The page-level object an item belongs to, whatever is being edited. */
+  private rootOf(item: Item | null): Item | null {
     while (item && item.parent !== this.contentLayer) item = item.parent;
     return item;
+  }
+  private findById(id: string): Item | null {
+    return this.contentLayer.getItem({ match: (it: Item) => it.data?.id === id }) ?? null;
+  }
+  /** Applies a transform to an object. An unlocked PowerClip moves its frame only; the print stays where it is. */
+  private tf(it: Item, fn: (target: Item) => void) {
+    if (isPowerClip(it) && !it.data.pc.lock) {
+      fn(frameOf(it));
+      syncMask(this.ps, it, it !== this.clipEdit);
+    } else fn(it);
   }
   private markChanged() {
     this.unsaved = true;
@@ -369,6 +459,7 @@ export class Editor {
   /** Records an undo step after a committed action. */
   commit() {
     this.shapingDirty = true;
+    this.clipList = null;
     if (this.tool === "shape") this.shape.validate();
     if (this.history.push(this.snapshot(), this.shape.meta())) this.markChanged();
     this.drawOverlay();
@@ -514,9 +605,16 @@ export class Editor {
     this.tool = tool;
     this.rotateMode = false;
     this.marqueeRect = null;
+    if (tool !== "pick") {
+      this.placing = null;
+      this.clipMenu = null;
+    }
     if (tool === "shape" && was !== "shape") {
-      // Start on the selected object, like switching to the Shape tool in Corel.
-      this.shape.enter(this.selected.length === 1 ? this.selected[0] : null);
+      // Node editing works on outlines, not on the inside of a PowerClip.
+      if (this.clipEdit) this.finishClipEdit();
+      // Start on the selected object, like switching to the Shape tool in Corel. A PowerClip opens on its frame.
+      const only = this.selected.length === 1 ? this.selected[0] : null;
+      this.shape.enter(only && isPowerClip(only) ? frameOf(only) : only);
     } else if (tool !== "shape" && was === "shape") {
       this.shape.clear();
       this.history.setMeta(this.shape.meta());
@@ -749,6 +847,19 @@ export class Editor {
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.nodeCanvas.width, this.nodeCanvas.height);
+    // A frame being node-edited: its clip follows the outline on every redraw.
+    const edited = this.tool === "shape" ? clipOwner(this.shape.targetItem) : null;
+    if (edited) syncMask(this.ps, edited);
+    this.drawCutLines(ctx, dpr);
+    if (this.frameHover && (this.placing || this.drag?.kind === "rdrag") && this.frameHover.isInserted()) {
+      // The outline the print is about to go into: blue if it can be a frame, amber if it is open.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.strokeStyle = isClosedOutline(this.ps, this.frameHover) ? SELECT_COLOR : "#d97706";
+      ctx.lineWidth = 3;
+      this.traceOutlines(ctx, [this.frameHover]);
+      ctx.stroke();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    } else this.frameHover = null;
     if (this.shaping && !this.drag) {
       if (this.shapingDirty) this.computeShaping();
       if (this.shapingPlan) {
@@ -763,16 +874,53 @@ export class Editor {
     this.shape.draw(ctx, this.nodeCanvas.width / dpr, this.nodeCanvas.height / dpr);
   }
 
+  /** Every PowerClip in the document, also inside groups (cached until the next change). */
+  private clips(): paper.Group[] {
+    if (!this.clipList) this.clipList = this.contentLayer.getItems({ match: isPowerClip }) as paper.Group[];
+    return this.clipList;
+  }
+
+  /**
+   * Cut lines: each PowerClip's outline drawn ON TOP of its print. Drawn on
+   * the overlay straight from the frame's live geometry, so it follows node
+   * edits and never touches the outline's own stroke.
+   */
+  private drawCutLines(ctx: CanvasRenderingContext2D, dpr: number) {
+    const cut = this.settings.cutLines;
+    if (!cut?.visible) return;
+    const view = this.ps.view.bounds;
+    const frames = this.clips()
+      .filter((pc) => pc.isInserted() && (this.rootOf(pc)?.visible ?? false))
+      .map((pc) => frameOf(pc))
+      .filter((f) => f && f.bounds.intersects(view));
+    if (!frames.length) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.strokeStyle = cut.color;
+    // Real width when zoomed in; never thinner than one screen pixel.
+    ctx.lineWidth = Math.max(1, cut.width * this.ps.view.zoom);
+    ctx.lineJoin = "round";
+    this.traceOutlines(ctx, frames);
+    ctx.stroke();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
   /** Outlines not-yet-applied result shapes in pink on the overlay canvas. */
   private strokePreview(ctx: CanvasRenderingContext2D, items: paper.PathItem[]) {
+    ctx.strokeStyle = "#d946ef";
+    ctx.fillStyle = "rgba(217, 70, 239, 0.12)";
+    ctx.lineWidth = 2;
+    this.traceOutlines(ctx, items);
+    ctx.fill("evenodd");
+    ctx.stroke();
+  }
+
+  /** Adds the outlines of paths / compound paths to the overlay's current path, in screen pixels. */
+  private traceOutlines(ctx: CanvasRenderingContext2D, items: Item[]) {
     const ps = this.ps;
     const zoom = ps.view.zoom;
     const tl = ps.view.bounds.topLeft;
     const X = (p: paper.Point) => (p.x - tl.x) * zoom;
     const Y = (p: paper.Point) => (p.y - tl.y) * zoom;
-    ctx.strokeStyle = "#d946ef";
-    ctx.fillStyle = "rgba(217, 70, 239, 0.12)";
-    ctx.lineWidth = 2;
     ctx.beginPath();
     for (const item of items) {
       for (const path of item instanceof ps.CompoundPath ? (item.children as paper.Path[]) : [item as paper.Path]) {
@@ -785,8 +933,6 @@ export class Editor {
         if (path.closed) ctx.closePath();
       }
     }
-    ctx.fill("evenodd");
-    ctx.stroke();
   }
 
   // ---------------------------------------------------------------- convert to curves / combine / shaping
@@ -942,6 +1088,205 @@ export class Editor {
     this.selected = results;
     this.commit();
     return { ok: true, message: "Shaping applied" };
+  }
+
+  // ---------------------------------------------------------------- PowerClip
+  /** The innermost PowerClip under a page point (its frame or its print), or null. */
+  private clipAt(p: paper.Point): paper.Group | null {
+    const res = this.contentLayer.hitTest(p, {
+      fill: true,
+      stroke: true,
+      segments: false,
+      tolerance: HIT_PX * this.px,
+      match: (h: paper.HitResult) => {
+        const root = this.rootOf(h.item);
+        return !!root && root.visible && !root.locked && !isDerived(h.item);
+      },
+    });
+    return res ? clipOwner(res.item) : null;
+  }
+
+  /**
+   * The outline a print would be placed into at this point. Aim at a line to
+   * choose that outline exactly; click inside a piece (pattern pieces have no
+   * fill) to get the closed outline around the pointer — the solid cut line
+   * rather than a dashed stitch line inside it, and the smallest one if
+   * several are nested. The result may be an open outline, which can't be a frame.
+   */
+  private frameAt(p: paper.Point, exclude: Item[]): { frame: Item } | { open: Item } | null {
+    const ps = this.ps;
+    const skip = (it: Item) => {
+      if (isDerived(it) || insideClipContents(it)) return true;
+      const root = this.rootOf(it);
+      if (!root || !root.visible || root.locked) return true;
+      return exclude.some((x) => x === it || it.isDescendant(x));
+    };
+    const near = this.shape.outlineAt(p);
+    if (near && !skip(near) && (near instanceof ps.Path || near instanceof ps.CompoundPath) && (near instanceof ps.CompoundPath || near.segments.length > 2)) {
+      return isClosedOutline(ps, near) ? { frame: near } : { open: near };
+    }
+    let best: Item | null = null;
+    let bestRank = Infinity;
+    for (const it of this.contentLayer.getItems({ match: (i: Item) => i instanceof ps.CompoundPath || (i instanceof ps.Path && !(i.parent instanceof ps.CompoundPath)) })) {
+      if (skip(it) || !isClosedOutline(ps, it) || !it.bounds.contains(p) || !(it as paper.Path).contains(p)) continue;
+      // Solid outlines first, then the smallest.
+      const rank = Math.abs((it as paper.Path).area) + (it.dashArray?.length ? 1e9 : 0);
+      if (rank < bestRank) {
+        bestRank = rank;
+        best = it;
+      }
+    }
+    return best ? { frame: best } : null;
+  }
+
+  /** Object > PowerClip > Place Inside Frame: the next click on an outline places the selected print(s) inside it. */
+  beginPlaceInside(): { ok: boolean; message: string } {
+    if (this.clipEdit) this.finishClipEdit();
+    if (!this.selected.length) return { ok: false, message: "Select the print to place first." };
+    this.setTool("pick");
+    this.placing = [...this.selected];
+    this.canvas.style.cursor = "crosshair";
+    this.emit();
+    return { ok: true, message: "Now click the pattern outline to place it inside (Esc to cancel)." };
+  }
+  cancelPlaceInside() {
+    if (!this.placing && !this.clipMenu) return false;
+    this.placing = null;
+    this.clipMenu = null;
+    this.canvas.style.cursor = this.toolCursor();
+    this.emit();
+    return true;
+  }
+  /** "PowerClip inside" chosen from the menu shown after a right-mouse drag. */
+  confirmClipMenu(): { ok: boolean; message: string } {
+    const m = this.clipMenu;
+    this.clipMenu = null;
+    if (!m) return { ok: false, message: "Nothing to place." };
+    return this.placeInside(m.contents, { frame: m.frame });
+  }
+
+  /**
+   * Places objects inside an outline. Nothing moves or resizes: the print
+   * keeps its exact page position, the frame only hides what is outside it.
+   * One undo step.
+   */
+  private placeInside(contents: Item[], target: { frame: Item } | { open: Item } | null): { ok: boolean; message: string; action?: "check-outlines" } {
+    contents = contents.filter((c) => c.isInserted());
+    if (!contents.length) return { ok: false, message: "Select the print to place first." };
+    if (!target) return { ok: false, message: "Click inside a closed pattern outline to place the print." };
+    if ("open" in target) {
+      this.lastOpenOutline = target.open;
+      return { ok: false, message: "Close this outline first — a print can only be placed inside a closed outline.", action: "check-outlines" };
+    }
+    const frame = target.frame;
+    if (contents.some((c) => c === frame || frame.isDescendant(c))) return { ok: false, message: "A print can't be placed inside itself — choose another outline." };
+    const ordered = [...contents].sort((a, b) => a.index - b.index);
+    let pc = frame.parent && isPowerClip(frame.parent) ? frame.parent : null;
+    if (pc) {
+      // The outline already holds a print: add these on top of it.
+      clipGroupOf(pc).addChildren(ordered);
+      syncMask(this.ps, pc);
+    } else {
+      pc = wrapInPowerClip(this.ps, frame, ordered, DEFAULT_CLIP);
+      pc.data.id = newId();
+      if (frame.name) pc.name = frame.name;
+    }
+    for (const c of ordered) this.idOf(c);
+    this.activeClip = pc;
+    const root = this.rootOf(pc);
+    this.selected = root ? [root] : [];
+    this.rotateMode = false;
+    this.commit();
+    return { ok: true, message: "Placed inside the frame. Double-click it to adjust the print." };
+  }
+
+  /** Shows the whole print (faded outside the frame) and points the Pick tool at the contents. */
+  private openClip(pc: paper.Group) {
+    const ps = this.ps;
+    const frame = frameOf(pc);
+    clipGroupOf(pc).clipped = false;
+    // Veil: everything outside the frame is washed out; inside stays normal.
+    const far = frame.bounds.expand(4000);
+    const hole = frame.clone({ insert: false, deep: true });
+    const veil = new ps.CompoundPath({ insert: false });
+    veil.addChild(new ps.Path.Rectangle({ rectangle: far, insert: false }));
+    for (const c of hole instanceof ps.CompoundPath ? [...hole.children] : [hole]) veil.addChild(c);
+    veil.fillRule = "evenodd";
+    veil.fillColor = new ps.Color(1, 1, 1, 0.68);
+    veil.strokeColor = null;
+    veil.data = { derived: true, pcVeil: true };
+    for (const c of veil.children) c.data = {};
+    veil.insertBelow(frame);
+    this.clipEdit = pc;
+    this.activeClip = pc;
+  }
+
+  /** Edit contents: double-click / Ctrl+click the frame, or the Edit button. */
+  editClip(pc: paper.Group | null = this.currentClip()) {
+    if (!pc || !isPowerClip(pc)) return;
+    if (this.clipEdit) this.finishClipEdit();
+    if (this.tool !== "pick") this.setTool("pick");
+    this.openClip(pc);
+    this.selected = contentsOf(pc).filter((c) => c.visible && !c.locked);
+    this.rotateMode = false;
+    this.selectedGuideId = null;
+    this.drawGuides();
+    this.drawOverlay();
+    this.emit();
+  }
+
+  /** Finish editing: Esc, click outside, or the Finish button. The frame clips the print again. */
+  finishClipEdit() {
+    const pc = this.clipEdit;
+    if (!pc) return false;
+    this.clipEdit = null;
+    if (pc.isInserted()) {
+      for (const c of [...pc.children]) if (c.data?.pcVeil) c.remove();
+      syncMask(this.ps, pc);
+      this.activeClip = pc;
+      const root = this.rootOf(pc);
+      this.selected = root ? [root] : [];
+    } else this.selected = [];
+    this.rotateMode = false;
+    this.drawOverlay();
+    this.emit();
+    return true;
+  }
+
+  /** Extract contents: the prints come back out as normal objects, exactly where they were. */
+  extractClip(pc: paper.Group | null = this.currentClip()): { ok: boolean; message: string } {
+    if (!pc || !isPowerClip(pc)) return { ok: false, message: "Select a PowerClip to extract its contents." };
+    if (this.clipEdit) this.finishClipEdit();
+    const topLevel = pc.parent === this.contentLayer;
+    const root = this.rootOf(pc);
+    const { frame, contents } = unwrapPowerClip(pc);
+    this.activeClip = null;
+    this.selected = topLevel ? (contents.length ? contents : [frame]) : root ? [root] : [];
+    this.commit();
+    return { ok: true, message: contents.length ? "Contents extracted" : "The frame was empty" };
+  }
+
+  /** Lock contents to frame (on by default). */
+  setClipLock(lock: boolean, pc: paper.Group | null = this.currentClip()) {
+    if (!pc || !isPowerClip(pc)) return;
+    pc.data.pc = { ...pc.data.pc, lock };
+    this.commit();
+  }
+
+  /** From the "Close this outline first" message: opens that outline in the Shape tool with its loose ends selected. */
+  fixOpenOutline() {
+    const item = this.lastOpenOutline;
+    this.lastOpenOutline = null;
+    if (!item || !item.isInserted()) return;
+    if (this.tool !== "shape") this.setTool("shape");
+    const bounds = this.shape.enterOpenItem(item);
+    if (bounds) this.fitRect(bounds.expand(Math.max(bounds.width, bounds.height) * 0.1 + 0.25));
+    this.drawOverlay();
+    this.emit();
+  }
+
+  toggleCutLines() {
+    this.updateSettings({ cutLines: { ...this.settings.cutLines, visible: !this.settings.cutLines.visible } });
   }
 
   // ---------------------------------------------------------------- trace bitmap
@@ -1109,12 +1454,25 @@ export class Editor {
     this.drawOverlay();
     this.emit();
   }
+  /** Objects panel click: a page object is selected; a PowerClip inside a group becomes the active one; a print opens its PowerClip for editing. */
   selectById(id: string, additive = false) {
-    const it = this.contentLayer.children.find((c) => c.data.id === id);
-    if (it) this.select([it], additive);
+    const it = this.findById(id);
+    if (!it) return;
+    if (insideClipContents(it)) {
+      const pc = clipOwner(it);
+      if (pc && pc !== this.clipEdit) this.editClip(pc);
+      const top = this.topLevel(it);
+      if (top) this.select([top], additive);
+      return;
+    }
+    if (this.clipEdit) this.finishClipEdit();
+    const root = this.rootOf(it);
+    if (!root) return;
+    this.activeClip = clipOwner(it);
+    this.select([root], additive);
   }
   selectAll() {
-    this.select(this.contentLayer.children.filter((c) => c.visible && !c.locked));
+    this.select(this.scope.children.filter((c) => c.visible && !c.locked && !isDerived(c)));
   }
   clearSelection() {
     this.select([]);
@@ -1122,14 +1480,14 @@ export class Editor {
 
   private hitTestContent(viewPoint: paper.Point): Item | null {
     const p = this.ps.view.viewToProject(viewPoint);
-    const res = this.contentLayer.hitTest(p, {
+    const res = this.scope.hitTest(p, {
       fill: true,
       stroke: true,
       segments: false,
       tolerance: HIT_PX * this.px,
       match: (h: paper.HitResult) => {
         const top = this.topLevel(h.item);
-        return !!top && top.visible && !top.locked;
+        return !!top && top.visible && !top.locked && !isDerived(top) && !isDerived(h.item);
       },
     });
     return res ? this.topLevel(res.item) : null;
@@ -1139,7 +1497,7 @@ export class Editor {
   translateSelection(dx: number, dy: number, record = true) {
     if (!this.selected.length) return;
     const d = new this.ps.Point(dx, dy);
-    for (const it of this.selected) it.translate(d);
+    for (const it of this.selected) this.tf(it, (t) => t.translate(d));
     if (record) this.commit();
     else this.drawOverlay();
   }
@@ -1172,14 +1530,14 @@ export class Editor {
         if (patch.w !== undefined) sy = sx;
         else sx = sy;
       }
-      if (Number.isFinite(sx) && Number.isFinite(sy) && sx !== 0 && sy !== 0) for (const it of this.selected) it.scale(sx, sy, anchor);
+      if (Number.isFinite(sx) && Number.isFinite(sy) && sx !== 0 && sy !== 0) for (const it of this.selected) this.tf(it, (t) => t.scale(sx, sy, anchor));
     }
     if (patch.x !== undefined || patch.y !== undefined) {
       const nb = this.selectionBounds()!;
       const cur = this.refPointOf(nb, this.refPoint);
       const tx = patch.x !== undefined ? this.origin.x + patch.x : cur.x;
       const ty = patch.y !== undefined ? this.origin.y - patch.y : cur.y;
-      for (const it of this.selected) it.translate(new ps.Point(tx - cur.x, ty - cur.y));
+      for (const it of this.selected) this.tf(it, (t) => t.translate(new ps.Point(tx - cur.x, ty - cur.y)));
     }
     this.commit();
   }
@@ -1187,7 +1545,7 @@ export class Editor {
   flip(axis: "h" | "v") {
     const b = this.selectionBounds();
     if (!b) return;
-    for (const it of this.selected) it.scale(axis === "h" ? -1 : 1, axis === "v" ? -1 : 1, b.center);
+    for (const it of this.selected) this.tf(it, (t) => t.scale(axis === "h" ? -1 : 1, axis === "v" ? -1 : 1, b.center));
     this.commit();
   }
 
@@ -1195,7 +1553,7 @@ export class Editor {
     const b = this.selectionBounds();
     if (!b || !degrees) return;
     // Screen/ruler convention: positive = counter-clockwise (y up).
-    for (const it of this.selected) it.rotate(-degrees, b.center);
+    for (const it of this.selected) this.tf(it, (t) => t.rotate(-degrees, b.center));
     this.commit();
   }
 
@@ -1239,7 +1597,7 @@ export class Editor {
     const items = this.clipboard.map((n) => fromNode(this.ps, n, (id) => this.assets.getProxy(id))).filter((i): i is Item => !!i);
     for (const it of items) {
       it.data.id = newId();
-      this.contentLayer.addChild(it);
+      this.scope.addChild(it);
     }
     this.selected = items;
     this.commit();
@@ -1268,7 +1626,8 @@ export class Editor {
   ungroup() {
     const out: Item[] = [];
     for (const it of this.selected) {
-      if (!(it instanceof this.ps.Group)) {
+      // A PowerClip is taken apart with Extract contents, not Ungroup.
+      if (!(it instanceof this.ps.Group) || it.data?.pc) {
         out.push(it);
         continue;
       }
@@ -1323,7 +1682,7 @@ export class Editor {
       if (how === "top") dy = ref.top - b.top;
       if (how === "vcenter") dy = ref.center.y - b.center.y;
       if (how === "bottom") dy = ref.bottom - b.bottom;
-      it.translate(new this.ps.Point(dx, dy));
+      this.tf(it, (t) => t.translate(new this.ps.Point(dx, dy)));
     }
     this.commit();
   }
@@ -1340,7 +1699,7 @@ export class Editor {
       const step = (last.center[key] - start) / (items.length - 1);
       items.forEach((it, i) => {
         const d = start + step * i - it.bounds.center[key];
-        it.translate(new this.ps.Point(axis === "h" ? d : 0, axis === "v" ? d : 0));
+        this.tf(it, (t) => t.translate(new this.ps.Point(axis === "h" ? d : 0, axis === "v" ? d : 0)));
       });
     } else {
       const lo = axis === "h" ? first.left : first.top;
@@ -1351,7 +1710,7 @@ export class Editor {
       for (const it of items) {
         const b = it.bounds;
         const d = pos - (axis === "h" ? b.left : b.top);
-        it.translate(new this.ps.Point(axis === "h" ? d : 0, axis === "v" ? d : 0));
+        this.tf(it, (t) => t.translate(new this.ps.Point(axis === "h" ? d : 0, axis === "v" ? d : 0)));
         pos += (axis === "h" ? b.width : b.height) + gap;
       }
     }
@@ -1359,7 +1718,7 @@ export class Editor {
   }
 
   setItemProps(id: string, patch: { name?: string; visible?: boolean; locked?: boolean }) {
-    const it = this.contentLayer.children.find((c) => c.data.id === id);
+    const it = this.findById(id);
     if (!it) return;
     if (patch.name !== undefined) it.name = patch.name.trim();
     if (patch.visible !== undefined) it.visible = patch.visible;
@@ -1374,7 +1733,7 @@ export class Editor {
     const t = new ps.PointText({ point: at, content, fontFamily: STUDIO_FONT, fontSize: fontSizeIn, insert: false });
     t.fillColor = new ps.Color("#000000");
     t.data.id = newId();
-    this.contentLayer.addChild(t);
+    this.scope.addChild(t);
     this.selected = [t];
     this.setTool("pick");
     this.commit();
@@ -1424,7 +1783,7 @@ export class Editor {
     r.data.assetId = asset.id;
     r.data.id = newId();
     r.name = asset.name;
-    this.contentLayer.addChild(r);
+    this.scope.addChild(r);
     this.selected = [r];
     this.commit();
   }
@@ -1437,6 +1796,12 @@ export class Editor {
   private restoreSnapshot(json: string) {
     const s = JSON.parse(json) as { objects: SceneNode[]; guides: Guide[]; page: PageSize };
     const selectedIds = new Set(this.selected.map((i) => i.data.id));
+    const editingId = this.clipEdit?.data.id;
+    const activeId = this.activeClip?.data.id;
+    this.clipEdit = null;
+    this.clipList = null;
+    this.clipMenu = null;
+    this.placing = null;
     this.contentLayer.removeChildren();
     for (const n of s.objects) {
       const it = fromNode(this.ps, n, (id) => this.assets.getProxy(id));
@@ -1444,7 +1809,12 @@ export class Editor {
     }
     this.guides = s.guides;
     if (s.page.width !== this.page.width || s.page.height !== this.page.height) this.setPage(s.page, false);
-    this.selected = this.contentLayer.children.filter((c) => selectedIds.has(c.data.id));
+    // The scene was rebuilt: find the PowerClip that was open (if it still exists) and stay inside it.
+    const active = activeId ? this.findById(activeId) : null;
+    this.activeClip = isPowerClip(active) ? active : null;
+    const editing = editingId ? this.findById(editingId) : null;
+    if (isPowerClip(editing)) this.openClip(editing);
+    this.selected = this.scope.children.filter((c) => c.data.id && selectedIds.has(c.data.id));
     this.shapingDirty = true;
     this.selectedGuideId = null;
     if (this.tool === "shape") {
@@ -1496,6 +1866,11 @@ export class Editor {
     this.selected = [];
     this.selectedGuideId = null;
     this.shape.clear();
+    this.clipEdit = null;
+    this.activeClip = null;
+    this.clipList = null;
+    this.placing = null;
+    this.clipMenu = null;
     this.contentLayer.removeChildren();
     for (const n of doc.objects) {
       const it = fromNode(this.ps, n, (id) => this.assets.getProxy(id));
@@ -1512,6 +1887,11 @@ export class Editor {
   newDocument(page: PageSize, units: DocSettings["units"], name = "Untitled") {
     this.assets.clear();
     this.shape.clear();
+    this.clipEdit = null;
+    this.activeClip = null;
+    this.clipList = null;
+    this.placing = null;
+    this.clipMenu = null;
     this.contentLayer.removeChildren();
     this.selected = [];
     this.guides = [];
@@ -1574,8 +1954,15 @@ export class Editor {
     const ctx = (e: MouseEvent) => e.preventDefault();
     const dbl = (e: MouseEvent) => {
       e.preventDefault();
+      if (e.button !== 0) return;
+      // Pick tool: double-click a PowerClip to edit its contents.
+      if (this.tool === "pick" && !this.clipEdit) {
+        const pc = this.clipAt(this.ps.view.viewToProject(this.viewPoint(e)));
+        if (pc) this.editClip(pc);
+        return;
+      }
       // Shape tool: double-click a node to delete it, the outline to add a node there.
-      if (this.tool !== "shape" || e.button !== 0) return;
+      if (this.tool !== "shape") return;
       const vp = this.viewPoint(e);
       this.shape.doubleClick(vp, this.ps.view.viewToProject(vp));
       this.drawOverlay();
@@ -1651,7 +2038,30 @@ export class Editor {
       this.drag = { kind: "zoomRect", start: p, startClient: new this.ps.Point(e.clientX, e.clientY) };
       return;
     }
+    if (this.clipMenu) {
+      this.clipMenu = null;
+      this.emit();
+    }
+    // Corel: drag an object with the RIGHT mouse button onto an outline, then choose "PowerClip inside".
+    if (e.button === 2 && this.tool === "pick" && !this.clipEdit) {
+      const hit = this.hitTestContent(vp);
+      if (hit) {
+        if (!this.selected.includes(hit)) this.select([hit]);
+        this.drag = { kind: "rdrag", startClient: new this.ps.Point(e.clientX, e.clientY), moved: false };
+        this.canvas.style.cursor = "copy";
+      }
+      return;
+    }
     if (e.button !== 0) return;
+    if (this.placing) {
+      // "Place inside frame": this click chooses the outline.
+      const contents = this.placing;
+      this.placing = null;
+      this.canvas.style.cursor = this.toolCursor();
+      this.onNotice?.(this.placeInside(contents, this.frameAt(p, contents)));
+      this.emit();
+      return;
+    }
     if (this.tool === "rectangle" || this.tool === "ellipse") {
       const targets = this.snapTargets(true);
       this.drag = { kind: "create", shape: this.tool, start: this.snapPoint(p, targets), targets };
@@ -1682,6 +2092,7 @@ export class Editor {
     }
     const hit = this.hitTestContent(vp);
     if (hit) {
+      if (!this.clipEdit) this.activeClip = this.clipAt(p);
       const wasSelected = this.selected.includes(hit);
       if (e.shiftKey) {
         this.select([hit], true);
@@ -1701,6 +2112,11 @@ export class Editor {
       this.emit();
       return;
     }
+    // Editing a PowerClip's contents: a click on nothing finishes editing (like Corel's Finish button).
+    if (this.clipEdit && !e.shiftKey) {
+      this.finishClipEdit();
+      return;
+    }
     if (!e.shiftKey) this.select([]);
     this.selectedGuideId = null;
     this.drawGuides();
@@ -1713,6 +2129,14 @@ export class Editor {
     const ps = this.ps;
     const d = this.drag;
     this.cursor = { x: p.x, y: p.y };
+    if (this.placing || d?.kind === "rdrag") {
+      const t = this.frameAt(p, this.placing ?? this.selected);
+      const hover = t ? ("frame" in t ? t.frame : t.open) : null;
+      if (hover !== this.frameHover) {
+        this.frameHover = hover;
+        this.drawOverlay();
+      }
+    }
     if (!d) {
       if (this.tool === "pick" && !this.spaceDown) {
         const h = this.hitHandle(vp);
@@ -1747,7 +2171,7 @@ export class Editor {
           this.snapMarker = r.at ? new ps.Point(r.at.x, r.at.y) : null;
         }
         const step = delta.subtract(d.applied);
-        for (const it of this.selected) it.translate(step);
+        for (const it of this.selected) this.tf(it, (t) => t.translate(step));
         d.applied = delta;
         break;
       }
@@ -1771,7 +2195,7 @@ export class Editor {
         const guard = (v: number) => (Math.abs(v) < 1e-4 ? (v < 0 ? -1e-4 : 1e-4) : v);
         sx = guard(sx);
         sy = guard(sy);
-        for (const it of this.selected) it.scale(sx / d.sx, sy / d.sy, d.anchor);
+        for (const it of this.selected) this.tf(it, (t) => t.scale(sx / d.sx, sy / d.sy, d.anchor));
         d.sx = sx;
         d.sy = sy;
         break;
@@ -1780,7 +2204,7 @@ export class Editor {
         let angle = p.subtract(d.center).angle - d.startAngle;
         if (e.ctrlKey || e.metaKey) angle = Math.round(angle / 15) * 15;
         const step = angle - d.applied;
-        for (const it of this.selected) it.rotate(step, d.center);
+        for (const it of this.selected) this.tf(it, (t) => t.rotate(step, d.center));
         d.applied = angle;
         this.snapLabel = `${(-angle).toFixed(1)}°`;
         break;
@@ -1817,6 +2241,9 @@ export class Editor {
       case "shape":
         this.shape.pointerMove(e, p);
         break;
+      case "rdrag":
+        if (new ps.Point(e.clientX, e.clientY).getDistance(d.startClient) > 4) d.moved = true;
+        return;
     }
     this.drawOverlay();
     this.emit();
@@ -1836,10 +2263,22 @@ export class Editor {
       case "move":
         if (d.moved) this.commit();
         else if (d.wasSelected && !e.shiftKey) {
+          // Ctrl+click a PowerClip → edit its contents (like Corel).
+          const pc = e.ctrlKey || e.metaKey ? this.clipAt(this.ps.view.viewToProject(vp)) : null;
+          if (pc && !this.clipEdit) this.editClip(pc);
           // Corel: click an already-selected object again → rotate handles.
-          this.rotateMode = !this.rotateMode;
+          else this.rotateMode = !this.rotateMode;
         }
         break;
+      case "rdrag": {
+        this.canvas.style.cursor = this.toolCursor();
+        if (!d.moved) break;
+        const contents = [...this.selected];
+        const target = this.frameAt(this.ps.view.viewToProject(vp), contents);
+        if (target && "frame" in target) this.clipMenu = { x: e.clientX, y: e.clientY, frame: target.frame, contents };
+        else this.onNotice?.(this.placeInside(contents, target));
+        break;
+      }
       case "scale":
       case "rotate":
         this.commit();
@@ -1848,7 +2287,7 @@ export class Editor {
         const r = this.marqueeRect;
         this.marqueeRect = null;
         if (r && r.width * this.ps.view.zoom > 2 && r.height * this.ps.view.zoom > 2) {
-          const hits = this.contentLayer.children.filter((c) => c.visible && !c.locked && (d.touching ? r.intersects(c.bounds) : r.contains(c.bounds)));
+          const hits = this.scope.children.filter((c) => c.visible && !c.locked && !isDerived(c) && (d.touching ? r.intersects(c.bounds) : r.contains(c.bounds)));
           this.select(hits, d.additive);
         }
         break;
@@ -1863,7 +2302,7 @@ export class Editor {
           shape.data.id = newId();
           // Stays a "shape" until converted to curves (Ctrl+Q); the Shape tool shows a hint for it.
           shape.data.shape = d.shape;
-          this.contentLayer.addChild(shape);
+          this.scope.addChild(shape);
           this.selected = [shape];
           this.commit();
         }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronDown, Grid3x3, Magnet, Redo2, Ruler as RulerIcon, ScanLine, Undo2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Grid3x3, Lock, Magnet, Redo2, Ruler as RulerIcon, ScanLine, Undo2, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { Editor, type EditorState } from "./engine/Editor";
+import { Editor, type ClipState, type EditorState } from "./engine/Editor";
 import { exportSvg } from "./engine/export-svg";
 import type { NodeType } from "./engine/node-geometry";
 import { parsePdf } from "./engine/import-pdf";
@@ -49,6 +49,37 @@ function isTypingTarget(t: EventTarget | null) {
   return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
 }
 
+/** Floating Edit / Finish / Extract / Lock bar shown just under the active PowerClip's frame. */
+function ClipBar({ editor, clip, onResult }: { editor: Editor; clip: ClipState; onResult: (r: { ok: boolean; message: string }) => void }) {
+  const at = editor.projectToClient(clip.anchor);
+  const btn = "rounded px-2 py-1 hover:bg-accent";
+  return (
+    <div role="toolbar" aria-label="PowerClip" className="fixed z-40 flex -translate-x-1/2 items-center gap-0.5 rounded-md border border-border bg-popover p-0.5 text-xs shadow-md" style={{ left: at.x, top: at.y + 10 }}>
+      {clip.editing ? (
+        <button type="button" className={cn(btn, "bg-primary text-primary-foreground hover:bg-primary/90")} title="Finish editing (Esc)" onClick={() => editor.finishClipEdit()}>
+          Finish
+        </button>
+      ) : (
+        <button type="button" className={btn} title="Edit the print inside this frame (double-click or Ctrl+click)" onClick={() => editor.editClip()}>
+          Edit
+        </button>
+      )}
+      <button type="button" className={btn} title="Take the print back out, in place" onClick={() => onResult(editor.extractClip())}>
+        Extract
+      </button>
+      <button
+        type="button"
+        className={cn(btn, "flex items-center gap-1", clip.lock && "text-primary")}
+        aria-pressed={clip.lock}
+        title={clip.lock ? "Contents locked to the frame: the print moves with the piece" : "Contents unlocked: the piece moves, the print stays"}
+        onClick={() => editor.setClipLock(!clip.lock)}
+      >
+        {clip.lock ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />} Lock
+      </button>
+    </div>
+  );
+}
+
 export default function PatternPrintStudio() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +104,12 @@ export default function PatternPrintStudio() {
     if (!canvas) return;
     const ed = new Editor(canvas);
     ed.onTextRequest = (at) => setTextAt(at);
+    // Outcomes of mouse-driven PowerClip actions; an open outline offers to jump to it.
+    ed.onNotice = (r) => {
+      if (r.ok) toast.success(r.message);
+      else if (r.action === "check-outlines") toast.warning(r.message, { action: { label: "Check outlines", onClick: () => ed.fixOpenOutline() } });
+      else toast.info(r.message);
+    };
     setEditor(ed);
     // Dev-only handle for debugging/verification; compiled out of production builds.
     if (process.env.NODE_ENV !== "production") (window as unknown as { __pps?: Editor }).__pps = ed;
@@ -181,6 +218,8 @@ export default function PatternPrintStudio() {
         return;
       }
       const shapeTool = st.tool === "shape";
+      // Show / hide PowerClip cut lines.
+      if (e.altKey && !mod && e.code === "KeyL") return e.preventDefault(), editor.toggleCutLines();
       if (mod) {
         const lower = k.toLowerCase();
         const handled = () => e.preventDefault();
@@ -218,6 +257,8 @@ export default function PatternPrintStudio() {
       if (shapeTool && !e.altKey && (k === "+" || k === "=")) return e.preventDefault(), editor.addNodes();
       if (shapeTool && !e.altKey && (k === "-" || k === "_")) return e.preventDefault(), editor.deleteNodes();
       // Shape tool: first Esc clears the node selection, the next returns to the object (Pick tool).
+      // Esc: cancel "place inside", then finish editing a PowerClip's contents, then the usual.
+      if (k === "Escape" && (editor.cancelPlaceInside() || editor.finishClipEdit())) return;
       if (k === "Escape") return shapeTool && editor.clearNodeSelection() ? undefined : st.tool !== "pick" ? editor.setTool("pick") : editor.clearSelection();
       if (k.startsWith("Arrow") && (shapeTool ? !!st.nodeEdit?.selected : st.selectionCount)) {
         e.preventDefault();
@@ -311,6 +352,19 @@ export default function PatternPrintStudio() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => showPanel("shaping")}>Shaping (weld, trim, intersect)…</DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={!state?.selectionCount || !!state?.clip?.editing} onClick={() => editor && report(editor.beginPlaceInside())}>
+                PowerClip: Place inside frame…
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!state?.clip} onClick={() => (state?.clip?.editing ? editor?.finishClipEdit() : editor?.editClip())}>
+                {state?.clip?.editing ? "PowerClip: Finish editing" : "PowerClip: Edit contents"} <DropdownMenuShortcut>{state?.clip?.editing ? "Esc" : "Double-click"}</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!state?.clip} onClick={() => editor && report(editor.extractClip())}>
+                PowerClip: Extract contents
+              </DropdownMenuItem>
+              <DropdownMenuCheckboxItem disabled={!state?.clip} checked={!!state?.clip?.lock} onCheckedChange={(v) => editor?.setClipLock(!!v)}>
+                PowerClip: Lock contents to frame
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem disabled={!state?.selectedBitmap} onClick={() => setTraceOpen(true)}>
                 Trace bitmap…
               </DropdownMenuItem>
@@ -390,6 +444,32 @@ export default function PatternPrintStudio() {
                   <DropdownMenuItem disabled={!state.guides.length} onClick={() => editor.clearGuides()}>
                     Delete all guidelines ({state.guides.length})
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem checked={state.settings.cutLines.visible} onCheckedChange={(v) => editor.updateSettings({ cutLines: { ...state.settings.cutLines, visible: !!v } })}>
+                    Show cut lines <DropdownMenuShortcut>Alt+L</DropdownMenuShortcut>
+                  </DropdownMenuCheckboxItem>
+                  <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+                    Cut line
+                    <input
+                      type="color"
+                      aria-label="Cut line colour"
+                      value={state.settings.cutLines.color}
+                      onChange={(e) => editor.updateSettings({ cutLines: { ...state.settings.cutLines, color: e.target.value } })}
+                      className="h-6 w-8 cursor-pointer rounded border border-border bg-background p-0"
+                    />
+                    <input
+                      key={state.settings.cutLines.width}
+                      defaultValue={(state.settings.cutLines.width * 72).toFixed(2)}
+                      aria-label="Cut line width in points"
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onBlur={(e) => {
+                        const pt = parseFloat(e.target.value);
+                        if (pt > 0 && pt <= 20) editor.updateSettings({ cutLines: { ...state.settings.cutLines, width: pt / 72 } });
+                      }}
+                      className="h-6 w-14 rounded border border-border bg-background px-1 text-right font-mono text-[11px] text-foreground"
+                    />
+                    pt
+                  </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => editor.resetOrigin()}>Reset ruler origin to page bottom-left</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -487,6 +567,8 @@ export default function PatternPrintStudio() {
             : `Page ${formatUnits(state?.page.width ?? 0, unit)} × ${formatUnits(state?.page.height ?? 0, unit)} ${UNIT_LABEL[unit]}`}
         </span>
         {state?.snapLabel && <span className="text-fuchsia-600">↳ {state.snapLabel}</span>}
+        {state?.placing && <span className="font-medium text-primary">Click a pattern outline to place the print inside · Esc cancels</span>}
+        {state?.clip?.editing && <span className="font-medium text-primary">Editing PowerClip contents · Esc or click outside to finish</span>}
         {state?.nodeEdit ? (
           <span>
             {state.nodeEdit.hint
@@ -500,6 +582,21 @@ export default function PatternPrintStudio() {
         )}
         <span className="ml-auto">{draftSavedAt ? `Draft autosaved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Autosaves a draft every 30s"}</span>
       </div>
+
+      {/* PowerClip mini toolbar, under the active frame (like CorelDRAW) */}
+      {editor && state?.clip && state.tool === "pick" && !state.placing && <ClipBar editor={editor} clip={state.clip} onResult={report} />}
+
+      {/* Right-mouse-drag menu */}
+      {editor && state?.clipMenu && (
+        <div role="menu" className="fixed z-50 min-w-44 rounded-md border border-border bg-popover p-1 text-sm shadow-md" style={{ left: state.clipMenu.x, top: state.clipMenu.y }}>
+          <button type="button" role="menuitem" autoFocus className="block w-full rounded px-2 py-1.5 text-left hover:bg-accent" onClick={() => report(editor.confirmClipMenu())}>
+            PowerClip inside
+          </button>
+          <button type="button" role="menuitem" className="block w-full rounded px-2 py-1.5 text-left text-muted-foreground hover:bg-accent" onClick={() => editor.cancelPlaceInside()}>
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Text tool input */}
       {textAt && textClient && (

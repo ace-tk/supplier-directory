@@ -4,6 +4,7 @@
 // file), never as pixel data, which keeps undo snapshots and saves cheap.
 
 import type paper from "paper/dist/paper-core";
+import { assemblePowerClip, contentsOf, frameOf, isPowerClip, type PowerClipSettings } from "./powerclip";
 
 /** [x, y, handleIn.x, handleIn.y, handleOut.x, handleOut.y] — handles relative to the point. */
 export type Seg = [number, number, number, number, number, number];
@@ -66,7 +67,15 @@ export interface RasterNode extends NodeBase {
   height: number;
 }
 
-export type SceneNode = PathNode | CompoundNode | GroupNode | TextNode | RasterNode;
+/** A print shown only inside an outline. The clip shape is rebuilt from `frame` on load, never saved. */
+export interface PowerClipNode extends NodeBase {
+  t: "powerclip";
+  pc: PowerClipSettings;
+  frame: PathNode | CompoundNode;
+  contents: SceneNode[];
+}
+
+export type SceneNode = PathNode | CompoundNode | GroupNode | TextNode | RasterNode | PowerClipNode;
 
 type PaperScope = typeof paper;
 type Item = paper.Item;
@@ -157,6 +166,12 @@ export function toNode(ps: PaperScope, item: Item): SceneNode | null {
     };
   }
   if (item instanceof ps.Path) return pathNode(item);
+  if (isPowerClip(item)) {
+    const frame = frameOf(item);
+    const f = frame ? toNode(ps, frame) : null;
+    if (!f || (f.t !== "path" && f.t !== "compound")) return null;
+    return { t: "powerclip", ...baseOf(item), pc: { ...item.data.pc }, frame: f, contents: contentsOf(item).map((c) => toNode(ps, c)).filter((c): c is SceneNode => !!c) };
+  }
   if (item instanceof ps.Group) {
     const children = item.children.map((c) => toNode(ps, c)).filter((c): c is SceneNode => !!c);
     const g: GroupNode = { t: "group", ...baseOf(item), children };
@@ -238,6 +253,13 @@ export function fromNode(ps: PaperScope, n: SceneNode, resolveProxy: ProxyResolv
       item = t;
       break;
     }
+    case "powerclip": {
+      const frame = fromNode(ps, n.frame, resolveProxy);
+      if (!frame) return null;
+      const contents = n.contents.map((c) => fromNode(ps, c, resolveProxy)).filter((c): c is Item => !!c);
+      item = assemblePowerClip(ps, frame, contents, n.pc);
+      break;
+    }
     case "raster": {
       const proxy = resolveProxy(n.assetId);
       if (!proxy) return null;
@@ -261,6 +283,7 @@ export function collectAssetIds(nodes: SceneNode[], into = new Set<string>()): S
   for (const n of nodes) {
     if (n.t === "raster") into.add(n.assetId);
     else if (n.t === "group") collectAssetIds(n.children, into);
+    else if (n.t === "powerclip") collectAssetIds(n.contents, into);
   }
   return into;
 }

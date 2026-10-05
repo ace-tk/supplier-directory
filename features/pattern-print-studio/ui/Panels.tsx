@@ -117,7 +117,8 @@ export function ObjectsPanel({ editor, state }: { editor: Editor; state: EditorS
       {state.objects.map((o) => (
         <li
           key={o.id}
-          className={cn("group flex items-center gap-1 px-2 py-1 text-xs", o.selected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/60")}
+          className={cn("group flex items-center gap-1 py-1 pr-2 text-xs", o.selected ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/60")}
+          style={{ paddingLeft: 8 + o.depth * 12 }}
           onClick={(e) => editor.selectById(o.id, e.shiftKey)}
           onDoubleClick={() => setRenaming(o.id)}
         >
@@ -137,7 +138,9 @@ export function ObjectsPanel({ editor, state }: { editor: Editor; state: EditorS
               className="h-5 min-w-0 flex-1 rounded border border-primary bg-background px-1 text-xs outline-none"
             />
           ) : (
-            <span className={cn("min-w-0 flex-1 truncate", !o.visible && "opacity-50")} title={`${o.name} — double-click to rename`}>
+            <span className={cn("min-w-0 flex-1 truncate", !o.visible && "opacity-50")} title={o.role === "content" ? `${o.name} — a print inside the PowerClip above; click to edit it` : `${o.name} — double-click to rename`}>
+              {o.role === "clip" && <span className="mr-1 rounded bg-primary/15 px-1 text-[10px] font-medium text-primary">clip</span>}
+              {o.role === "content" && <span className="mr-1 text-muted-foreground/70">↳</span>}
               {o.name}
             </span>
           )}

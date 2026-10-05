@@ -1,5 +1,6 @@
 import type paper from "paper/dist/paper-core";
 import { constrainOpposite, curveDragOffsets, fitHandleLengths, inferNodeType, parseNodeTypes, smoothedHandles, turnAngle, unsplitHandleLengths, type NodeType } from "./node-geometry";
+import { insideClipContents, isDerived } from "./powerclip";
 import { SNAP_PX, snapPoints, type SnapTargets } from "./snap";
 
 type Item = paper.Item;
@@ -424,6 +425,8 @@ export class ShapeTool {
       segments: false,
       tolerance: PATH_HIT_PX * this.host.px(),
       match: (h: paper.HitResult) => {
+        // Outlines only: not a PowerClip's generated mask, and not the print inside it.
+        if (isDerived(h.item) || insideClipContents(h.item)) return false;
         const top = this.host.topLevel(h.item);
         return !!top && top.visible && !top.locked;
       },
@@ -1084,7 +1087,7 @@ export class ShapeTool {
     const ps = this.host.ps;
     const out: OpenPathInfo[] = [];
     for (const path of this.host.contentLayer().getItems({ class: ps.Path }) as paper.Path[]) {
-      if (path.closed || path.segments.length < 2 || path.clipMask) continue;
+      if (path.closed || path.segments.length < 2 || path.clipMask || isDerived(path) || insideClipContents(path)) continue;
       const top = this.host.topLevel(path);
       const address = this.addressOf(path);
       if (!top || !top.visible || !address) continue;
@@ -1100,7 +1103,11 @@ export class ShapeTool {
 
   /** Opens an item found by openPaths() for editing, with its two loose ends selected. Returns its bounds. */
   enterOpenPath(address: ItemAddress): paper.Rectangle | null {
-    const item = this.resolve(address);
+    return this.enterOpenItem(this.resolve(address));
+  }
+
+  /** Same, for an open outline already in hand. */
+  enterOpenItem(item: Item | null): paper.Rectangle | null {
     if (!(item instanceof this.host.ps.Path)) return null;
     this.enter(item);
     if (!this.target) return null;
@@ -1112,6 +1119,16 @@ export class ShapeTool {
   /** The text / rectangle / ellipse the convert-to-curves hint is showing for, if any. */
   get convertible(): Item | null {
     return this.hintItem && this.hintItem.isInserted() ? this.hintItem : null;
+  }
+
+  /** The curve being edited (for keeping a PowerClip's clip in step with its outline). */
+  get targetItem(): Item | null {
+    return this.target;
+  }
+
+  /** The outline under a page point, as the Shape tool would pick it. */
+  outlineAt(p: paper.Point): Item | null {
+    return this.hitObject(p);
   }
 
   get hasTarget() {
