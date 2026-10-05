@@ -35,6 +35,8 @@ export interface PathNode extends NodeBase {
   segs: Seg[];
   /** Drawn with the Rectangle/Ellipse tool and not yet converted to curves (Ctrl+Q). */
   shape?: "rectangle" | "ellipse";
+  /** Node types, one letter per node: c = cusp, s = smooth, y = symmetrical. Absent = worked out from the handles. */
+  nt?: string;
 }
 export interface CompoundNode extends NodeBase {
   t: "compound";
@@ -140,6 +142,7 @@ function pathNode(p: paper.Path): PathNode {
   });
   const n: PathNode = { t: "path", ...baseOf(p), style: styleOf(p), closed: p.closed, segs };
   if (p.data?.shape) n.shape = p.data.shape;
+  if (typeof p.data?.nt === "string" && p.data.nt.length === p.segments.length) n.nt = p.data.nt;
   return n;
 }
 
@@ -198,6 +201,7 @@ export function fromNode(ps: PaperScope, n: SceneNode, resolveProxy: ProxyResolv
       p.segments = n.segs.map((s) => new ps.Segment(new ps.Point(s[0], s[1]), new ps.Point(s[2], s[3]), new ps.Point(s[4], s[5])));
       p.closed = n.closed;
       if (n.shape) p.data.shape = n.shape;
+      if (n.nt) p.data.nt = n.nt;
       applyStyle(ps, p, n.style);
       item = p;
       break;

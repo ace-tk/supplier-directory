@@ -1,4 +1,5 @@
 import type paper from "paper/dist/paper-core";
+import { constrainOpposite, curveDragOffsets, inferNodeType, parseNodeTypes, smoothedHandles, type NodeType } from "./node-geometry";
 import { SNAP_PX, snapPoints, type SnapTargets } from "./snap";
 
 type Item = paper.Item;
@@ -10,6 +11,7 @@ type EditTarget = paper.Path | paper.CompoundPath;
 const NODE_PX = 7;
 const START_NODE_PX = 9;
 const NODE_HIT_PX = 6;
+const HANDLE_PX = 5;
 const PATH_HIT_PX = 6;
 const DRAG_START_PX = 3;
 const NODE_COLOR = "#2563eb";
@@ -26,6 +28,8 @@ export interface ItemAddress {
 export interface ShapeMeta {
   target: ItemAddress | null;
   nodes: string[];
+  /** Selected segments, keyed by the node they start at. */
+  segs?: string[];
 }
 
 export interface NodeEditState {
@@ -41,6 +45,14 @@ export interface NodeEditState {
   point: { x: number; y: number } | null;
   /** Bounding box of 2+ selected nodes, page space. */
   bounds: Rect | null;
+  /** Type shared by the selected nodes, "mixed" if they differ, null if none are selected. */
+  nodeType: NodeType | "mixed" | null;
+  /** Segments the To line / To curve buttons act on, and whether any is a curve / a line. */
+  segments: number;
+  hasCurve: boolean;
+  hasLine: boolean;
+  /** Total length of those segments, inches. */
+  segmentLength: number | null;
 }
 
 /** The slice of the Editor the Shape tool needs. */
@@ -64,9 +76,14 @@ export interface ShapeHost {
   selectionChanged: () => void;
 }
 
+type HandleSide = "in" | "out";
+type CurveHit = { sub: number; index: number; curve: paper.Curve; time: number };
+
 type ShapeDrag =
   | { kind: "nodes"; start: paper.Point; anchor: paper.Point; starts: Map<paper.Segment, paper.Point>; moved: boolean; targets: SnapTargets }
-  | { kind: "marquee"; start: paper.Point; additive: boolean; moved: boolean };
+  | { kind: "marquee"; start: paper.Point; additive: boolean; moved: boolean; clickSeg: string | null }
+  | { kind: "handle"; seg: paper.Segment; side: HandleSide; grab: paper.Point; moved: boolean }
+  | { kind: "curve"; start: paper.Point; hit: CurveHit; h1: paper.Point; h2: paper.Point; moved: boolean; additive: boolean };
 
 const key = (sub: number, index: number) => `${sub}:${index}`;
 
@@ -83,6 +100,8 @@ export class ShapeTool {
   private lastAddress: ItemAddress | null = null;
   private hint: string | null = null;
   private nodes = new Set<string>();
+  /** Selected segments: "subpath:index" of the node each one starts at. */
+  private segs = new Set<string>();
   private drag: ShapeDrag | null = null;
   private marqueeEnd: paper.Point | null = null;
 
@@ -130,6 +149,7 @@ export class ShapeTool {
   /** Starts editing an object (or shows why it can't be edited). */
   enter(item: Item | null) {
     this.nodes.clear();
+    this.segs.clear();
     this.drag = null;
     this.target = null;
     this.address = null;
@@ -154,6 +174,7 @@ export class ShapeTool {
   clear() {
     if (this.target && this.address) this.lastAddress = this.address;
     this.nodes.clear();
+    this.segs.clear();
     this.drag = null;
     this.target = null;
     this.address = null;
@@ -179,10 +200,14 @@ export class ShapeTool {
       const [s, i] = k.split(":").map(Number);
       if (!paths[s] || i >= paths[s].segments.length) this.nodes.delete(k);
     }
+    for (const k of [...this.segs]) {
+      const [s, i] = k.split(":").map(Number);
+      if (!paths[s] || i >= paths[s].curves.length) this.segs.delete(k);
+    }
   }
 
   meta(): ShapeMeta {
-    return { target: this.target ? this.address : null, nodes: [...this.nodes] };
+    return { target: this.target ? this.address : null, nodes: [...this.nodes], segs: [...this.segs] };
   }
 
   /** Undo/redo: restore exactly the node selection saved with that step. */
@@ -194,6 +219,7 @@ export class ShapeTool {
     this.target = found as EditTarget;
     this.address = meta.target;
     this.nodes = new Set(meta.nodes);
+    this.segs = new Set(meta.segs ?? []);
     this.pruneNodes();
     this.host.selectTop(this.host.topLevel(found));
   }
@@ -219,6 +245,120 @@ export class ShapeTool {
       if (seg) out.push(seg);
     }
     return out;
+  }
+
+  /** Handle tip in page space. */
+  private handlePoint(seg: paper.Segment, side: HandleSide): paper.Point {
+    const local = seg.point.add(side === "in" ? seg.handleIn : seg.handleOut);
+    const m = seg.path.globalMatrix;
+    return m.isIdentity() ? local : m.transform(local);
+  }
+
+  private setHandlePoint(seg: paper.Segment, side: HandleSide, page: paper.Point) {
+    const m = seg.path.globalMatrix;
+    const h = (m.isIdentity() ? page : m.inverseTransform(page)).subtract(seg.point);
+    if (side === "in") seg.handleIn = h;
+    else seg.handleOut = h;
+  }
+
+  // ---------------------------------------------------------------- node types
+  /** Node types of a path: stored on the path once set, otherwise worked out from the handles. */
+  private typesOf(path: paper.Path): NodeType[] {
+    return parseNodeTypes(path.data?.nt, path.segments.length) ?? path.segments.map((s) => inferNodeType(s.handleIn, s.handleOut));
+  }
+
+  private typeOf(seg: paper.Segment): NodeType {
+    return this.typesOf(seg.path)[seg.index];
+  }
+
+  private setType(seg: paper.Segment, type: NodeType) {
+    const types = this.typesOf(seg.path);
+    types[seg.index] = type;
+    seg.path.data.nt = types.join("");
+  }
+
+  /** Keeps the handle opposite the one that moved in line with the node's type. */
+  private constrain(seg: paper.Segment, moved: HandleSide) {
+    const type = this.typeOf(seg);
+    if (type === "c") return;
+    const ps = this.host.ps;
+    if (moved === "in") seg.handleOut = new ps.Point(constrainOpposite(seg.handleIn, seg.handleOut, type));
+    else seg.handleIn = new ps.Point(constrainOpposite(seg.handleOut, seg.handleIn, type));
+  }
+
+  // ---------------------------------------------------------------- segments
+  private selectedCurves(): paper.Curve[] {
+    const paths = this.paths();
+    const out: paper.Curve[] = [];
+    for (const k of this.segs) {
+      const [s, i] = k.split(":").map(Number);
+      const c = paths[s]?.curves[i];
+      if (c) out.push(c);
+    }
+    return out;
+  }
+
+  /** Segments the line/curve commands act on: the selected ones, else (like Corel) the one leading into each selected node. */
+  private actionCurves(): paper.Curve[] {
+    const chosen = this.selectedCurves();
+    if (chosen.length) return chosen;
+    const out: paper.Curve[] = [];
+    for (const seg of this.selectedSegments()) {
+      const c = seg.previous ? seg.previous.curve : null;
+      if (c && c.segment2 === seg && !out.includes(c)) out.push(c);
+    }
+    return out;
+  }
+
+  /** Nodes whose handles are shown: the selected nodes, their neighbours' facing handles, and both ends of selected segments. */
+  private shownHandles(): { seg: paper.Segment; side: HandleSide }[] {
+    const out: { seg: paper.Segment; side: HandleSide }[] = [];
+    const seen = new Set<string>();
+    const add = (seg: paper.Segment | null, side: HandleSide) => {
+      if (!seg) return;
+      const h = side === "in" ? seg.handleIn : seg.handleOut;
+      if (h.isZero()) return;
+      const k = `${seg.path.id}:${seg.index}:${side}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push({ seg, side });
+    };
+    for (const seg of this.selectedSegments()) {
+      add(seg, "in");
+      add(seg, "out");
+      add(seg.previous, "out");
+      add(seg.next, "in");
+    }
+    for (const c of this.selectedCurves()) {
+      add(c.segment1, "out");
+      add(c.segment2, "in");
+    }
+    return out;
+  }
+
+  private hitHandle(viewPoint: paper.Point): { seg: paper.Segment; side: HandleSide; d: number } | null {
+    const view = this.host.ps.view;
+    let best: { seg: paper.Segment; side: HandleSide; d: number } | null = null;
+    for (const h of this.shownHandles()) {
+      const d = view.projectToView(this.handlePoint(h.seg, h.side)).getDistance(viewPoint);
+      if (d <= NODE_HIT_PX && (!best || d < best.d)) best = { ...h, d };
+    }
+    return best;
+  }
+
+  /** The point on the edited object's own outline under the pointer, if any. */
+  private hitCurve(p: paper.Point): CurveHit | null {
+    const tol = PATH_HIT_PX * this.host.px();
+    let best: (CurveHit & { d: number }) | null = null;
+    this.paths().forEach((path, sub) => {
+      const m = path.globalMatrix;
+      const local = m.isIdentity() ? p : m.inverseTransform(p);
+      const loc = path.getNearestLocation(local);
+      if (!loc?.curve) return;
+      const d = loc.point.getDistance(local);
+      if (d <= tol && (!best || d < best.d)) best = { sub, index: loc.curve.index, curve: loc.curve, time: loc.time, d };
+    });
+    return best;
   }
 
   private hitNode(viewPoint: paper.Point): { key: string; seg: paper.Segment } | null {
@@ -275,8 +415,14 @@ export class ShapeTool {
   // ---------------------------------------------------------------- pointer
   /** Returns true if a drag started (the Editor then routes move/up here). */
   pointerDown(e: PointerEvent, vp: paper.Point, p: paper.Point): boolean {
+    const handle = this.hitHandle(vp);
+    if (handle) {
+      this.drag = { kind: "handle", seg: handle.seg, side: handle.side, grab: this.handlePoint(handle.seg, handle.side).subtract(p), moved: false };
+      return true;
+    }
     const node = this.hitNode(vp);
     if (node) {
+      if (!e.shiftKey) this.segs.clear();
       if (e.shiftKey) {
         if (this.nodes.has(node.key)) {
           this.nodes.delete(node.key);
@@ -303,14 +449,33 @@ export class ShapeTool {
       this.host.changed();
       return true;
     }
+    // The edited object's own outline: drag a curve to bend it, click to select the segment.
+    const onCurve = this.hitCurve(p);
+    if (onCurve) {
+      if (onCurve.curve.hasHandles()) {
+        this.drag = { kind: "curve", start: p, hit: onCurve, h1: onCurve.curve.handle1.clone(), h2: onCurve.curve.handle2.clone(), moved: false, additive: e.shiftKey };
+      } else {
+        // A straight line can't be bent until it is converted to a curve: dragging from it just draws a marquee.
+        this.drag = { kind: "marquee", start: p, additive: e.shiftKey, moved: false, clickSeg: key(onCurve.sub, onCurve.index) };
+      }
+      return true;
+    }
     const hit = this.hitObject(p);
     if (hit && hit !== this.target) {
       this.enter(hit);
       this.host.changed();
       return false;
     }
-    this.drag = { kind: "marquee", start: p, additive: e.shiftKey, moved: false };
+    this.drag = { kind: "marquee", start: p, additive: e.shiftKey, moved: false, clickSeg: null };
     return true;
+  }
+
+  private clickSegment(k: string, additive: boolean) {
+    if (!additive) {
+      this.nodes.clear();
+      this.segs = new Set([k]);
+    } else if (this.segs.has(k)) this.segs.delete(k);
+    else this.segs.add(k);
   }
 
   pointerMove(e: PointerEvent, p: paper.Point) {
@@ -322,6 +487,30 @@ export class ShapeTool {
       d.moved = true;
       this.marqueeEnd = p;
       this.host.setMarquee(new ps.Rectangle(d.start, p));
+      return;
+    }
+    if (d.kind === "handle") {
+      // Pin the node types down before the handles change, so a type is never re-guessed from a half-edited shape.
+      if (!d.moved) this.setType(d.seg, this.typeOf(d.seg));
+      d.moved = true;
+      this.setHandlePoint(d.seg, d.side, p.add(d.grab));
+      this.constrain(d.seg, d.side);
+      return;
+    }
+    if (d.kind === "curve") {
+      const move = p.subtract(d.start);
+      if (!d.moved && move.length / this.host.px() < DRAG_START_PX) return;
+      const c = d.hit.curve;
+      if (!d.moved) this.setType(c.segment1, this.typeOf(c.segment1));
+      d.moved = true;
+      const m = c.path.globalMatrix;
+      // Offsets are vectors: take the matrix's linear part only.
+      const local = m.isIdentity() ? move : m.inverseTransform(move).subtract(m.inverseTransform(new ps.Point(0, 0)));
+      const o = curveDragOffsets(d.hit.time, local);
+      c.handle1 = d.h1.add(new ps.Point(o.first));
+      c.handle2 = d.h2.add(new ps.Point(o.second));
+      this.constrain(c.segment1, "out");
+      this.constrain(c.segment2, "in");
       return;
     }
     let delta = p.subtract(d.start);
@@ -341,19 +530,33 @@ export class ShapeTool {
     const d = this.drag;
     this.drag = null;
     if (!d) return;
-    if (d.kind === "nodes") {
+    if (d.kind === "nodes" || d.kind === "handle") {
       if (d.moved) this.host.commit();
+      return;
+    }
+    if (d.kind === "curve") {
+      if (d.moved) this.host.commit();
+      else {
+        this.clickSegment(key(d.hit.sub, d.hit.index), d.additive);
+        this.host.selectionChanged();
+      }
       return;
     }
     const ps = this.host.ps;
     if (d.moved) {
       const r = new ps.Rectangle(d.start, this.marqueeEnd ?? d.start);
       const next = d.additive ? new Set(this.nodes) : new Set<string>();
+      if (!d.additive) this.segs.clear();
       this.paths().forEach((path, s) => path.segments.forEach((seg, i) => r.contains(this.pagePoint(seg)) && next.add(key(s, i))));
       this.nodes = next;
+    } else if (d.clickSeg) {
+      this.clickSegment(d.clickSeg, d.additive);
     } else if (!e.shiftKey) {
-      // Plain click on nothing: drop the node selection first, then the object.
-      if (this.nodes.size) this.nodes.clear();
+      // Plain click on nothing: drop the node/segment selection first, then the object.
+      if (this.nodes.size || this.segs.size) {
+        this.nodes.clear();
+        this.segs.clear();
+      }
       else if (!this.hitObject(d.start)) {
         this.host.selectTop(null);
         this.enter(null);
@@ -365,7 +568,7 @@ export class ShapeTool {
   }
 
   cursorAt(vp: paper.Point): string {
-    return this.hitNode(vp) ? "move" : "default";
+    return this.hitHandle(vp) ? "crosshair" : this.hitNode(vp) ? "move" : "default";
   }
 
   // ---------------------------------------------------------------- commands
@@ -379,8 +582,9 @@ export class ShapeTool {
 
   /** Esc: clears the node selection. Returns false when there was nothing to clear. */
   escape(): boolean {
-    if (!this.nodes.size) return false;
+    if (!this.nodes.size && !this.segs.size) return false;
     this.nodes.clear();
+    this.segs.clear();
     this.host.selectionChanged();
     this.host.changed();
     return true;
@@ -403,6 +607,46 @@ export class ShapeTool {
     const cur = this.pagePoint(segs[0]);
     this.setPagePoint(segs[0], new this.host.ps.Point(patch.x ?? cur.x, patch.y ?? cur.y));
     this.host.commit();
+  }
+
+  /** C / S / Y: makes the selected nodes cusp, smooth or symmetrical (one undo step). */
+  setNodeType(type: NodeType) {
+    const segs = this.selectedSegments();
+    if (!segs.length) return;
+    const ps = this.host.ps;
+    for (const seg of segs) {
+      if (type !== "c") {
+        const toPrev = seg.previous ? seg.previous.point.subtract(seg.point) : null;
+        const toNext = seg.next ? seg.next.point.subtract(seg.point) : null;
+        const h = smoothedHandles(seg.handleIn, seg.handleOut, toPrev, toNext, type === "y");
+        seg.handleIn = new ps.Point(h.handleIn);
+        seg.handleOut = new ps.Point(h.handleOut);
+      }
+      this.setType(seg, type);
+    }
+    this.host.commit();
+  }
+
+  /** To line / To curve for the selected segments (or the segment leading into each selected node). */
+  convertSegments(to: "line" | "curve") {
+    const curves = this.actionCurves();
+    let changed = false;
+    for (const c of curves) {
+      if (to === "line" && c.hasHandles()) {
+        c.clearHandles();
+        // A node with a straight side can no longer be smooth.
+        this.setType(c.segment1, "c");
+        this.setType(c.segment2, "c");
+        changed = true;
+      } else if (to === "curve" && !c.hasHandles()) {
+        // Handles a third of the way along: the shape is unchanged, but the segment can now be bent.
+        const third = c.point2.subtract(c.point1).divide(3);
+        c.handle1 = third;
+        c.handle2 = third.multiply(-1);
+        changed = true;
+      }
+    }
+    if (changed) this.host.commit();
   }
 
   get hasTarget() {
@@ -432,6 +676,13 @@ export class ShapeTool {
       }
       bounds = { x: l, y: t, w: r - l, h: b - t };
     }
+    let nodeType: NodeEditState["nodeType"] = null;
+    for (const s of segs) {
+      const t = this.typeOf(s);
+      nodeType = nodeType === null ? t : nodeType === t ? t : "mixed";
+      if (nodeType === "mixed") break;
+    }
+    const curves = this.actionCurves();
     return {
       hasTarget: !!this.target,
       hint: this.hint,
@@ -441,7 +692,20 @@ export class ShapeTool {
       open: paths.some((p) => !p.closed),
       point,
       bounds,
+      nodeType,
+      segments: curves.length,
+      hasCurve: curves.some((c) => c.hasHandles()),
+      hasLine: curves.some((c) => !c.hasHandles()),
+      segmentLength: curves.length ? curves.reduce((n, c) => n + this.curveLength(c), 0) : null,
     };
+  }
+
+  /** Curve length in page inches (allows for a transform on the path). */
+  private curveLength(c: paper.Curve): number {
+    const m = c.path.globalMatrix;
+    if (m.isIdentity()) return c.length;
+    const ps = this.host.ps;
+    return new ps.Curve(m.transform(c.point1), m.transform(c.point1.add(c.handle1)).subtract(m.transform(c.point1)), m.transform(c.point2.add(c.handle2)).subtract(m.transform(c.point2)), m.transform(c.point2)).length;
   }
 
   // ---------------------------------------------------------------- drawing
@@ -453,6 +717,45 @@ export class ShapeTool {
     const tl = view.bounds.topLeft;
     const pad = START_NODE_PX;
     const selected: [number, number, number][] = [];
+    const sx = (pt: paper.Point) => (pt.x - tl.x) * zoom;
+    const sy = (pt: paper.Point) => (pt.y - tl.y) * zoom;
+    const page = (path: paper.Path, pt: paper.Point) => (path.globalMatrix.isIdentity() ? pt : path.globalMatrix.transform(pt));
+
+    // Selected segments: highlighted along the curve.
+    ctx.strokeStyle = NODE_COLOR;
+    ctx.lineWidth = 2;
+    for (const c of this.selectedCurves()) {
+      const a = page(c.path, c.point1);
+      const b = page(c.path, c.point2);
+      const h1 = page(c.path, c.point1.add(c.handle1));
+      const h2 = page(c.path, c.point2.add(c.handle2));
+      ctx.beginPath();
+      ctx.moveTo(sx(a), sy(a));
+      ctx.bezierCurveTo(sx(h1), sy(h1), sx(h2), sy(h2), sx(b), sy(b));
+      ctx.stroke();
+    }
+
+    // Control handles: thin dashed line from the node, small dot at the tip.
+    const handles = this.shownHandles();
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 2]);
+    ctx.beginPath();
+    for (const h of handles) {
+      const n = this.pagePoint(h.seg);
+      const t = this.handlePoint(h.seg, h.side);
+      ctx.moveTo(sx(n), sy(n));
+      ctx.lineTo(sx(t), sy(t));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = NODE_COLOR;
+    for (const h of handles) {
+      const t = this.handlePoint(h.seg, h.side);
+      ctx.beginPath();
+      ctx.arc(sx(t), sy(t), HANDLE_PX / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.lineWidth = 1;
     ctx.strokeStyle = NODE_COLOR;
     ctx.fillStyle = "#ffffff";

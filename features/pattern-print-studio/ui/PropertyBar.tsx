@@ -5,7 +5,8 @@ import { ChevronDown, FlipHorizontal2, FlipVertical2, Link2, Link2Off, RotateCcw
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Editor, EditorState, RefPoint } from "../engine/Editor";
-import { MAX_ZOOM_PCT, MIN_ZOOM_PCT, type DisplayUnit } from "../engine/units";
+import { NODE_TYPE_LABEL, type NodeType } from "../engine/node-geometry";
+import { formatUnits, MAX_ZOOM_PCT, MIN_ZOOM_PCT, UNIT_LABEL, type DisplayUnit } from "../engine/units";
 import { LengthField } from "./LengthField";
 
 const ZOOM_PRESETS = [10, 14, 25, 50, 75, 100, 200, 400, 800, 1600, 3200];
@@ -25,6 +26,23 @@ function IconBtn({ title, onClick, active, disabled, children }: { title: string
       className={cn(
         "flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-35",
         active && "bg-primary/10 text-primary"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TextBtn({ title, onClick, active, disabled, children }: { title: string; onClick: () => void; active?: boolean; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "h-6 shrink-0 rounded border border-border px-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-35",
+        active && "border-primary bg-primary/10 text-primary"
       )}
     >
       {children}
@@ -123,6 +141,24 @@ function NodeFields({ editor, state }: { editor: Editor; state: EditorState }) {
       <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground" title="Selected nodes / total nodes">
         {n.selected} / {n.total} nodes
       </span>
+      <Sep />
+      {(["c", "s", "y"] as NodeType[]).map((t) => (
+        <TextBtn key={t} title={`Make node ${NODE_TYPE_LABEL[t].toLowerCase()} (${t.toUpperCase()})`} active={n.nodeType === t} disabled={!n.selected} onClick={() => editor.setNodeType(t)}>
+          {NODE_TYPE_LABEL[t]}
+        </TextBtn>
+      ))}
+      <Sep />
+      <TextBtn title="Convert the selected segment to a straight line" disabled={!n.hasCurve} onClick={() => editor.convertSegments("line")}>
+        To line
+      </TextBtn>
+      <TextBtn title="Convert the selected segment to a curve (so it can be bent)" disabled={!n.hasLine} onClick={() => editor.convertSegments("curve")}>
+        To curve
+      </TextBtn>
+      {n.segmentLength !== null && (
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-foreground" title={n.segments > 1 ? `Total length of ${n.segments} segments` : "Length of the selected segment"}>
+          Length {formatUnits(n.segmentLength, unit)} {UNIT_LABEL[unit]}
+        </span>
+      )}
     </>
   );
 }

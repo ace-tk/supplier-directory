@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Editor, type EditorState } from "./engine/Editor";
 import { exportSvg } from "./engine/export-svg";
+import type { NodeType } from "./engine/node-geometry";
 import { parsePdf } from "./engine/import-pdf";
 import { parseRaster } from "./engine/import-raster";
 import { parseSvg } from "./engine/import-svg";
@@ -35,6 +36,7 @@ const nullState = () => null;
 
 // F10 is CorelDRAW's Shape tool key; N is a second key for keyboards where F10 is a media key.
 const TOOL_KEYS: Record<string, ToolId> = { v: "pick", n: "shape", F10: "shape", z: "zoom", h: "pan", F6: "rectangle", F7: "ellipse", F8: "text" };
+const NODE_TYPE_KEYS: Record<string, NodeType> = { c: "c", s: "s", y: "y" };
 /** A Space press shorter than this (with no panning) toggles Shape ⇄ Pick; longer = hold-to-pan. */
 const SPACE_TAP_MS = 250;
 
@@ -200,6 +202,8 @@ export default function PatternPrintStudio() {
         else editor.nudge(dx, dy);
         return;
       }
+      // Shape tool, CorelDRAW keys: C = cusp, S = smooth, Y = symmetrical.
+      if (shapeTool && !e.altKey && NODE_TYPE_KEYS[k.toLowerCase()]) return e.preventDefault(), editor.setNodeType(NODE_TYPE_KEYS[k.toLowerCase()]);
       const tool = TOOL_KEYS[k] ?? TOOL_KEYS[k.toLowerCase()];
       if (tool && !e.altKey) {
         e.preventDefault();
@@ -441,7 +445,7 @@ export default function PatternPrintStudio() {
             {state.nodeEdit.hint
               ? state.nodeEdit.hint
               : state.nodeEdit.hasTarget
-                ? `${state.nodeEdit.subpaths > 1 ? "Compound curve" : "Curve"} on Layer 1 · ${state.nodeEdit.total} nodes · ${state.nodeEdit.selected} selected${state.nodeEdit.open ? " · open path" : ""}`
+                ? `${state.nodeEdit.subpaths > 1 ? "Compound curve" : "Curve"} on Layer 1 · ${state.nodeEdit.total} nodes · ${state.nodeEdit.selected} selected${state.nodeEdit.segmentLength !== null ? ` · segment length ${formatUnits(state.nodeEdit.segmentLength, unit)} ${UNIT_LABEL[unit]}` : ""}${state.nodeEdit.open ? " · open path" : ""}`
                 : "Shape tool · click a curve to edit its nodes"}
           </span>
         ) : (

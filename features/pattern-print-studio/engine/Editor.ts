@@ -4,6 +4,7 @@ import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { History } from "./history";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
+import type { NodeType } from "./node-geometry";
 import { ShapeTool, type NodeEditState, type ShapeMeta } from "./shape-tool";
 import { buildTargets, snapPoints, SNAP_PX, type SnapTargets } from "./snap";
 import { DEFAULT_PAGE, DEFAULT_SETTINGS, type DocSettings, type Guide, type Orientation, type Origin, type PageSize, type RasterAsset, type ToolId } from "./types";
@@ -726,6 +727,14 @@ export class Editor {
   /** Esc in the Shape tool. Returns false when no nodes were selected (caller then leaves the tool). */
   clearNodeSelection(): boolean {
     return this.shape.escape();
+  }
+  /** Makes the selected nodes cusp (c), smooth (s) or symmetrical (y). */
+  setNodeType(type: NodeType) {
+    this.shape.setNodeType(type);
+  }
+  /** Converts the selected segments to straight lines or to curves. */
+  convertSegments(to: "line" | "curve") {
+    this.shape.convertSegments(to);
   }
   /** Nudge the selected nodes in display direction (dy positive = UP). */
   nudgeNodes(dxUnits: number, dyUp: number) {
