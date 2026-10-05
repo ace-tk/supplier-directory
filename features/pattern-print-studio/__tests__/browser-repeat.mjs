@@ -11,7 +11,6 @@ export default async function run() {
   const R = []; const ok = (name, pass, info) => R.push(`${pass ? 'PASS' : 'FAIL'} 3C ${name}${info !== undefined ? ' — ' + info : ''}`);
   const ev = (type, pt, o = {}) => { const r = cv.getBoundingClientRect(); cv.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: r.left + pt.x, clientY: r.top + pt.y, button: 0, pointerId: 1, ...o })); };
   const click = (pt, o) => { ev('pointerdown', pt, o); ev('pointerup', pt, o); };
-  const drag = (a, b, o) => { ev('pointerdown', a, o); for (let i = 1; i <= 5; i++) ev('pointermove', { x: a.x + (b.x - a.x) * i / 5, y: a.y + (b.y - a.y) * i / 5 }, o); ev('pointerup', b, o); };
   const V = (p) => ps.view.projectToView(p);
   const key = (k, o = {}) => { window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...o })); window.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true, ...o })); };
   const st = () => ed.getState(); const hist = () => ed.history.index; const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e;

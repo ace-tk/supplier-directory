@@ -21,6 +21,19 @@ export interface PowerClipSettings {
   lock: boolean;
   /** Repeat fill: the contents are ONE tile, repeated to cover the frame. Only these numbers are saved, never the tiles. */
   repeat?: RepeatSettings;
+  /** Linked sizes: this piece's print was copied from a master piece and follows its edits. */
+  link?: ClipLink;
+}
+
+export interface ClipLink {
+  /** The master PowerClip's id. */
+  master: string;
+  mode: "keep" | "scale";
+  anchor: "center" | "top" | "ref";
+  mirror: boolean;
+  /** What the master looked like, and what this copy looked like, when they were last in step (for spotting drift). */
+  masterSig: string;
+  selfSig: string;
 }
 
 export const DEFAULT_CLIP: PowerClipSettings = { lock: true };

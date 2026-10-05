@@ -4,7 +4,8 @@ import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
 import { History } from "./history";
-import { clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, syncRepeatHolder, tileHolderOf, unwrapPowerClip, wrapInPowerClip } from "./powerclip";
+import { namePieces, parseSizeLabel, pieceAnchor, pieceLabel, repeatForCopy, sizeOrder, sizeScale, sizeTransform, type AnchorMode, type ApplyOptions, type PieceTag, type ScaleMode } from "./pieces";
+import { clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, syncRepeatHolder, tileHolderOf, unwrapPowerClip, wrapInPowerClip, type ClipLink, type PowerClipSettings } from "./powerclip";
 import { cellMatrix, countCells, coverInRepeatSpace, defaultRepeat, deltaInRepeatSpace, repeatCells, repeatSteps, type RepeatSettings } from "./repeat";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
 import { anchorOf, dpiLevel, effectiveDpi, fillScale, fitScale } from "./clip-fit";
@@ -73,6 +74,39 @@ export interface ClipContentState {
   stretchDistorts: boolean;
 }
 
+/** One row of the Pieces panel. */
+export interface PieceInfo {
+  id: string;
+  size: string;
+  piece: string;
+  mirrorOf: string;
+  hasRef: boolean;
+  w: number;
+  h: number;
+  /** Name of the group the outline sits in. */
+  block: string;
+  hasPrint: boolean;
+  repeat: boolean;
+  /** "S-Front" when this piece's print is linked to a master. */
+  linkedTo: string | null;
+  /** Linked, but changed by hand since it was last in step with its master. */
+  differs: boolean;
+  current: boolean;
+}
+
+/** One row of the auto-tag table: a suggestion until the user applies it. */
+export interface TagSuggestion {
+  id: string;
+  size: string;
+  piece: string;
+  mirrorOf: string;
+  w: number;
+  h: number;
+  block: string;
+  /** Already tagged (its current tag is shown). */
+  tagged: boolean;
+}
+
 export type ClipFit = "center" | "fit" | "fill" | "stretch" | "top";
 
 /** The PowerClip the floating Edit / Finish / Extract / Lock bar belongs to. */
@@ -85,6 +119,10 @@ export interface ClipState {
   count: number;
   /** Repeat fill settings, when on. */
   repeat: RepeatSettings | null;
+  /** This piece's tag ("S-Front"), and the master it is linked to, if any. */
+  label: string | null;
+  linkedTo: string | null;
+  linkDiffers: boolean;
   /** Repeat tiles currently drawn, and how many were left out because the tile is too small at this zoom. */
   tiles: { drawn: number; skipped: number } | null;
   /** Where the bar goes: bottom-centre of the frame, page inches. */
@@ -125,6 +163,10 @@ export interface EditorState {
   clipContent: ClipContentState | null;
   /** "Place inside frame" is waiting for a click on an outline. */
   placing: boolean;
+  /** Waiting for a click that places a piece's reference point. */
+  pickingRef: boolean;
+  /** Goes up whenever the document changes (lets panels refresh their lists only when needed). */
+  docVersion: number;
   /** After a right-mouse drag onto an outline: where to show the "PowerClip inside" menu (client px). */
   clipMenu: { x: number; y: number } | null;
 }
@@ -244,6 +286,11 @@ export class Editor {
   private tileDefs = new WeakMap<Item, paper.SymbolDefinition>();
   private dirtyRepeats = new Set<paper.Group>();
   private repeatInfo = new WeakMap<Item, { tiles: number; skipped: number }>();
+  /** Pieces: document version (for caches), the cached outline list, apply-to-sizes highlight, reference-point picking. */
+  private docVersion = 0;
+  private pieceCache: { version: number; items: Item[] } | null = null;
+  private applyPreview: Item[] | null = null;
+  private pickingRef = false;
   /** While choosing a frame: the outline the print would go into (highlighted). */
   private frameHover: Item | null = null;
   /** Reports the outcome of pointer-driven PowerClip actions (shown as a toast). */
@@ -372,6 +419,8 @@ export class Editor {
       clip: this.clipState(),
       clipContent: this.clipContentState(),
       placing: !!this.placing,
+      pickingRef: this.pickingRef,
+      docVersion: this.docVersion,
       clipMenu: this.clipMenu ? { x: this.clipMenu.x, y: this.clipMenu.y } : null,
     };
   }
@@ -414,7 +463,12 @@ export class Editor {
     if (!pc || !frame) return null;
     const b = frame.bounds;
     const info = this.repeatInfo.get(pc);
-    return { id: this.idOf(pc), editing: pc === this.clipEdit, lock: !!pc.data.pc.lock, count: contentsOf(pc).length, repeat: pc.data.pc.repeat ?? null, tiles: info ? { drawn: info.tiles, skipped: info.skipped } : null, anchor: { x: b.center.x, y: b.bottom } };
+    const tag = this.tagOf(frame);
+    const link = pc.data.pc.link as ClipLink | undefined;
+    const master = link ? this.findById(link.master) : null;
+    const masterTag = master && isPowerClip(master) ? this.tagOf(frameOf(master)) : null;
+    return { id: this.idOf(pc), editing: pc === this.clipEdit, lock: !!pc.data.pc.lock, count: contentsOf(pc).length, repeat: pc.data.pc.repeat ?? null, tiles: info ? { drawn: info.tiles, skipped: info.skipped } : null,
+      label: tag ? pieceLabel(tag) : null, linkedTo: link ? (masterTag ? pieceLabel(masterTag) : "master") : null, linkDiffers: !!link && this.printSignature(pc) !== link.selfSig, anchor: { x: b.center.x, y: b.bottom } };
   }
 
   /** Re-render React (rAF-batched) after any state change. */
@@ -504,6 +558,9 @@ export class Editor {
   /** Records an undo step after a committed action. */
   commit() {
     this.shapingDirty = true;
+    this.clipList = null;
+    this.docVersion++;
+    this.syncLinks();
     this.clipList = null;
     // Contents may have changed: tile definitions are rebuilt from the artwork.
     this.tileDefs = new WeakMap();
@@ -656,6 +713,7 @@ export class Editor {
     if (tool !== "pick") {
       this.placing = null;
       this.clipMenu = null;
+      this.pickingRef = false;
     }
     if (tool === "shape" && was !== "shape") {
       // Node editing works on outlines, not on the inside of a PowerClip.
@@ -912,6 +970,19 @@ export class Editor {
       ctx.stroke();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     } else this.frameHover = null;
+    const targets = this.applyPreview?.filter((f) => f.isInserted());
+    if (targets?.length) {
+      // Pieces that "Apply to all sizes" is about to update.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.strokeStyle = SELECT_COLOR;
+      ctx.fillStyle = "rgba(37, 99, 235, 0.10)";
+      ctx.lineWidth = 2.5;
+      this.traceOutlines(ctx, targets);
+      ctx.fill("evenodd");
+      ctx.stroke();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    this.drawRefPoints(ctx, dpr);
     if (this.shaping && !this.drag) {
       if (this.shapingDirty) this.computeShaping();
       if (this.shapingPlan) {
@@ -952,6 +1023,31 @@ export class Editor {
     ctx.lineWidth = Math.max(1, cut.width * this.ps.view.zoom);
     ctx.lineJoin = "round";
     this.traceOutlines(ctx, frames);
+    ctx.stroke();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /** Pieces' reference points: a small magenta cross-hair. */
+  private drawRefPoints(ctx: CanvasRenderingContext2D, dpr: number) {
+    const view = this.ps.view;
+    const pts: paper.Point[] = [];
+    for (const f of this.pieceOutlines()) {
+      const ref = (f.data?.tag as PieceTag | undefined)?.ref;
+      if (ref && f.isInserted() && f.bounds.intersects(view.bounds)) pts.push(view.projectToView(new this.ps.Point(f.bounds.x + ref.dx, f.bounds.y + ref.dy)));
+    }
+    if (!pts.length) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.strokeStyle = "#d946ef";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (const p of pts) {
+      ctx.moveTo(p.x - 7, p.y);
+      ctx.lineTo(p.x + 7, p.y);
+      ctx.moveTo(p.x, p.y - 7);
+      ctx.lineTo(p.x, p.y + 7);
+      ctx.moveTo(p.x + 4, p.y);
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    }
     ctx.stroke();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
@@ -1202,7 +1298,8 @@ export class Editor {
     return { ok: true, message: "Now click the pattern outline to place it inside (Esc to cancel)." };
   }
   cancelPlaceInside() {
-    if (!this.placing && !this.clipMenu) return false;
+    if (!this.placing && !this.clipMenu && !this.pickingRef) return false;
+    this.pickingRef = false;
     this.placing = null;
     this.clipMenu = null;
     this.canvas.style.cursor = this.toolCursor();
@@ -1634,6 +1731,332 @@ export class Editor {
     }
     this.dirtyRepeats.add(pc);
     this.commit();
+  }
+
+  // ---------------------------------------------------------------- pattern pieces: tags, apply to all sizes, links, mirror pairs
+  /** Outlines that are (or could be) pattern pieces: tagged ones, plus closed solid outlines of a real size. Cached until the document changes. */
+  private pieceOutlines(): Item[] {
+    if (this.pieceCache?.version === this.docVersion) return this.pieceCache.items;
+    const ps = this.ps;
+    const items = (this.contentLayer.getItems({ match: (i: Item) => i instanceof ps.CompoundPath || (i instanceof ps.Path && !(i.parent instanceof ps.CompoundPath)) }) as Item[]).filter((it) => {
+      if (isDerived(it) || insideClipContents(it)) return false;
+      if (it.data?.tag) return true;
+      return isClosedOutline(ps, it) && !it.dashArray?.length && Math.abs((it as paper.Path).area) >= 1;
+    });
+    this.pieceCache = { version: this.docVersion, items };
+    return items;
+  }
+  private clipOfFrame(frame: Item): paper.Group | null {
+    return frame.parent && isPowerClip(frame.parent) ? frame.parent : null;
+  }
+  private tagOf(frame: Item | null | undefined): PieceTag | null {
+    const t = frame?.data?.tag as PieceTag | undefined;
+    return t && (t.size || t.piece) ? t : null;
+  }
+
+  /** A PowerClip's print described relative to its frame, for telling whether a linked copy still matches. */
+  private printSignature(pc: Item): string {
+    const f = frameOf(pc).bounds;
+    const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
+    const parts = contentsOf(pc).map((c) => {
+      const b = c.bounds;
+      const what = c instanceof this.ps.Raster ? `img:${c.data.assetId}:${r6(c.matrix.a)},${r6(c.matrix.b)}` : `${c.className}:${c.fillColor ? c.fillColor.toCSS(true) : ""}`;
+      return `${what}@${r6(b.x - f.x)},${r6(b.y - f.y)},${r6(b.width)},${r6(b.height)}`;
+    });
+    const r = pc.data.pc.repeat as RepeatSettings | undefined;
+    return parts.join("|") + "#" + (r ? [r.type, r6(r.tileW), r6(r.tileH), r6(r.gapX), r6(r.gapY), r6(r.offsetX), r6(r.offsetY), r6(r.rotation), r6(r.scale)].join(",") : "");
+  }
+
+  /** Pieces panel: every piece, smallest size first. */
+  listPieces(): PieceInfo[] {
+    const current = this.currentClip();
+    const rows = this.pieceOutlines().map((f): PieceInfo => {
+      const tag = this.tagOf(f);
+      const pc = this.clipOfFrame(f);
+      const link = pc?.data.pc.link as ClipLink | undefined;
+      const master = link ? this.findById(link.master) : null;
+      const masterTag = master && isPowerClip(master) ? this.tagOf(frameOf(master)) : null;
+      const root = this.rootOf(f);
+      return {
+        id: this.idOf(f),
+        size: tag?.size ?? "",
+        piece: tag?.piece ?? "",
+        mirrorOf: tag?.mirrorOf ?? "",
+        hasRef: !!tag?.ref,
+        w: f.bounds.width,
+        h: f.bounds.height,
+        block: root && root !== f ? root.name || "Group" : "",
+        hasPrint: !!pc && contentsOf(pc).length > 0,
+        repeat: !!pc?.data.pc.repeat,
+        linkedTo: link ? (masterTag ? pieceLabel(masterTag) : "master") : null,
+        differs: !!link && !!pc && this.printSignature(pc) !== link.selfSig,
+        current: !!pc && pc === current,
+      };
+    });
+    return rows.sort((a, b) => sizeOrder(a.size || "~") - sizeOrder(b.size || "~") || (a.size || "~").localeCompare(b.size || "~") || a.piece.localeCompare(b.piece));
+  }
+
+  /**
+   * Auto-tag helper: reads the size labels ("S", "M", "XL"…) and suggests a
+   * Size and Piece for every outline, from the label in the same group (or
+   * the nearest one) and each outline's shape and position. Nothing is
+   * changed — the user confirms the table first.
+   */
+  suggestPieceTags(): TagSuggestion[] {
+    const ps = this.ps;
+    const labels: { size: string; root: Item | null; center: paper.Point; weight: number }[] = [];
+    for (const it of this.contentLayer.getItems({ match: (i: Item) => !isDerived(i) && !insideClipContents(i) }) as Item[]) {
+      // Live text, or text already converted to curves (which keeps its wording in its name).
+      const text = it instanceof ps.PointText ? it.content : /^Text "(.+)"$/.exec(it.name ?? "")?.[1];
+      const size = text ? parseSizeLabel(text) : null;
+      if (size) labels.push({ size, root: this.rootOf(it), center: it.bounds.center, weight: it.bounds.height });
+    }
+    const outlines = this.pieceOutlines();
+    const blocks = new Map<string, { size: string; label: string; items: Item[] }>();
+    for (const f of outlines) {
+      const root = this.rootOf(f);
+      const inGroup = root && root !== f ? labels.filter((l) => l.root === root).sort((a, b) => b.weight - a.weight)[0] : undefined;
+      const nearest = inGroup ?? [...labels].sort((a, b) => a.center.getDistance(f.bounds.center) - b.center.getDistance(f.bounds.center))[0];
+      const key = root && root !== f ? `g:${root.id}` : `l:${nearest ? labels.indexOf(nearest) : -1}`;
+      let block = blocks.get(key);
+      if (!block) blocks.set(key, (block = { size: nearest?.size ?? "", label: root && root !== f ? root.name || "Group" : nearest ? `near "${nearest.size}"` : "", items: [] }));
+      block.items.push(f);
+    }
+    const out: TagSuggestion[] = [];
+    for (const block of blocks.values()) {
+      const names = namePieces(block.items.map((f) => rectOf(f.bounds)));
+      const hasFront = names.includes("Front") && names.includes("Back");
+      block.items.forEach((f, i) => {
+        const have = this.tagOf(f);
+        out.push({
+          id: this.idOf(f),
+          size: have?.size || block.size,
+          piece: have?.piece || names[i],
+          mirrorOf: have ? (have.mirrorOf ?? "") : hasFront && names[i] === "Back" ? "Front" : "",
+          w: f.bounds.width,
+          h: f.bounds.height,
+          block: block.label,
+          tagged: !!have,
+        });
+      });
+    }
+    return out.sort((a, b) => sizeOrder(a.size || "~") - sizeOrder(b.size || "~") || a.piece.localeCompare(b.piece));
+  }
+
+  /** Sets Size / Piece (and mirror pair) on outlines. An empty size and piece removes the tag. One undo step. */
+  applyPieceTags(list: { id: string; size: string; piece: string; mirrorOf?: string }[]): { ok: boolean; message: string } {
+    let n = 0;
+    for (const t of list) {
+      const f = this.findById(t.id);
+      if (!f) continue;
+      const size = t.size.trim();
+      const piece = t.piece.trim();
+      if (!size && !piece) {
+        if (f.data.tag) delete f.data.tag;
+      } else {
+        const old = (f.data.tag ?? {}) as Partial<PieceTag>;
+        const tag: PieceTag = { size, piece };
+        const mirrorOf = (t.mirrorOf ?? old.mirrorOf ?? "").trim();
+        if (mirrorOf && mirrorOf !== piece) tag.mirrorOf = mirrorOf;
+        if (old.ref) tag.ref = old.ref;
+        f.data.tag = tag;
+      }
+      n++;
+    }
+    this.commit();
+    return { ok: n > 0, message: n ? `Tagged ${n} piece${n === 1 ? "" : "s"}` : "Nothing to tag." };
+  }
+
+  /** Objects/Pieces panel click: selects the piece and makes its PowerClip (if any) the active one. */
+  selectPiece(id: string, zoom = false) {
+    const f = this.findById(id);
+    if (!f) return;
+    if (this.clipEdit) this.finishClipEdit();
+    if (this.tool !== "pick") this.setTool("pick");
+    this.activeClip = this.clipOfFrame(f);
+    const root = this.rootOf(f);
+    this.select(root ? [root] : []);
+    if (zoom) this.fitRect(f.bounds.expand(Math.max(f.bounds.width, f.bounds.height) * 0.08 + 0.25));
+  }
+
+  /**
+   * Copies one PowerClip's print onto another outline. Keep-size moves it
+   * only; scale grows it with the piece; mirror flips it left-right about
+   * the anchor. The target becomes (or stays) a PowerClip; its old print is
+   * replaced. No undo step of its own — callers commit once.
+   */
+  private copyPrint(master: paper.Group, target: Item, o: { mode: ScaleMode; anchor: AnchorMode; mirror: boolean; link: boolean }): paper.Group {
+    const ps = this.ps;
+    const mf = frameOf(master);
+    const mBox = rectOf(mf.bounds);
+    const tBox = rectOf(target.bounds);
+    const mA = pieceAnchor(mBox, o.anchor, this.tagOf(mf));
+    const tA = pieceAnchor(tBox, o.anchor, this.tagOf(target));
+    const s = o.mode === "scale" ? sizeScale(mBox, tBox) : 1;
+    const r = master.data.pc.repeat as RepeatSettings | undefined;
+    const source = contentsOf(master);
+    const clones = source.map((c) => this.cloneWithNewIds(c));
+    if (r && source.length) {
+      // A repeat's tile artwork keeps its own size (the repeat's scale carries any growth); only its place follows the anchor.
+      const c = source.map((i) => i.bounds).reduce((a, b) => a.unite(b)).center;
+      const nc = new ps.Point(tA.x + (o.mirror ? -1 : 1) * s * (c.x - mA.x), tA.y + s * (c.y - mA.y));
+      for (const k of clones) {
+        k.translate(nc.subtract(c));
+        if (o.mirror) k.scale(-1, 1, nc);
+      }
+    } else {
+      const m = sizeTransform(mA, tA, s, o.mirror);
+      for (const k of clones) {
+        k.transform(new ps.Matrix(m[0], m[1], m[2], m[3], m[4], m[5]));
+        if (o.mirror && typeof k.data?.rot === "number") k.data.rot = -k.data.rot;
+      }
+    }
+    const settings: PowerClipSettings = { lock: master.data.pc.lock !== false };
+    if (r) settings.repeat = repeatForCopy(r, s, o.mirror);
+    let pc = this.clipOfFrame(target);
+    if (!pc) {
+      pc = wrapInPowerClip(ps, target, clones, settings);
+      pc.data.id = newId();
+      if (target.name) pc.name = target.name;
+    } else {
+      if (pc === this.clipEdit) this.finishClipEdit();
+      for (const c of contentsOf(pc)) c.remove();
+      pc.data.pc = settings;
+      syncRepeatHolder(ps, pc);
+      (tileHolderOf(pc) ?? clipGroupOf(pc)).addChildren(clones);
+      syncMask(ps, pc);
+      const holder = tileHolderOf(pc);
+      if (holder) this.tileDefs.delete(holder);
+    }
+    if (o.link) pc.data.pc = { ...pc.data.pc, link: { master: this.idOf(master), mode: o.mode, anchor: o.anchor, mirror: o.mirror, masterSig: this.printSignature(master), selfSig: this.printSignature(pc) } };
+    this.dirtyRepeats.add(pc);
+    this.clipList = null;
+    return pc;
+  }
+
+  /** What "Apply to all sizes" would touch, for the preview: the same piece in every other size, plus mirrored pairs if asked. */
+  private applyTargets(o: ApplyOptions): { master: paper.Group; tag: PieceTag; same: Item[]; pairs: { source: Item; target: Item }[] } | string {
+    const master = this.currentClip();
+    if (!master) return "Select the piece whose print you want to apply (it must be a PowerClip).";
+    const mf = frameOf(master);
+    const tag = this.tagOf(mf);
+    if (!tag || !tag.size || !tag.piece) return "Tag this piece with a Size and a Piece name first.";
+    if (!contentsOf(master).length) return "This piece has no print to apply yet.";
+    const outlines = this.pieceOutlines();
+    const same = outlines.filter((f) => f !== mf && this.tagOf(f)?.piece === tag.piece && this.tagOf(f)?.size !== tag.size);
+    const pairs: { source: Item; target: Item }[] = [];
+    if (o.pairs) {
+      for (const src of [mf, ...same]) {
+        const size = this.tagOf(src)!.size;
+        for (const f of outlines) if (f !== src && this.tagOf(f)?.size === size && this.tagOf(f)?.mirrorOf === tag.piece) pairs.push({ source: src, target: f });
+      }
+    }
+    return { master, tag, same, pairs };
+  }
+
+  /** Highlights, on the page, the pieces "Apply to all sizes" would update with these options. */
+  showApplyPreview(o: ApplyOptions) {
+    const t = this.applyTargets(o);
+    this.applyPreview = typeof t === "string" ? null : [...t.same, ...t.pairs.map((p) => p.target)];
+    this.drawOverlay();
+  }
+
+  /** Summary for the Pieces panel ("Will update 5 pieces: M-Front … XXXL-Front"). Changes nothing. */
+  planApplySizes(o: ApplyOptions): { ok: boolean; message: string; labels: string[] } {
+    const t = this.applyTargets(o);
+    if (typeof t === "string") return { ok: false, message: t, labels: [] };
+    const labels = [...t.same.map((f) => pieceLabel(this.tagOf(f)!)), ...t.pairs.map((p) => `${pieceLabel(this.tagOf(p.target)!)} (mirrored)`)];
+    if (!labels.length) return { ok: false, message: `No other piece is tagged "${t.tag.piece}" in another size.`, labels: [] };
+    return { ok: true, message: `Will update ${labels.length} piece${labels.length === 1 ? "" : "s"}: ${labels.join(", ")}`, labels };
+  }
+
+  /** Apply to all sizes: one undo step for every piece. */
+  applyToSizes(o: ApplyOptions): { ok: boolean; message: string } {
+    if (this.clipEdit) this.finishClipEdit();
+    const t = this.applyTargets(o);
+    if (typeof t === "string") return { ok: false, message: t };
+    if (!t.same.length && !t.pairs.length) return { ok: false, message: `No other piece is tagged "${t.tag.piece}" in another size.` };
+    const made = new Map<Item, paper.Group>([[frameOf(t.master), t.master]]);
+    for (const f of t.same) made.set(f, this.copyPrint(t.master, f, { mode: o.mode, anchor: o.anchor, mirror: false, link: o.link }));
+    for (const p of t.pairs) {
+      const src = made.get(p.source);
+      if (src) this.copyPrint(src, p.target, { mode: "keep", anchor: o.anchor, mirror: true, link: o.link });
+    }
+    this.applyPreview = null;
+    this.activeClip = t.master;
+    const n = t.same.length + t.pairs.length;
+    this.commit();
+    return { ok: true, message: `Print applied to ${n} piece${n === 1 ? "" : "s"}${o.link ? " (linked)" : ""}` };
+  }
+
+  /** Mirror print: puts a left-right mirrored copy of this piece's print on the piece(s) marked as its mirror, in the same size. */
+  mirrorPrint(link = false): { ok: boolean; message: string } {
+    if (this.clipEdit) this.finishClipEdit();
+    const master = this.currentClip();
+    const tag = master ? this.tagOf(frameOf(master)) : null;
+    if (!master || !tag) return { ok: false, message: "Select a tagged piece that has a print." };
+    const targets = this.pieceOutlines().filter((f) => f !== frameOf(master) && this.tagOf(f)?.size === tag.size && this.tagOf(f)?.mirrorOf === tag.piece);
+    if (!targets.length) return { ok: false, message: `No piece in size ${tag.size} is marked as the mirror of "${tag.piece}". Set "Mirror of" in the Pieces panel.` };
+    for (const f of targets) this.copyPrint(master, f, { mode: "keep", anchor: "center", mirror: true, link });
+    this.activeClip = master;
+    this.commit();
+    return { ok: true, message: `Mirrored onto ${targets.map((f) => pieceLabel(this.tagOf(f)!)).join(", ")}` };
+  }
+
+  /** Linked pieces whose master changed are brought back in step. Runs inside commit(), so it is part of the same undo step. */
+  private syncLinks() {
+    for (let pass = 0; pass < 3; pass++) {
+      let changed = false;
+      for (const pc of this.clips()) {
+        const link = pc.data.pc.link as ClipLink | undefined;
+        if (!link || !pc.isInserted()) continue;
+        const master = this.findById(link.master);
+        if (!master || !isPowerClip(master) || master === pc) {
+          const { link: _gone, ...rest } = pc.data.pc;
+          void _gone;
+          pc.data.pc = rest; // the master is gone: this piece simply keeps its print
+          continue;
+        }
+        if (this.printSignature(master) === link.masterSig) continue;
+        this.copyPrint(master, frameOf(pc), { mode: link.mode, anchor: link.anchor, mirror: link.mirror, link: true });
+        changed = true;
+      }
+      if (!changed) break;
+    }
+  }
+
+  /** Re-sync from master: throws away changes made directly to a linked piece. */
+  resyncLink(pc: paper.Group | null = this.currentClip()): { ok: boolean; message: string } {
+    const link = pc?.data.pc.link as ClipLink | undefined;
+    const master = link ? this.findById(link.master) : null;
+    if (!pc || !link || !master || !isPowerClip(master)) return { ok: false, message: "This piece is not linked to a master." };
+    this.copyPrint(master, frameOf(pc), { mode: link.mode, anchor: link.anchor, mirror: link.mirror, link: true });
+    this.commit();
+    return { ok: true, message: "Re-synced from the master piece" };
+  }
+
+  unlinkClip(pc: paper.Group | null = this.currentClip()) {
+    if (!pc || !pc.data.pc.link) return;
+    const { link: _gone, ...rest } = pc.data.pc;
+    void _gone;
+    pc.data.pc = rest;
+    this.commit();
+  }
+
+  /** Removes the "Apply to all sizes" highlight (the Pieces panel was closed). */
+  clearApplyPreview() {
+    if (!this.applyPreview) return;
+    this.applyPreview = null;
+    this.drawOverlay();
+  }
+
+  /** The next click on a tagged piece places its reference point (e.g. on the centre-front line). */
+  beginSetRefPoint() {
+    if (this.clipEdit) this.finishClipEdit();
+    this.setTool("pick");
+    this.pickingRef = true;
+    this.canvas.style.cursor = "crosshair";
+    this.emit();
   }
 
   // ---------------------------------------------------------------- trace bitmap
@@ -2156,6 +2579,9 @@ export class Editor {
     const activeId = this.activeClip?.data.id;
     this.clipEdit = null;
     this.clipList = null;
+    this.docVersion++;
+    this.applyPreview = null;
+    this.pickingRef = false;
     this.clipMenu = null;
     this.placing = null;
     this.contentLayer.removeChildren();
@@ -2225,6 +2651,9 @@ export class Editor {
     this.clipEdit = null;
     this.activeClip = null;
     this.clipList = null;
+    this.docVersion++;
+    this.applyPreview = null;
+    this.pickingRef = false;
     this.placing = null;
     this.clipMenu = null;
     this.contentLayer.removeChildren();
@@ -2246,6 +2675,9 @@ export class Editor {
     this.clipEdit = null;
     this.activeClip = null;
     this.clipList = null;
+    this.docVersion++;
+    this.applyPreview = null;
+    this.pickingRef = false;
     this.placing = null;
     this.clipMenu = null;
     this.contentLayer.removeChildren();
@@ -2409,6 +2841,24 @@ export class Editor {
       return;
     }
     if (e.button !== 0) return;
+    if (this.pickingRef) {
+      // The click places the reference point of the piece under the pointer (snapped, so it can sit exactly on a guideline).
+      this.pickingRef = false;
+      this.canvas.style.cursor = this.toolCursor();
+      const sp = this.snapPoint(p, this.snapTargets(true));
+      this.snapLabel = null;
+      this.snapMarker = null;
+      const t = this.frameAt(sp, []);
+      const f = t && "frame" in t ? t.frame : null;
+      const tag = f ? this.tagOf(f) : null;
+      if (f && tag) {
+        f.data.tag = { ...tag, ref: { dx: sp.x - f.bounds.x, dy: sp.y - f.bounds.y } };
+        this.commit();
+        this.onNotice?.({ ok: true, message: `Reference point set on ${pieceLabel(tag)}` });
+      } else this.onNotice?.({ ok: false, message: "Click inside a tagged piece to place its reference point." });
+      this.emit();
+      return;
+    }
     if (this.placing) {
       // "Place inside frame": this click chooses the outline.
       const contents = this.placing;

@@ -27,6 +27,7 @@ import type { SnapSettings, ToolId } from "./engine/types";
 import { formatUnits, UNIT_LABEL } from "./engine/units";
 import { CalibrateDialog, ImportDialog, NewDocumentDialog, type PendingImport } from "./ui/Dialogs";
 import { AlignPanel, ObjectsPanel, ShapingPanel, Toolbox } from "./ui/Panels";
+import { PiecesPanel } from "./ui/PiecesPanel";
 import { PropertyBar } from "./ui/PropertyBar";
 import { Ruler, RULER_SIZE } from "./ui/Ruler";
 
@@ -40,6 +41,8 @@ const nullState = () => null;
 
 // F10 is CorelDRAW's Shape tool key; N is a second key for keyboards where F10 is a media key.
 const TOOL_KEYS: Record<string, ToolId> = { v: "pick", n: "shape", F10: "shape", z: "zoom", h: "pan", F6: "rectangle", F7: "ellipse", F8: "text" };
+type PanelId = "objects" | "align" | "shaping" | "pieces";
+const PANEL_LABEL: Record<PanelId, string> = { objects: "Objects", align: "Align", shaping: "Shaping", pieces: "Pieces" };
 const NODE_TYPE_KEYS: Record<string, NodeType> = { c: "c", s: "s", y: "y" };
 /** A Space press shorter than this (with no panning) toggles Shape ⇄ Pick; longer = hold-to-pan. */
 const SPACE_TAP_MS = 250;
@@ -89,7 +92,7 @@ export default function PatternPrintStudio() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const state = useSyncExternalStore(editor?.subscribe ?? noopSubscribe, editor?.getState ?? nullState, nullState) as EditorState | null;
 
-  const [panel, setPanel] = useState<"objects" | "align" | "shaping">("objects");
+  const [panel, setPanel] = useState<PanelId>("objects");
   const [newOpen, setNewOpen] = useState(false);
   const [calibrateOpen, setCalibrateOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -167,9 +170,10 @@ export default function PatternPrintStudio() {
 
   /** Switches the right-hand panel; the Shaping preview only lives while its panel is open. */
   const showPanel = useCallback(
-    (p: "objects" | "align" | "shaping") => {
+    (p: PanelId) => {
       setPanel(p);
       if (p !== "shaping") editor?.setShaping(null);
+      if (p !== "pieces") editor?.clearApplyPreview();
     },
     [editor]
   );
@@ -545,18 +549,18 @@ export default function PatternPrintStudio() {
         {/* Right panel */}
         <div className="flex w-60 shrink-0 flex-col border-l border-border bg-card">
           <div className="flex shrink-0 border-b border-border text-xs">
-            {(["objects", "align", "shaping"] as const).map((p) => (
+            {(Object.keys(PANEL_LABEL) as PanelId[]).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => showPanel(p)}
                 className={cn("flex-1 py-2 font-medium", panel === p ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
-                {p === "objects" ? `Objects${state ? ` (${state.objects.length})` : ""}` : p === "align" ? "Align" : "Shaping"}
+                {PANEL_LABEL[p]}
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : panel === "align" ? <AlignPanel editor={editor} state={state} /> : <ShapingPanel editor={editor} state={state} onResult={report} />)}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : panel === "align" ? <AlignPanel editor={editor} state={state} /> : panel === "shaping" ? <ShapingPanel editor={editor} state={state} onResult={report} /> : <PiecesPanel editor={editor} state={state} onResult={report} />)}</div>
         </div>
       </div>
 
@@ -569,6 +573,7 @@ export default function PatternPrintStudio() {
         </span>
         {state?.snapLabel && <span className="text-fuchsia-600">↳ {state.snapLabel}</span>}
         {state?.placing && <span className="font-medium text-primary">Click a pattern outline to place the print inside · Esc cancels</span>}
+        {state?.pickingRef && <span className="font-medium text-primary">Click a point on a tagged piece to place its reference point · Esc cancels</span>}
         {state?.clip?.editing && <span className="font-medium text-primary">{state.clip.repeat ? "Editing repeat fill · drag inside the frame to shift it · Esc or click outside to finish" : "Editing PowerClip contents · Esc or click outside to finish"}</span>}
         {state?.nodeEdit ? (
           <span>

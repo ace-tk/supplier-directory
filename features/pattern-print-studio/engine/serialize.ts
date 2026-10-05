@@ -4,6 +4,7 @@
 // file), never as pixel data, which keeps undo snapshots and saves cheap.
 
 import type paper from "paper/dist/paper-core";
+import type { PieceTag } from "./pieces";
 import { assemblePowerClip, contentsOf, frameOf, isPowerClip, tileHolderOf, type PowerClipSettings } from "./powerclip";
 
 /** [x, y, handleIn.x, handleIn.y, handleOut.x, handleOut.y] — handles relative to the point. */
@@ -29,6 +30,8 @@ interface NodeBase {
   clipMask?: boolean;
   /** Rotation applied to a print inside a PowerClip, degrees counter-clockwise (so it can be shown and edited later). */
   rot?: number;
+  /** Pattern piece tag (on outlines): size, piece name, mirror pair, reference point. */
+  tag?: PieceTag;
   style?: StyleJSON;
 }
 
@@ -133,6 +136,7 @@ function baseOf(item: Item): NodeBase {
   if (item.locked) b.locked = true;
   if (item.clipMask) b.clipMask = true;
   if (typeof item.data?.rot === "number" && item.data.rot) b.rot = item.data.rot;
+  if (item.data?.tag) b.tag = structuredClone(item.data.tag);
   return b;
 }
 
@@ -143,6 +147,7 @@ function applyBase(item: Item, n: NodeBase) {
   if (n.locked) item.locked = true;
   if (n.clipMask) item.clipMask = true;
   if (n.rot) item.data.rot = n.rot;
+  if (n.tag) item.data.tag = structuredClone(n.tag);
 }
 
 function pathNode(p: paper.Path): PathNode {
