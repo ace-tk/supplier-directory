@@ -1,5 +1,5 @@
 import type paper from "paper/dist/paper-core";
-import { constrainOpposite, curveDragOffsets, fitHandleLengths, inferNodeType, parseNodeTypes, smoothedHandles, turnAngle, type NodeType } from "./node-geometry";
+import { constrainOpposite, curveDragOffsets, fitHandleLengths, inferNodeType, parseNodeTypes, smoothedHandles, turnAngle, unsplitHandleLengths, type NodeType } from "./node-geometry";
 import { SNAP_PX, snapPoints, type SnapTargets } from "./snap";
 
 type Item = paper.Item;
@@ -814,7 +814,8 @@ export class ShapeTool {
     for (let k = 1; k < N; k++) samples.push({ p: c2.getPointAt((c2.length * k) / N), t: (l1 + (c2.length * k) / N) / total });
     const dirA = (prev.handleOut.isZero() ? seg.point.subtract(prev.point) : prev.handleOut).normalize();
     const dirC = (next.handleIn.isZero() ? seg.point.subtract(next.point) : next.handleIn).normalize();
-    const { alpha, beta } = fitHandleLengths(prev.point, dirA, next.point, dirC, samples);
+    const guess = unsplitHandleLengths(prev.handleOut.length, seg.handleIn.length, seg.handleOut.length, next.handleIn.length);
+    const { alpha, beta } = fitHandleLengths(prev.point, dirA, next.point, dirC, samples, guess ? [guess] : []);
     seg.remove();
     prev.handleOut = new ps.Point(dirA.multiply(alpha));
     next.handleIn = new ps.Point(dirC.multiply(beta));

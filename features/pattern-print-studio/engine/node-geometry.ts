@@ -109,15 +109,50 @@ function bernstein(t: number): [number, number, number, number] {
  * tangent directions leaving a and c (kept, so the neighbours stay smooth);
  * `samples` are points on the old shape with t = their fraction of its
  * length. Least squares on the two lengths; falls back to a third of the
- * chord when the fit is degenerate.
+ * chord when the fit is degenerate. `guesses` are extra candidates (see
+ * unsplitHandleLengths); whichever candidate follows the old shape best wins.
  */
-export function fitHandleLengths(a: Vec, dirA: Vec, c: Vec, dirC: Vec, samples: { p: Vec; t: number }[]): { alpha: number; beta: number } {
+export function fitHandleLengths(a: Vec, dirA: Vec, c: Vec, dirC: Vec, samples: { p: Vec; t: number }[], guesses: { alpha: number; beta: number }[] = []): { alpha: number; beta: number } {
   const fallback = len({ x: c.x - a.x, y: c.y - a.y }) / 3;
   const dd = dirA.x * dirC.x + dirA.y * dirC.y;
   const ts = samples.map((s) => s.t);
-  let best: { alpha: number; beta: number } | null = null;
-  // Solve for the two lengths, then move each sample's t to the nearest point on the fitted curve and solve again.
-  for (let pass = 0; pass < 6; pass++) {
+  const at = (alpha: number, beta: number, t: number): Vec => {
+    const [b0, b1, b2, b3] = bernstein(t);
+    return { x: (b0 + b1) * a.x + b1 * dirA.x * alpha + (b2 + b3) * c.x + b2 * dirC.x * beta, y: (b0 + b1) * a.y + b1 * dirA.y * alpha + (b2 + b3) * c.y + b2 * dirC.y * beta };
+  };
+  /** How far the old shape's sample points are from a candidate curve (worst case). */
+  const misfit = (alpha: number, beta: number): number => {
+    const pts: Vec[] = [];
+    for (let i = 0; i <= 96; i++) pts.push(at(alpha, beta, i / 96));
+    let worst = 0;
+    for (const { p } of samples) {
+      let best = Infinity;
+      // Squared distance from p to each short chord of the candidate curve.
+      for (let i = 1; i < pts.length; i++) {
+        const u = pts[i - 1];
+        const v = pts[i];
+        const ex = v.x - u.x;
+        const ey = v.y - u.y;
+        const l2 = ex * ex + ey * ey;
+        const k = l2 > 0 ? Math.min(1, Math.max(0, ((p.x - u.x) * ex + (p.y - u.y) * ey) / l2)) : 0;
+        const dx = u.x + ex * k - p.x;
+        const dy = u.y + ey * k - p.y;
+        best = Math.min(best, dx * dx + dy * dy);
+      }
+      worst = Math.max(worst, best);
+    }
+    return worst;
+  };
+  let best: { alpha: number; beta: number; err: number } | null = null;
+  for (const g of guesses) {
+    if (!(g.alpha > 0) || !(g.beta > 0) || !Number.isFinite(g.alpha + g.beta)) continue;
+    const err = misfit(g.alpha, g.beta);
+    if (!best || err < best.err) best = { ...g, err };
+  }
+  // Solve for the two lengths, then move each sample's t towards its nearest point on the fitted curve and
+  // solve again. Every pass is scored against the old shape and the best one wins, so refining can never
+  // make the result worse than the first solve.
+  for (let pass = 0; pass < 8; pass++) {
     let s11 = 0;
     let s12 = 0;
     let s22 = 0;
@@ -138,25 +173,40 @@ export function fitHandleLengths(a: Vec, dirA: Vec, c: Vec, dirC: Vec, samples: 
     const alpha = (r1 * s22 - r2 * s12) / det;
     const beta = (s11 * r2 - s12 * r1) / det;
     if (!(alpha > 0) || !(beta > 0) || !Number.isFinite(alpha + beta)) break;
-    best = { alpha, beta };
-    // One Newton step per sample towards its closest point on this curve.
+    const err = misfit(alpha, beta);
+    if (!best || err < best.err) best = { alpha, beta, err };
     const p1 = { x: a.x + dirA.x * alpha, y: a.y + dirA.y * alpha };
     const p2 = { x: c.x + dirC.x * beta, y: c.y + dirC.y * beta };
     samples.forEach(({ p }, i) => {
       const t = ts[i];
       const m = 1 - t;
-      const [b0, b1, b2, b3] = bernstein(t);
-      const qx = b0 * a.x + b1 * p1.x + b2 * p2.x + b3 * c.x - p.x;
-      const qy = b0 * a.y + b1 * p1.y + b2 * p2.y + b3 * c.y - p.y;
+      const q = at(alpha, beta, t);
+      const qx = q.x - p.x;
+      const qy = q.y - p.y;
       const d1x = 3 * (m * m * (p1.x - a.x) + 2 * m * t * (p2.x - p1.x) + t * t * (c.x - p2.x));
       const d1y = 3 * (m * m * (p1.y - a.y) + 2 * m * t * (p2.y - p1.y) + t * t * (c.y - p2.y));
       const d2x = 6 * (m * (p2.x - 2 * p1.x + a.x) + t * (c.x - 2 * p2.x + p1.x));
       const d2y = 6 * (m * (p2.y - 2 * p1.y + a.y) + t * (c.y - 2 * p2.y + p1.y));
       const den = d1x * d1x + d1y * d1y + qx * d2x + qy * d2y;
-      if (Math.abs(den) > 1e-12) ts[i] = Math.min(1, Math.max(0, t - (qx * d1x + qy * d1y) / den));
+      // Only step where Newton heads for a nearest point (not a farthest one).
+      if (den > 1e-12) ts[i] = Math.min(1, Math.max(0, t - (qx * d1x + qy * d1y) / den));
     });
   }
-  return best ?? { alpha: fallback, beta: fallback };
+  return best ? { alpha: best.alpha, beta: best.beta } : { alpha: fallback, beta: fallback };
+}
+
+/**
+ * The exact inverse of splitting a curve: if a node was made by dividing one
+ * curve at parameter t, its two handles are in the ratio t : (1 − t), and
+ * the neighbours' handles were shortened by t and (1 − t). Undoing that
+ * gives back the original curve exactly. For any other smooth node it is a
+ * good first guess. Lengths are of: the previous node's outgoing handle, the
+ * deleted node's two handles, and the next node's incoming handle.
+ */
+export function unsplitHandleLengths(prevOut: number, nodeIn: number, nodeOut: number, nextIn: number): { alpha: number; beta: number } | null {
+  if (!(nodeIn > 0) || !(nodeOut > 0)) return null;
+  const t = nodeIn / (nodeIn + nodeOut);
+  return { alpha: prevOut / t, beta: nextIn / (1 - t) };
 }
 
 /** Direction change at a node, in degrees (0 = straight through). `incoming` points into the node, `outgoing` away from it. */
