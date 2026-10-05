@@ -47,6 +47,7 @@
     "decimal.js": "^10.6.0",
     "framer-motion": "^12.42.2",
     "html2canvas-pro": "^2.3.9",
+    "imagetracerjs": "^1.2.6",
     "jose": "^6.2.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

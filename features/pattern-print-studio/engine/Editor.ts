@@ -1,5 +1,5 @@
 import paper from "paper/dist/paper-core";
-import { AssetStore, newId } from "./assets";
+import { AssetStore, loadImageElement, newId } from "./assets";
 import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
@@ -10,6 +10,7 @@ import { DEFAULT_SIMPLIFY_TOLERANCE, ShapeTool, type NodeEditState, type OpenPat
 import { missingGlyphs, nodeCount, planShaping, textToOutlines, type ShapingOp, type ShapingPlan } from "./shaping";
 import { buildTargets, snapPoints, SNAP_PX, type SnapTargets } from "./snap";
 import { DEFAULT_PAGE, DEFAULT_SETTINGS, type DocSettings, type Guide, type Orientation, type Origin, type PageSize, type RasterAsset, type ToolId } from "./types";
+import type { TraceResult } from "./trace/trace-core";
 import { clamp, CSS_PX_PER_INCH, MAX_ZOOM_PCT, MIN_ZOOM_PCT } from "./units";
 import type { ParsedVectorImport } from "./import-svg";
 
@@ -58,6 +59,8 @@ export interface EditorState {
   selectionCount: number;
   selectedText: { fontSize: number; content: string } | null;
   selectedGuideId: string | null;
+  /** Exactly one bitmap is selected (it can be traced). */
+  selectedBitmap: boolean;
   objects: ObjectEntry[];
   canUndo: boolean;
   canRedo: boolean;
@@ -71,6 +74,15 @@ export interface EditorState {
   nodeEdit: NodeEditState | null;
   /** Shaping panel: the chosen operation and what its live preview found. */
   shaping: ShapingState | null;
+}
+
+/** A bitmap ready to be traced: its ORIGINAL pixels (not the on-screen proxy) and its real size on the page. */
+export interface TraceSource {
+  id: string;
+  name: string;
+  image: HTMLImageElement;
+  widthIn: number;
+  heightIn: number;
 }
 
 export interface ShapingState {
@@ -273,6 +285,7 @@ export class Editor {
       selectionCount: this.selected.length,
       selectedText: single instanceof this.ps.PointText ? { fontSize: Number(single.fontSize), content: single.content } : null,
       selectedGuideId: this.selectedGuideId,
+      selectedBitmap: single instanceof this.ps.Raster,
       objects: this.contentLayer.children
         .slice()
         .reverse()
@@ -929,6 +942,64 @@ export class Editor {
     this.selected = results;
     this.commit();
     return { ok: true, message: "Shaping applied" };
+  }
+
+  // ---------------------------------------------------------------- trace bitmap
+  /** The single selected bitmap, for the Trace dialog. Null if the selection isn't exactly one bitmap. */
+  async getTraceSource(): Promise<TraceSource | null> {
+    const r = this.selected.length === 1 ? this.selected[0] : null;
+    if (!(r instanceof this.ps.Raster)) return null;
+    const asset = this.assets.get(r.data.assetId);
+    if (!asset) return null;
+    const image = await loadImageElement(asset.dataUrl);
+    const o = r.matrix.transform(new this.ps.Point(0, 0));
+    return {
+      id: this.idOf(r),
+      name: r.name || asset.name,
+      image,
+      widthIn: r.matrix.transform(new this.ps.Point(r.width, 0)).getDistance(o),
+      heightIn: r.matrix.transform(new this.ps.Point(0, r.height)).getDistance(o),
+    };
+  }
+
+  /**
+   * Places a trace result as one group of vector shapes exactly over the
+   * bitmap it came from (same size, position and rotation). One undo step.
+   */
+  placeTrace(rasterId: string, result: TraceResult, deleteOriginal: boolean): { ok: boolean; message: string } {
+    const ps = this.ps;
+    const r = this.contentLayer.children.find((c) => c.data.id === rasterId);
+    if (!(r instanceof ps.Raster)) return { ok: false, message: "The original image is no longer on the page." };
+    // Traced pixels → the raster's own space (centred on its middle) → page inches.
+    const m = r.matrix;
+    const at = (x: number, y: number) => m.transform(new ps.Point((x / result.width - 0.5) * r.width, (y / result.height - 0.5) * r.height));
+    const group = new ps.Group({ insert: false });
+    for (const shape of result.shapes) {
+      const cp = new ps.CompoundPath({ insert: false });
+      for (const sub of shape.subpaths) {
+        cp.moveTo(at(sub.start[0], sub.start[1]));
+        for (const s of sub.segs) {
+          if (s[0] === "L") cp.lineTo(at(s[1], s[2]));
+          else cp.quadraticCurveTo(at(s[1], s[2]), at(s[3], s[4]));
+        }
+        cp.closePath();
+      }
+      if (!cp.children.length) continue;
+      // A shape without holes is a plain curve; one with holes stays a compound path.
+      const item = cp.children.length === 1 ? cp.children[0] : cp;
+      const [red, green, blue, alpha] = shape.color;
+      item.fillColor = new ps.Color(red / 255, green / 255, blue / 255, alpha / 255);
+      if (item === cp) cp.fillRule = "evenodd";
+      group.addChild(item);
+    }
+    if (!group.children.length) return { ok: false, message: "Nothing was traced." };
+    group.name = `Trace of ${r.name || "bitmap"}`;
+    group.data.id = newId();
+    group.insertAbove(r);
+    if (deleteOriginal) r.remove();
+    this.selected = [group];
+    this.commit();
+    return { ok: true, message: `Traced into ${group.children.length} shape${group.children.length === 1 ? "" : "s"} (${result.nodes} nodes)` };
   }
 
   // ---------------------------------------------------------------- shape tool (node editing)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, Grid3x3, Magnet, Redo2, Ruler as RulerIcon, ScanLine, Undo2 } from "lucide-react";
@@ -28,6 +29,9 @@ import { CalibrateDialog, ImportDialog, NewDocumentDialog, type PendingImport } 
 import { AlignPanel, ObjectsPanel, ShapingPanel, Toolbox } from "./ui/Panels";
 import { PropertyBar } from "./ui/PropertyBar";
 import { Ruler, RULER_SIZE } from "./ui/Ruler";
+
+// The Trace dialog (and with it the tracing worker and library) loads only when it is first opened.
+const TraceDialog = dynamic(() => import("./ui/TraceDialog"), { ssr: false });
 
 const AUTOSAVE_MS = 30_000;
 const IMPORT_ACCEPT = ".svg,.pdf,.png,.jpg,.jpeg,.tif,.tiff,.dxf";
@@ -57,6 +61,7 @@ export default function PatternPrintStudio() {
   const [panel, setPanel] = useState<"objects" | "align" | "shaping">("objects");
   const [newOpen, setNewOpen] = useState(false);
   const [calibrateOpen, setCalibrateOpen] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
   const [pending, setPending] = useState<PendingImport | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
@@ -305,6 +310,10 @@ export default function PatternPrintStudio() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => showPanel("shaping")}>Shaping (weld, trim, intersect)…</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={!state?.selectedBitmap} onClick={() => setTraceOpen(true)}>
+                Trace bitmap…
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="ghost" size="icon-sm" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" disabled={!state?.canUndo} onClick={() => editor?.undo()}>
@@ -533,6 +542,7 @@ export default function PatternPrintStudio() {
           }}
         />
       )}
+      {traceOpen && editor && <TraceDialog editor={editor} unit={unit} onClose={() => setTraceOpen(false)} onResult={report} />}
       <ImportDialog
         pending={pending}
         unit={unit}
