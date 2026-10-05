@@ -36,6 +36,14 @@ export interface DocSettings {
   guidesVisible: boolean;
   /** PowerClip cut lines: each frame's outline drawn on top of its print (a view aid, not part of the artwork). */
   cutLines: CutLineSettings;
+  /** Bleed: how far every print runs past its cut line (pieces can override it), and whether that area is shown on screen. */
+  bleed: BleedSettings;
+}
+
+export interface BleedSettings {
+  /** Inches. */
+  amount: number;
+  visible: boolean;
 }
 
 export interface CutLineSettings {
@@ -81,6 +89,7 @@ export const DEFAULT_SETTINGS: DocSettings = {
   guidesVisible: true,
   // 0.5 pt black, like CorelDRAW's hairline outline.
   cutLines: { visible: true, color: "#000000", width: 0.5 / 72 },
+  bleed: { amount: 0.25, visible: true },
 };
 
 /** Leggings program page (CorelDRAW): 163.75 × 37.694 in. */

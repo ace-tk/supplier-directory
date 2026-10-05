@@ -1,4 +1,5 @@
 import type paper from "paper/dist/paper-core";
+import { offsetOutline, pointInPolygon, selfIntersects, type Pt } from "./bleed";
 import type { RepeatSettings } from "./repeat";
 
 type PaperScope = typeof paper;
@@ -23,6 +24,8 @@ export interface PowerClipSettings {
   repeat?: RepeatSettings;
   /** Linked sizes: this piece's print was copied from a master piece and follows its edits. */
   link?: ClipLink;
+  /** This piece's own bleed, inches. Not set = the document's bleed. */
+  bleed?: number;
 }
 
 export interface ClipLink {
@@ -98,8 +101,61 @@ export function isClosedOutline(ps: PaperScope, item: Item): boolean {
   return item instanceof ps.Path && item.closed && item.segments.length > 1;
 }
 
+/** The document's bleed, and whether the bleed area is shown on screen, per editor (PaperScope). */
+const viewBleed = new WeakMap<object, { amount: number; visible: boolean }>();
+export function setViewBleed(ps: PaperScope, bleed: { amount: number; visible: boolean }) {
+  viewBleed.set(ps, bleed);
+}
+/** The bleed that applies to a PowerClip: its own, or the document's. */
+export function bleedOf(ps: PaperScope, pc: Item): number {
+  const own = pc.data?.pc?.bleed;
+  const v = typeof own === "number" ? own : (viewBleed.get(ps)?.amount ?? 0);
+  return v > 0 ? v : 0;
+}
+/** What the print is clipped to on screen: nothing extra while the bleed area is hidden. */
+const shownBleed = (ps: PaperScope, pc: Item) => (viewBleed.get(ps)?.visible === false ? 0 : bleedOf(ps, pc));
+
+/** Curves are turned into straight pieces this fine (inches) before the outline is grown. */
+const BLEED_FLATNESS = 0.002;
+
 /**
- * Rebuilds the clip mask from the frame's current geometry. Call after the
+ * The outline grown outward by `d` inches — what the print is clipped to
+ * when there is bleed. Holes in the outline get smaller by the same amount.
+ * The outline itself is not touched.
+ */
+export function bleedOutline(ps: PaperScope, frame: Item, d: number): paper.PathItem {
+  const contours = (frame instanceof ps.CompoundPath ? (frame.children as paper.Path[]) : [frame as paper.Path]).map((c) => {
+    const flat = c.clone({ insert: false });
+    flat.flatten(BLEED_FLATNESS);
+    return flat.segments.map((sg): Pt => ({ x: sg.point.x, y: sg.point.y }));
+  });
+  const toPath = (pts: Pt[]) => new ps.Path({ segments: pts.map((p) => [p.x, p.y]), closed: true, insert: false });
+  const outers: paper.PathItem[] = [];
+  const holes: paper.PathItem[] = [];
+  contours.forEach((pts, i) => {
+    if (pts.length < 3) return;
+    const isHole = contours.filter((other, j) => j !== i && other.length >= 3 && pointInPolygon(pts[0], other)).length % 2 === 1;
+    const { points, bridged } = offsetOutline(pts, d, { tolerance: BLEED_FLATNESS, inward: isHole });
+    if (points.length < 3) return;
+    let path: paper.PathItem = toPath(points);
+    if (bridged && selfIntersects(points)) {
+      // A very unusual shape (e.g. a wide pocket behind a narrow neck): let Paper untangle it and keep the outer loop.
+      const fixed = path.unite(path, { insert: false });
+      const parts = fixed instanceof ps.CompoundPath ? (fixed.children as paper.Path[]) : [fixed as paper.Path];
+      path = parts.reduce((best, c) => (Math.abs(c.area) > Math.abs(best.area) ? c : best), parts[0]).clone({ insert: false });
+    }
+    (isHole ? holes : outers).push(path);
+  });
+  if (!outers.length) return frame.clone({ insert: false, deep: true }) as paper.PathItem;
+  let res = outers[0];
+  for (const o of outers.slice(1)) res = res.unite(o, { insert: false });
+  for (const h of holes) res = res.subtract(h, { insert: false });
+  return res;
+}
+
+/**
+ * Rebuilds the clip mask from the frame's current geometry (grown by the
+ * bleed, if there is one). Call after the
  * frame is edited or moved on its own. `clipped` is false while the contents
  * are being edited (the whole print is shown).
  */
@@ -109,7 +165,8 @@ export function syncMask(ps: PaperScope, pc: Item, clipped = true) {
   if (!clip || !frame) return;
   clip.clipped = false;
   for (const c of [...clip.children]) if (c.data?.pcMask) c.remove();
-  const mask = frame.clone({ insert: false, deep: true });
+  const bleed = shownBleed(ps, pc);
+  const mask = bleed > 0 && isClosedOutline(ps, frame) ? bleedOutline(ps, frame, bleed) : frame.clone({ insert: false, deep: true });
   mask.data = { derived: true, pcMask: true };
   for (const c of mask.children ?? []) c.data = {};
   mask.name = "";

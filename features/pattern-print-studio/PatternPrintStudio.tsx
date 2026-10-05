@@ -28,6 +28,7 @@ import { formatUnits, UNIT_LABEL } from "./engine/units";
 import { CalibrateDialog, ImportDialog, NewDocumentDialog, type PendingImport } from "./ui/Dialogs";
 import { AlignPanel, ObjectsPanel, ShapingPanel, Toolbox } from "./ui/Panels";
 import { PiecesPanel } from "./ui/PiecesPanel";
+import { ProductionPanel, SeamBar } from "./ui/ProductionPanel";
 import { PropertyBar } from "./ui/PropertyBar";
 import { Ruler, RULER_SIZE } from "./ui/Ruler";
 
@@ -41,8 +42,8 @@ const nullState = () => null;
 
 // F10 is CorelDRAW's Shape tool key; N is a second key for keyboards where F10 is a media key.
 const TOOL_KEYS: Record<string, ToolId> = { v: "pick", n: "shape", F10: "shape", z: "zoom", h: "pan", F6: "rectangle", F7: "ellipse", F8: "text" };
-type PanelId = "objects" | "align" | "shaping" | "pieces";
-const PANEL_LABEL: Record<PanelId, string> = { objects: "Objects", align: "Align", shaping: "Shaping", pieces: "Pieces" };
+type PanelId = "objects" | "align" | "shaping" | "pieces" | "checks";
+const PANEL_LABEL: Record<PanelId, string> = { objects: "Objects", align: "Align", shaping: "Shaping", pieces: "Pieces", checks: "Checks" };
 const NODE_TYPE_KEYS: Record<string, NodeType> = { c: "c", s: "s", y: "y" };
 /** A Space press shorter than this (with no panning) toggles Shape ⇄ Pick; longer = hold-to-pan. */
 const SPACE_TAP_MS = 250;
@@ -219,6 +220,17 @@ export default function PatternPrintStudio() {
         e.preventDefault();
         if (!e.repeat) spaceDownAt.current = performance.now();
         editor.setSpaceDown(true);
+        return;
+      }
+      if (st.seam.preview) {
+        // Seam preview: arrows move piece B's print, Enter applies that to the real piece, Esc closes. Nothing else can change the layout.
+        e.preventDefault();
+        if (k === "Escape") return editor.closeSeamPreview();
+        if (k === "Enter") return report(editor.applySeamOffset());
+        if (k.startsWith("Arrow") && st.seam.preview.canNudge) {
+          const step = st.settings.nudge * (e.shiftKey ? 10 : 1);
+          editor.nudgeSeam(k === "ArrowLeft" ? -step : k === "ArrowRight" ? step : 0, k === "ArrowUp" ? step : k === "ArrowDown" ? -step : 0);
+        }
         return;
       }
       const shapeTool = st.tool === "shape";
@@ -453,6 +465,9 @@ export default function PatternPrintStudio() {
                   <DropdownMenuCheckboxItem checked={state.settings.cutLines.visible} onCheckedChange={(v) => editor.updateSettings({ cutLines: { ...state.settings.cutLines, visible: !!v } })}>
                     Show cut lines <DropdownMenuShortcut>Alt+L</DropdownMenuShortcut>
                   </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem checked={state.settings.bleed.visible} onCheckedChange={(v) => editor.updateSettings({ bleed: { ...state.settings.bleed, visible: !!v } })}>
+                    Show bleed area
+                  </DropdownMenuCheckboxItem>
                   <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
                     Cut line
                     <input
@@ -560,7 +575,7 @@ export default function PatternPrintStudio() {
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : panel === "align" ? <AlignPanel editor={editor} state={state} /> : panel === "shaping" ? <ShapingPanel editor={editor} state={state} onResult={report} /> : <PiecesPanel editor={editor} state={state} onResult={report} />)}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : panel === "align" ? <AlignPanel editor={editor} state={state} /> : panel === "shaping" ? <ShapingPanel editor={editor} state={state} onResult={report} /> : panel === "pieces" ? <PiecesPanel editor={editor} state={state} onResult={report} /> : <ProductionPanel editor={editor} state={state} onResult={report} />)}</div>
         </div>
       </div>
 
@@ -573,6 +588,8 @@ export default function PatternPrintStudio() {
         </span>
         {state?.snapLabel && <span className="text-fuchsia-600">↳ {state.snapLabel}</span>}
         {state?.placing && <span className="font-medium text-primary">Click a pattern outline to place the print inside · Esc cancels</span>}
+        {state?.seam.picking && <span className="font-medium text-primary">Click the edge of a piece to pick seam edge {state.seam.picking.toUpperCase()} · Esc cancels</span>}
+        {state?.seam.preview && <span className="font-medium text-primary">Seam preview · arrow keys move the print of piece B · Enter applies · Esc closes</span>}
         {state?.pickingRef && <span className="font-medium text-primary">Click a point on a tagged piece to place its reference point · Esc cancels</span>}
         {state?.clip?.editing && <span className="font-medium text-primary">{state.clip.repeat ? "Editing repeat fill · drag inside the frame to shift it · Esc or click outside to finish" : "Editing PowerClip contents · Esc or click outside to finish"}</span>}
         {state?.nodeEdit ? (
@@ -590,7 +607,8 @@ export default function PatternPrintStudio() {
       </div>
 
       {/* PowerClip mini toolbar, under the active frame (like CorelDRAW) */}
-      {editor && state?.clip && state.tool === "pick" && !state.placing && <ClipBar editor={editor} clip={state.clip} onResult={report} />}
+      {editor && state?.seam.preview && <SeamBar editor={editor} seam={state.seam} unit={unit} onResult={report} />}
+      {editor && state?.clip && state.tool === "pick" && !state.placing && !state.seam.preview && <ClipBar editor={editor} clip={state.clip} onResult={report} />}
 
       {/* Right-mouse-drag menu */}
       {editor && state?.clipMenu && (

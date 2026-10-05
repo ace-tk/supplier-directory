@@ -7,7 +7,9 @@ window.requestAnimationFrame = (cb) => { tick().then(() => cb(performance.now())
 
 export default async function run() {
   const ed = window.__pps, ps = ed.ps, L = ed.contentLayer, cv = ed.canvas;
-  cv.setPointerCapture = () => {}; ed.emitScheduled = false;
+  cv.setPointerCapture = () => {};
+  // Written before bleed (3E): these checks look at the print clipped exactly at the cut line, so bleed is off here.
+  ed.updateSettings({ bleed: { amount: 0, visible: true } }); ed.emitScheduled = false;
   const black = (v) => v.startsWith('0,0,0,') && v !== '0,0,0,0'; const R = []; window.__partial = R; const ok = (name, pass, info) => R.push(`${pass ? 'PASS' : 'FAIL'} 3A ${name}${info !== undefined ? ' — ' + info : ''}`);
   const ev = (type, pt, o = {}) => { const r = cv.getBoundingClientRect(); cv.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: r.left + pt.x, clientY: r.top + pt.y, button: 0, pointerId: 1, ...o })); };
   const click = (pt, o) => { ev('pointerdown', pt, o); ev('pointerup', pt, o); };

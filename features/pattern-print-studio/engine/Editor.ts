@@ -3,13 +3,14 @@ import { AssetStore, loadImageElement, newId } from "./assets";
 import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
+import { edgeBetweenCorners, seamTransform, unrotate, type Rigid } from "./bleed";
 import { History } from "./history";
 import { namePieces, parseSizeLabel, pieceAnchor, pieceLabel, repeatForCopy, sizeOrder, sizeScale, sizeTransform, type AnchorMode, type ApplyOptions, type PieceTag, type ScaleMode } from "./pieces";
-import { clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, syncRepeatHolder, tileHolderOf, unwrapPowerClip, wrapInPowerClip, type ClipLink, type PowerClipSettings } from "./powerclip";
+import { bleedOf, bleedOutline, setViewBleed, clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, syncRepeatHolder, tileHolderOf, unwrapPowerClip, wrapInPowerClip, type ClipLink, type PowerClipSettings } from "./powerclip";
 import { cellMatrix, countCells, coverInRepeatSpace, defaultRepeat, deltaInRepeatSpace, repeatCells, repeatSteps, type RepeatSettings } from "./repeat";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
 import { anchorOf, dpiLevel, effectiveDpi, fillScale, fitScale } from "./clip-fit";
-import type { NodeType } from "./node-geometry";
+import { turnAngle, type NodeType } from "./node-geometry";
 import { DEFAULT_SIMPLIFY_TOLERANCE, ShapeTool, type NodeEditState, type OpenPathInfo, type ShapeMeta } from "./shape-tool";
 import { missingGlyphs, nodeCount, planShaping, textToOutlines, type ShapingOp, type ShapingPlan } from "./shaping";
 import { buildTargets, snapPoints, SNAP_PX, type SnapTargets } from "./snap";
@@ -127,6 +128,51 @@ export interface ClipState {
   tiles: { drawn: number; skipped: number } | null;
   /** Where the bar goes: bottom-centre of the frame, page inches. */
   anchor: { x: number; y: number };
+  /** The bleed that applies to this piece (inches), and whether it is the piece's own rather than the document's. */
+  bleed: number;
+  ownBleed: boolean;
+}
+
+/** Seam match: the two picked edges (as piece labels), and the preview while it is open. */
+export interface SeamState {
+  a: string | null;
+  b: string | null;
+  /** Waiting for a click that picks this edge. */
+  picking: "a" | "b" | null;
+  /** How far piece B's print has been nudged in the preview, as seen on screen (inches, y up). */
+  preview: { dx: number; dy: number; canNudge: boolean } | null;
+}
+
+export type PreflightKind = "empty" | "gap" | "dpi" | "open" | "untagged" | "link";
+
+/** One line of the pre-flight report. */
+export interface PreflightIssue {
+  kind: PreflightKind;
+  level: "error" | "warning";
+  /** The piece or object it is about. */
+  label: string;
+  message: string;
+  /** Item to zoom to. */
+  id: string | null;
+  open?: OpenPathInfo;
+}
+
+export const PREFLIGHT_LABEL: Record<PreflightKind, string> = {
+  empty: "Pieces with no print",
+  gap: "White-gap risk",
+  dpi: "Low DPI prints",
+  open: "Open outlines",
+  untagged: "Pieces without tags",
+  link: "Linked pieces that differ",
+};
+
+/** A picked seam edge: a run of an outline from one node to another. */
+interface SeamEdge {
+  frame: Item;
+  /** Which sub-path, for a compound outline. */
+  child: number;
+  from: number;
+  to: number;
 }
 
 export interface EditorState {
@@ -165,6 +211,7 @@ export interface EditorState {
   placing: boolean;
   /** Waiting for a click that places a piece's reference point. */
   pickingRef: boolean;
+  seam: SeamState;
   /** Goes up whenever the document changes (lets panels refresh their lists only when needed). */
   docVersion: number;
   /** After a right-mouse drag onto an outline: where to show the "PowerClip inside" menu (client px). */
@@ -221,6 +268,8 @@ const GUIDE_SELECTED_COLOR = "#dc2626";
 const NEW_SHAPE_STROKE = 0.01; // inches
 /** Most repeat tiles drawn for one piece at a time; beyond this the tile is too small to matter at that zoom. */
 const MAX_TILES = 6000;
+/** A node where the outline turns by more than this is a corner — where one seam edge ends and the next begins. */
+const SEAM_CORNER_DEG = 30;
 const CALIBRATION_KEY = "pps.screenCalibration";
 
 function rectOf(b: paper.Rectangle): Rect {
@@ -290,6 +339,11 @@ export class Editor {
   private docVersion = 0;
   private pieceCache: { version: number; items: Item[] } | null = null;
   private applyPreview: Item[] | null = null;
+  private seamLayer!: paper.Layer;
+  private seamA: SeamEdge | null = null;
+  private seamB: SeamEdge | null = null;
+  private seamPicking: "a" | "b" | null = null;
+  private seamPreview: { m: Rigid; offset: { x: number; y: number }; edgeA: paper.Path; edgeB: paper.Path; outlines: Item[]; restore: { center: paper.Point; zoom: number } } | null = null;
   private pickingRef = false;
   /** While choosing a frame: the outline the print would go into (highlighted). */
   private frameHover: Item | null = null;
@@ -327,8 +381,10 @@ export class Editor {
     this.gridLayer = new ps.Layer({ name: "grid" });
     this.contentLayer = new ps.Layer({ name: "content" });
     this.guideLayer = new ps.Layer({ name: "guides" });
+    this.seamLayer = new ps.Layer({ name: "seam-preview" });
     this.overlayLayer = new ps.Layer({ name: "overlay" });
     this.contentLayer.activate();
+    setViewBleed(ps, this.settings.bleed);
 
     this.shape = new ShapeTool({
       ps,
@@ -420,6 +476,7 @@ export class Editor {
       clipContent: this.clipContentState(),
       placing: !!this.placing,
       pickingRef: this.pickingRef,
+      seam: this.seamState(),
       docVersion: this.docVersion,
       clipMenu: this.clipMenu ? { x: this.clipMenu.x, y: this.clipMenu.y } : null,
     };
@@ -468,7 +525,8 @@ export class Editor {
     const master = link ? this.findById(link.master) : null;
     const masterTag = master && isPowerClip(master) ? this.tagOf(frameOf(master)) : null;
     return { id: this.idOf(pc), editing: pc === this.clipEdit, lock: !!pc.data.pc.lock, count: contentsOf(pc).length, repeat: pc.data.pc.repeat ?? null, tiles: info ? { drawn: info.tiles, skipped: info.skipped } : null,
-      label: tag ? pieceLabel(tag) : null, linkedTo: link ? (masterTag ? pieceLabel(masterTag) : "master") : null, linkDiffers: !!link && this.printSignature(pc) !== link.selfSig, anchor: { x: b.center.x, y: b.bottom } };
+      label: tag ? pieceLabel(tag) : null, linkedTo: link ? (masterTag ? pieceLabel(masterTag) : "master") : null, linkDiffers: !!link && this.printSignature(pc) !== link.selfSig, anchor: { x: b.center.x, y: b.bottom },
+      bleed: bleedOf(this.ps, pc), ownBleed: typeof pc.data.pc.bleed === "number" };
   }
 
   /** Re-render React (rAF-batched) after any state change. */
@@ -557,6 +615,7 @@ export class Editor {
   }
   /** Records an undo step after a committed action. */
   commit() {
+    if (this.seamPreview) this.closeSeamPreview();
     this.shapingDirty = true;
     this.clipList = null;
     this.docVersion++;
@@ -692,7 +751,13 @@ export class Editor {
   }
 
   updateSettings(patch: Partial<DocSettings>) {
+    const before = this.settings.bleed;
     this.settings = { ...this.settings, ...patch };
+    if (patch.bleed) {
+      const amount = Number.isFinite(patch.bleed.amount) ? clamp(patch.bleed.amount, 0, 3) : before.amount;
+      this.settings.bleed = { amount, visible: !!patch.bleed.visible };
+      if (amount !== before.amount || this.settings.bleed.visible !== before.visible) this.applyBleed();
+    }
     this.markChanged();
     this.viewChanged();
   }
@@ -714,6 +779,7 @@ export class Editor {
       this.placing = null;
       this.clipMenu = null;
       this.pickingRef = false;
+      this.seamPicking = null;
     }
     if (tool === "shape" && was !== "shape") {
       // Node editing works on outlines, not on the inside of a PowerClip.
@@ -960,7 +1026,14 @@ export class Editor {
       if (edited.data.pc.repeat) this.dirtyRepeats.add(edited);
     }
     if (this.dirtyRepeats.size) this.refreshRepeats(false);
+    if (this.seamPreview) {
+      // Seam preview: only the two joined pieces and the seam are shown.
+      this.drawSeam(ctx, dpr);
+      return;
+    }
+    this.drawBleed(ctx, dpr);
     this.drawCutLines(ctx, dpr);
+    this.drawSeam(ctx, dpr);
     if (this.frameHover && (this.placing || this.drag?.kind === "rdrag") && this.frameHover.isInserted()) {
       // The outline the print is about to go into: blue if it can be a frame, amber if it is open.
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1298,8 +1371,9 @@ export class Editor {
     return { ok: true, message: "Now click the pattern outline to place it inside (Esc to cancel)." };
   }
   cancelPlaceInside() {
-    if (!this.placing && !this.clipMenu && !this.pickingRef) return false;
+    if (!this.placing && !this.clipMenu && !this.pickingRef && !this.seamPicking) return false;
     this.pickingRef = false;
+    this.seamPicking = null;
     this.placing = null;
     this.clipMenu = null;
     this.canvas.style.cursor = this.toolCursor();
@@ -1567,7 +1641,9 @@ export class Editor {
     const e = this.clipEditing();
     if (!e) return;
     const ps = this.ps;
-    const F = rectOf(e.frame);
+    // Fill and Stretch must leave no white anywhere the print is cut, so they cover the bleed as well.
+    const bleed = (mode === "fill" || mode === "stretch") && this.clipEdit ? bleedOf(ps, this.clipEdit) : 0;
+    const F = rectOf(e.frame.expand(bleed * 2));
     const center = new ps.Point(e.box.center);
     if (mode === "fit" || mode === "fill") {
       const s = mode === "fit" ? fitScale(e.w, e.h, e.rot, F.w, F.h) : fillScale(e.w, e.h, e.rot, F.w, F.h);
@@ -1596,7 +1672,7 @@ export class Editor {
    * plus instances, only where the frame (plus bleed) is on screen. Nothing
    * here is saved — it all comes from the repeat settings.
    */
-  private rebuildRepeat(pc: paper.Group) {
+  private rebuildRepeat(pc: paper.Group, cull = true) {
     const ps = this.ps;
     const clip = clipGroupOf(pc);
     for (const c of [...clip.children]) if (c.data?.pcRepeat) c.remove();
@@ -1609,7 +1685,7 @@ export class Editor {
     const tile = rectOf(tb);
     // Only the part of the frame that is on screen (a little more, so panning does not show the edge).
     const view = this.ps.view.bounds;
-    const visible = mask.bounds.intersect(view.expand(Math.max(view.width, view.height) * 0.1));
+    const visible = cull ? mask.bounds.intersect(view.expand(Math.max(view.width, view.height) * 0.1)) : mask.bounds;
     const rep = new ps.Group({ insert: false });
     rep.data = { derived: true, pcRepeat: true };
     clip.insertChild(1, rep);
@@ -2056,6 +2132,389 @@ export class Editor {
     this.setTool("pick");
     this.pickingRef = true;
     this.canvas.style.cursor = "crosshair";
+    this.emit();
+  }
+
+  // ---------------------------------------------------------------- production safety: bleed
+  /** After the document's bleed (or its show/hide switch) changed: every print's clip is rebuilt. */
+  private applyBleed() {
+    setViewBleed(this.ps, this.settings.bleed);
+    for (const pc of this.clips()) {
+      if (!pc.isInserted()) continue;
+      syncMask(this.ps, pc, pc !== this.clipEdit);
+    }
+    this.refreshRepeats(true);
+  }
+
+  /** This piece's own bleed (inches), or null to follow the document's bleed again. One undo step. */
+  setClipBleed(value: number | null) {
+    const pc = this.currentClip();
+    if (!pc) return;
+    const { bleed: _old, ...rest } = pc.data.pc as PowerClipSettings;
+    void _old;
+    if (value !== null && !(Number.isFinite(value) && value >= 0)) return;
+    pc.data.pc = value === null ? rest : { ...rest, bleed: clamp(value, 0, 3) };
+    syncMask(this.ps, pc, pc !== this.clipEdit);
+    if (pc.data.pc.repeat) this.dirtyRepeats.add(pc);
+    this.commit();
+  }
+
+  toggleBleed() {
+    this.updateSettings({ bleed: { ...this.settings.bleed, visible: !this.settings.bleed.visible } });
+  }
+
+  /** The bleed area — between the cut line and the edge of the print — as a light tint over the print. */
+  private drawBleed(ctx: CanvasRenderingContext2D, dpr: number) {
+    if (!this.settings.bleed.visible) return;
+    const view = this.ps.view.bounds;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "rgba(236, 72, 153, 0.22)";
+    for (const pc of this.clips()) {
+      if (!pc.isInserted() || pc === this.clipEdit || !(this.rootOf(pc)?.visible ?? false) || bleedOf(this.ps, pc) <= 0) continue;
+      const mask = clipGroupOf(pc)?.children.find((c) => c.data?.pcMask);
+      const frame = frameOf(pc);
+      if (!mask || !frame || !mask.bounds.intersects(view)) continue;
+      this.traceOutlines(ctx, [mask, frame]);
+      ctx.fill("evenodd");
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // ---------------------------------------------------------------- production safety: seam match preview
+  private seamPathOf(e: SeamEdge | null): paper.Path | null {
+    if (!e || !e.frame.isInserted()) return null;
+    const ps = this.ps;
+    const path = (e.frame instanceof ps.CompoundPath ? e.frame.children[e.child] : e.frame) as paper.Path | undefined;
+    const n = path?.segments?.length ?? 0;
+    if (!path || !path.closed || e.from >= n || e.to >= n || e.from === e.to) return null;
+    const out = new ps.Path({ insert: false });
+    let i = e.from;
+    out.add(path.segments[i].clone());
+    do {
+      i = (i + 1) % n;
+      out.add(path.segments[i].clone());
+    } while (i !== e.to);
+    out.firstSegment.handleIn = new ps.Point(0, 0);
+    out.lastSegment.handleOut = new ps.Point(0, 0);
+    return out;
+  }
+  private seamLabel(e: SeamEdge | null): string | null {
+    if (!e || !this.seamPathOf(e)) return null;
+    const tag = this.tagOf(e.frame);
+    return tag ? pieceLabel(tag) : "an untagged piece";
+  }
+  private seamState(): SeamState {
+    // Edges on outlines that are gone (undo, delete, node edits) are forgotten.
+    if (this.seamA && !this.seamPathOf(this.seamA)) this.seamA = null;
+    if (this.seamB && !this.seamPathOf(this.seamB)) this.seamB = null;
+    const pv = this.seamPreview;
+    return {
+      a: this.seamLabel(this.seamA),
+      b: this.seamLabel(this.seamB),
+      picking: this.seamPicking,
+      preview: pv ? { dx: pv.offset.x, dy: -pv.offset.y, canNudge: !!(this.seamB && this.clipOfFrame(this.seamB.frame) && contentsOf(this.clipOfFrame(this.seamB.frame) as Item).length) } : null,
+    };
+  }
+  private resetSeam() {
+    this.seamLayer.removeChildren();
+    this.seamPreview = null;
+    this.seamA = null;
+    this.seamB = null;
+    this.seamPicking = null;
+  }
+
+  /** The next click on a piece's outline picks seam edge A or B: the run of the outline between the two corners either side of the click. */
+  beginPickSeam(which: "a" | "b") {
+    if (this.seamPreview) this.closeSeamPreview();
+    if (this.clipEdit) this.finishClipEdit();
+    this.setTool("pick");
+    this.seamPicking = which;
+    this.canvas.style.cursor = "crosshair";
+    this.emit();
+  }
+  clearSeam() {
+    if (this.seamPreview) this.closeSeamPreview();
+    this.seamA = null;
+    this.seamB = null;
+    this.seamPicking = null;
+    this.drawOverlay();
+    this.emit();
+  }
+
+  private seamEdgeAt(p: paper.Point): SeamEdge | null {
+    const ps = this.ps;
+    let best: { frame: Item; child: number; path: paper.Path; curve: number; dist: number } | null = null;
+    for (const f of this.pieceOutlines()) {
+      if (!f.isInserted() || !(this.rootOf(f)?.visible ?? false)) continue;
+      const paths = f instanceof ps.CompoundPath ? (f.children as paper.Path[]) : [f as paper.Path];
+      paths.forEach((path, child) => {
+        if (!path.closed || path.segments.length < 2) return;
+        const loc = path.getNearestLocation(p);
+        if (loc && (!best || loc.distance < best.dist)) best = { frame: f, child, path, curve: loc.curve.index, dist: loc.distance };
+      });
+    }
+    const hit = best as { frame: Item; child: number; path: paper.Path; curve: number; dist: number } | null;
+    if (!hit || hit.dist > 14 * this.px) return null;
+    const n = hit.path.segments.length;
+    const corners: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const tin = hit.path.curves[(i + n - 1) % n].getTangentAtTime(1);
+      const tout = hit.path.curves[i].getTangentAtTime(0);
+      if (turnAngle(tin, tout) > SEAM_CORNER_DEG) corners.push(i);
+    }
+    const [from, to] = edgeBetweenCorners(corners, n, hit.curve);
+    return { frame: hit.frame, child: hit.child, from, to };
+  }
+
+  /** Moves a PowerClip's print without moving the piece: a repeat shifts where it starts, a single print is moved. */
+  private shiftPrint(pc: Item, dx: number, dy: number) {
+    const r = pc.data.pc.repeat as RepeatSettings | undefined;
+    if (r) {
+      const d = deltaInRepeatSpace(r, dx, dy);
+      pc.data.pc = { ...pc.data.pc, repeat: { ...r, offsetX: r.offsetX + d.x, offsetY: r.offsetY + d.y } };
+    } else for (const c of contentsOf(pc)) c.translate(new this.ps.Point(dx, dy));
+  }
+
+  /** A copy of a piece (with its print) for the preview layer. Never part of the document. */
+  private seamCopy(frame: Item, shift: { x: number; y: number } | null, m: Rigid | null): Item {
+    const src = this.clipOfFrame(frame) ?? frame;
+    const copy = src.clone({ insert: false, deep: true });
+    this.seamLayer.addChild(copy);
+    if (isPowerClip(copy)) {
+      if (shift) this.shiftPrint(copy, shift.x, shift.y);
+      syncMask(this.ps, copy);
+      // The whole piece is shown, so the repeat is built for all of it, not just the part that was on screen.
+      if (copy.data.pc.repeat) this.rebuildRepeat(copy, false);
+    }
+    if (m) copy.transform(new this.ps.Matrix(m[0], m[1], m[2], m[3], m[4], m[5]));
+    return copy;
+  }
+  private buildSeamPreview() {
+    const pv = this.seamPreview;
+    if (!pv || !this.seamA || !this.seamB) return;
+    const ps = this.ps;
+    this.seamLayer.removeChildren();
+    const veil = new ps.Path.Rectangle({ rectangle: this.contentLayer.bounds.unite(new ps.Rectangle(0, 0, this.page.width, this.page.height)).expand(4000), insert: false });
+    veil.fillColor = new ps.Color(1, 1, 1);
+    this.seamLayer.addChild(veil);
+    const a = this.seamCopy(this.seamA.frame, null, null);
+    const b = this.seamCopy(this.seamB.frame, unrotate(pv.m, pv.offset), pv.m);
+    pv.outlines = [a, b].map((c) => (isPowerClip(c) ? frameOf(c) : c));
+  }
+
+  /**
+   * Preview seam: shows piece B laid against piece A along the two picked
+   * edges, so you can see whether the print carries on across the seam.
+   * Preview only — the real layout does not move.
+   */
+  previewSeam(): { ok: boolean; message: string } {
+    const a = this.seamPathOf(this.seamA);
+    const b = this.seamPathOf(this.seamB);
+    if (!a || !b || !this.seamA || !this.seamB) return { ok: false, message: "Pick an edge on piece A and an edge on piece B first." };
+    if (this.seamA.frame === this.seamB.frame) return { ok: false, message: "Pick edge B on a different piece." };
+    if (this.seamPreview) this.closeSeamPreview();
+    if (this.clipEdit) this.finishClipEdit();
+    this.setTool("pick");
+    this.selected = [];
+    const pt = (p: paper.Point) => ({ x: p.x, y: p.y });
+    const inside = (f: Item) => pt((f as paper.Path).interiorPoint ?? f.bounds.center);
+    const m = seamTransform(pt(a.firstSegment.point), pt(a.lastSegment.point), pt(b.firstSegment.point), pt(b.lastSegment.point), inside(this.seamA.frame), inside(this.seamB.frame));
+    b.transform(new this.ps.Matrix(m[0], m[1], m[2], m[3], m[4], m[5]));
+    this.seamPreview = { m, offset: { x: 0, y: 0 }, edgeA: a, edgeB: b, outlines: [], restore: { center: this.ps.view.center, zoom: this.ps.view.zoom } };
+    this.buildSeamPreview();
+    const box = this.seamPreview.outlines.map((o) => o.bounds).reduce((u, r) => u.unite(r));
+    this.fitRect(box, 70);
+    this.drawOverlay();
+    this.emit();
+    return { ok: true, message: "Seam preview — the real layout has not moved." };
+  }
+
+  /** In the preview: moves piece B's print (not the piece) by this much as seen on screen, inches (dy positive = UP). */
+  nudgeSeam(dxUnits: number, dyUp: number) {
+    const pv = this.seamPreview;
+    if (!pv) return;
+    this.setSeamOffset(pv.offset.x + dxUnits, -pv.offset.y + dyUp);
+  }
+  setSeamOffset(dxUnits: number, dyUp: number) {
+    const pv = this.seamPreview;
+    if (!pv || !this.seamB || !Number.isFinite(dxUnits) || !Number.isFinite(dyUp)) return;
+    if (!this.clipOfFrame(this.seamB.frame)) return;
+    pv.offset = { x: dxUnits, y: -dyUp };
+    this.buildSeamPreview();
+    this.ps.view?.requestUpdate();
+    this.drawOverlay();
+    this.emit();
+  }
+
+  /** Applies the nudge made in the preview to the REAL piece B's print, and closes the preview. One undo step. */
+  applySeamOffset(): { ok: boolean; message: string } {
+    const pv = this.seamPreview;
+    const pc = this.seamB ? this.clipOfFrame(this.seamB.frame) : null;
+    if (!pv || !pc) return { ok: false, message: "Piece B has no print to move." };
+    const v = unrotate(pv.m, pv.offset);
+    const label = this.seamLabel(this.seamB) ?? "piece B";
+    this.closeSeamPreview();
+    if (Math.hypot(v.x, v.y) < 1e-9) return { ok: true, message: "No offset to apply." };
+    this.shiftPrint(pc, v.x, v.y);
+    if (pc.data.pc.repeat) this.dirtyRepeats.add(pc);
+    this.commit();
+    return { ok: true, message: `Moved the print of ${label} to match the seam` };
+  }
+
+  closeSeamPreview() {
+    const pv = this.seamPreview;
+    if (!pv) return;
+    this.seamPreview = null;
+    this.seamLayer.removeChildren();
+    if (this.ps.view) {
+      this.ps.view.zoom = pv.restore.zoom;
+      this.ps.view.center = pv.restore.center;
+    }
+    this.viewChanged();
+    this.drawOverlay();
+    this.emit();
+  }
+
+  /** Picked seam edges (A orange, B teal). In the preview: the two pieces' cut lines and the joined seam. */
+  private drawSeam(ctx: CanvasRenderingContext2D, dpr: number) {
+    const pv = this.seamPreview;
+    const a = pv ? pv.edgeA : this.seamPathOf(this.seamA);
+    const b = pv ? pv.edgeB : this.seamPathOf(this.seamB);
+    if (!a && !b && !pv) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    if (pv) {
+      ctx.strokeStyle = this.settings.cutLines.color;
+      ctx.lineWidth = Math.max(1, this.settings.cutLines.width * this.ps.view.zoom);
+      this.traceOutlines(ctx, pv.outlines);
+      ctx.stroke();
+    }
+    const view = this.ps.view;
+    const mark = (path: paper.Path | null, color: string, letter: string, dashed: boolean) => {
+      if (!path) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = pv ? 2 : 4;
+      ctx.setLineDash(dashed ? [6, 5] : []);
+      this.traceOutlines(ctx, [path]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const mid = view.projectToView(path.getPointAt(path.length / 2));
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(mid.x, mid.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(letter, mid.x, mid.y + 0.5);
+    };
+    mark(a, "#f97316", "A", false);
+    mark(b, "#0d9488", "B", !!pv);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // ---------------------------------------------------------------- production safety: pre-flight
+  /** True if every sample point of the piece (outline + bleed) has print under it. For single prints, not repeats. */
+  private printCovers(pc: Item): { covered: boolean; missing: number; total: number } {
+    const ps = this.ps;
+    const frame = frameOf(pc);
+    const d = bleedOf(ps, pc);
+    const area = d > 0 ? bleedOutline(ps, frame, d) : (frame as paper.PathItem);
+    const pts: paper.Point[] = [];
+    for (const path of area instanceof ps.CompoundPath ? (area.children as paper.Path[]) : [area as paper.Path]) {
+      const n = Math.min(240, Math.max(24, Math.ceil(path.length * 4)));
+      for (let i = 0; i < n; i++) pts.push(path.getPointAt((path.length * i) / n));
+    }
+    const b = area.bounds;
+    for (let iy = 0; iy < 32; iy++)
+      for (let ix = 0; ix < 16; ix++) {
+        const p = new ps.Point(b.x + (b.width * (ix + 0.5)) / 16, b.y + (b.height * (iy + 0.5)) / 32);
+        if (area.contains(p)) pts.push(p);
+      }
+    const prints = contentsOf(pc);
+    const eps = 1e-6;
+    const under = (p: paper.Point) =>
+      prints.some((c) => {
+        if (c instanceof ps.Raster) {
+          const q = c.matrix.inverseTransform(p);
+          return Math.abs(q.x) <= c.width / 2 + eps && Math.abs(q.y) <= c.height / 2 + eps;
+        }
+        if (c instanceof ps.Path || c instanceof ps.CompoundPath) return c.contains(p) || c.getNearestPoint(p).getDistance(p) <= eps;
+        return c.bounds.expand(eps).contains(p);
+      });
+    const missing = pts.filter((p) => !under(p)).length;
+    return { covered: missing === 0, missing, total: pts.length };
+  }
+
+  /**
+   * Pre-flight: the production check, run on demand. Lists pieces with no
+   * print, single prints that leave white gaps inside outline + bleed, low
+   * DPI bitmaps, open outlines, untagged pieces, and linked pieces that no
+   * longer match their master.
+   */
+  runPreflight(): PreflightIssue[] {
+    const ps = this.ps;
+    const out: PreflightIssue[] = [];
+    const u = (v: number) => `${Math.round(v * 100) / 100} in`;
+    const nameOf = (f: Item) => {
+      const tag = this.tagOf(f);
+      if (tag) return pieceLabel(tag);
+      const root = this.rootOf(f);
+      return `Untagged piece${root && root !== f && !isPowerClip(root) && root.name ? ` in ${root.name}` : ""}`;
+    };
+    const pieces = this.pieceOutlines().filter((f) => f.isInserted());
+    for (const f of pieces) {
+      const pc = this.clipOfFrame(f);
+      if (!pc || !contentsOf(pc).length) out.push({ kind: "empty", level: "error", label: nameOf(f), message: "No print inside this piece.", id: this.idOf(f) });
+    }
+    for (const pc of this.clips()) {
+      if (!pc.isInserted()) continue;
+      const f = frameOf(pc);
+      const prints = contentsOf(pc);
+      if (!f || !prints.length) continue;
+      const label = nameOf(f);
+      const r = pc.data.pc.repeat as RepeatSettings | undefined;
+      if (!r) {
+        const c = this.printCovers(pc);
+        const d = bleedOf(ps, pc);
+        if (!c.covered) out.push({ kind: "gap", level: "error", label, message: `The print does not cover the whole piece${d > 0 ? ` plus its ${u(d)} bleed` : ""} — about ${Math.max(1, Math.round((c.missing / c.total) * 100))}% would stay unprinted.`, id: this.idOf(pc) });
+      }
+      for (const it of prints) {
+        const raw = this.printDpi(it);
+        if (raw === null) continue;
+        const dpi = r ? raw / (r.scale / 100) : raw;
+        const level = dpiLevel(dpi);
+        if (level !== "ok") out.push({ kind: "dpi", level: level === "bad" ? "error" : "warning", label, message: `${it.name || "Bitmap"} prints at ${Math.round(dpi)} DPI${level === "bad" ? " — too low for production" : " — low"}.`, id: this.idOf(pc) });
+      }
+    }
+    for (const o of this.listOpenPaths()) {
+      const path = this.shape.itemAt(o.address);
+      // Grain lines, notches and stitch lines are meant to be open. An outline that comes almost all the way back to its start is not.
+      if (path instanceof ps.Path && (path.dashArray?.length || o.gap > path.length * 0.25)) continue;
+      out.push({ kind: "open", level: "error", label: o.label, message: `Open outline: ${o.nodes} nodes, the ends are ${u(o.gap)} apart. It cannot hold a print until it is closed.`, id: path ? this.idOf(path) : null, open: o });
+    }
+    for (const f of pieces) if (!this.tagOf(f)) out.push({ kind: "untagged", level: "warning", label: nameOf(f), message: `No Size / Piece tag (${u(f.bounds.width)} × ${u(f.bounds.height)}).`, id: this.idOf(f) });
+    for (const p of this.listPieces()) if (p.differs) out.push({ kind: "link", level: "warning", label: pieceLabel({ size: p.size, piece: p.piece }), message: `Linked to ${p.linkedTo}, but its print was changed by hand. Re-sync or unlink it.`, id: p.id });
+    return out;
+  }
+
+  /** Clicking a pre-flight line: zooms to that piece and selects it. */
+  showIssue(issue: PreflightIssue) {
+    if (this.seamPreview) this.closeSeamPreview();
+    if (issue.kind === "open" && issue.open && this.shape.itemAt(issue.open.address)) return this.editOpenPath(issue.open);
+    const it = issue.id ? this.findById(issue.id) : null;
+    if (!it) return;
+    if (this.clipEdit) this.finishClipEdit();
+    this.setTool("pick");
+    const pc = clipOwner(it);
+    const root = this.rootOf(it);
+    this.selected = root ? [root] : [];
+    this.activeClip = pc;
+    const b = (pc ? frameOf(pc) : it).bounds;
+    this.fitRect(b.expand(Math.max(b.width, b.height) * 0.15 + 0.5));
+    this.drawOverlay();
     this.emit();
   }
 
@@ -2574,6 +3033,7 @@ export class Editor {
 
   private restoreSnapshot(json: string) {
     const s = JSON.parse(json) as { objects: SceneNode[]; guides: Guide[]; page: PageSize };
+    if (this.seamPreview) this.closeSeamPreview();
     const selectedIds = new Set(this.selected.map((i) => i.data.id));
     const editingId = this.clipEdit?.data.id;
     const activeId = this.activeClip?.data.id;
@@ -2642,6 +3102,9 @@ export class Editor {
     this.docName = doc.name || "Untitled";
     this.page = { ...doc.page };
     this.settings = { ...structuredClone(DEFAULT_SETTINGS), ...doc.settings };
+    this.settings.bleed = { ...DEFAULT_SETTINGS.bleed, ...(doc.settings?.bleed ?? {}) };
+    setViewBleed(this.ps, this.settings.bleed);
+    this.resetSeam();
     this.origin = { ...doc.origin };
     this.originAtPageCorner = doc.originAtPageCorner ?? false;
     this.guides = doc.guides ?? [];
@@ -2685,6 +3148,8 @@ export class Editor {
     this.guides = [];
     this.docName = name;
     this.settings = { ...structuredClone(DEFAULT_SETTINGS), units };
+    setViewBleed(this.ps, this.settings.bleed);
+    this.resetSeam();
     this.page = { ...page };
     this.origin = { x: 0, y: page.height };
     this.originAtPageCorner = true;
@@ -2830,6 +3295,8 @@ export class Editor {
       this.clipMenu = null;
       this.emit();
     }
+    // Seam preview is look-only: the real layout cannot be touched while it is open.
+    if (this.seamPreview) return;
     // Corel: drag an object with the RIGHT mouse button onto an outline, then choose "PowerClip inside".
     if (e.button === 2 && this.tool === "pick" && !this.clipEdit) {
       const hit = this.hitTestContent(vp);
@@ -2841,6 +3308,20 @@ export class Editor {
       return;
     }
     if (e.button !== 0) return;
+    if (this.seamPicking) {
+      const which = this.seamPicking;
+      this.seamPicking = null;
+      this.canvas.style.cursor = this.toolCursor();
+      const edge = this.seamEdgeAt(p);
+      if (edge) {
+        if (which === "a") this.seamA = edge;
+        else this.seamB = edge;
+        this.onNotice?.({ ok: true, message: `Edge ${which.toUpperCase()} picked on ${this.seamLabel(edge)}` });
+      } else this.onNotice?.({ ok: false, message: "Click on the outline of a piece to pick that edge." });
+      this.drawOverlay();
+      this.emit();
+      return;
+    }
     if (this.pickingRef) {
       // The click places the reference point of the piece under the pointer (snapped, so it can sit exactly on a guideline).
       this.pickingRef = false;

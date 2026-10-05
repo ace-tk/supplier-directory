@@ -1101,6 +1101,11 @@ export class ShapeTool {
     return out.sort((a, b) => b.nodes - a.nodes);
   }
 
+  /** The item an openPaths() entry points at, if it is still there. */
+  itemAt(address: ItemAddress): Item | null {
+    return this.resolve(address);
+  }
+
   /** Opens an item found by openPaths() for editing, with its two loose ends selected. Returns its bounds. */
   enterOpenPath(address: ItemAddress): paper.Rectangle | null {
     return this.enterOpenItem(this.resolve(address));

@@ -7,7 +7,9 @@ window.requestAnimationFrame = (cb) => { tick().then(() => cb(performance.now())
 
 export default async function run() {
   const ed = window.__pps, ps = ed.ps, L = ed.contentLayer, cv = ed.canvas;
-  cv.setPointerCapture = () => {}; ed.emitScheduled = false;
+  cv.setPointerCapture = () => {};
+  // Written before bleed (3E): these checks look at the print clipped exactly at the cut line, so bleed is off here.
+  ed.updateSettings({ bleed: { amount: 0, visible: true } }); ed.emitScheduled = false;
   // A hidden test pane never sizes the overlay canvas; match it to the main canvas so its pixels can be read.
   ed.nodeCanvas.width = cv.width; ed.nodeCanvas.height = cv.height;
   const R = []; const ok = (name, pass, info) => R.push(`${pass ? 'PASS' : 'FAIL'} 3D ${name}${info !== undefined ? ' — ' + info : ''}`);
