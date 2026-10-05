@@ -25,7 +25,7 @@ import { clearDraft, DOC_EXTENSION, downloadText, loadDraft, safeFileName, saveD
 import type { SnapSettings, ToolId } from "./engine/types";
 import { formatUnits, UNIT_LABEL } from "./engine/units";
 import { CalibrateDialog, ImportDialog, NewDocumentDialog, type PendingImport } from "./ui/Dialogs";
-import { AlignPanel, ObjectsPanel, Toolbox } from "./ui/Panels";
+import { AlignPanel, ObjectsPanel, ShapingPanel, Toolbox } from "./ui/Panels";
 import { PropertyBar } from "./ui/PropertyBar";
 import { Ruler, RULER_SIZE } from "./ui/Ruler";
 
@@ -54,7 +54,7 @@ export default function PatternPrintStudio() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const state = useSyncExternalStore(editor?.subscribe ?? noopSubscribe, editor?.getState ?? nullState, nullState) as EditorState | null;
 
-  const [panel, setPanel] = useState<"objects" | "align">("objects");
+  const [panel, setPanel] = useState<"objects" | "align" | "shaping">("objects");
   const [newOpen, setNewOpen] = useState(false);
   const [calibrateOpen, setCalibrateOpen] = useState(false);
   const [pending, setPending] = useState<PendingImport | null>(null);
@@ -117,6 +117,21 @@ export default function PatternPrintStudio() {
     toast.success(`Exported SVG at ${formatUnits(doc.page.width, "in")} × ${formatUnits(doc.page.height, "in")} in`);
   }, [editor]);
 
+  /** Shows the outcome of an object command (convert, combine, shaping) as a toast. */
+  const report = useCallback((r: { ok: boolean; message: string }) => {
+    if (r.ok) toast.success(r.message);
+    else toast.info(r.message);
+  }, []);
+
+  /** Switches the right-hand panel; the Shaping preview only lives while its panel is open. */
+  const showPanel = useCallback(
+    (p: "objects" | "align" | "shaping") => {
+      setPanel(p);
+      if (p !== "shaping") editor?.setShaping(null);
+    },
+    [editor]
+  );
+
   async function openFile(file: File) {
     if (!editor) return;
     try {
@@ -173,6 +188,10 @@ export default function PatternPrintStudio() {
         if (lower === "a") return handled(), shapeTool ? editor.selectAllNodes() : editor.selectAll();
         if (lower === "g") return handled(), editor.group();
         if (lower === "u") return handled(), editor.ungroup();
+        // CorelDRAW object keys. On a Mac use the Control key: Cmd+Q quits the browser and can't be intercepted.
+        if (lower === "q") return handled(), void editor.convertToCurves().then(report);
+        if (lower === "l") return handled(), report(editor.combine());
+        if (lower === "k") return handled(), report(editor.breakApart());
         if (k === "'" || e.code === "Quote") return handled(), editor.toggleGrid();
         if (lower === "s") return handled(), save();
         if (lower === "o") return handled(), openInputRef.current?.click();
@@ -225,7 +244,7 @@ export default function PatternPrintStudio() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [editor, save, exportPageSvg]);
+  }, [editor, save, exportPageSvg, report]);
 
   const unit = state?.settings.units ?? "in";
   const textClient = textAt && editor ? editor.projectToClient(textAt) : null;
@@ -269,6 +288,23 @@ export default function PatternPrintStudio() {
               <DropdownMenuItem onClick={exportPageSvg}>
                 Export page as SVG <DropdownMenuShortcut>Ctrl+E</DropdownMenuShortcut>
               </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="gap-1">Object <ChevronDown className="h-3 w-3" /></Button>} />
+            <DropdownMenuContent align="start" className="min-w-60">
+              <DropdownMenuItem onClick={() => editor?.convertToCurves().then(report)}>
+                Convert to curves <DropdownMenuShortcut>Ctrl+Q</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => editor && report(editor.combine())}>
+                Combine <DropdownMenuShortcut>Ctrl+L</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => editor && report(editor.breakApart())}>
+                Break apart <DropdownMenuShortcut>Ctrl+K</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => showPanel("shaping")}>Shaping (weld, trim, intersect)…</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="ghost" size="icon-sm" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" disabled={!state?.canUndo} onClick={() => editor?.undo()}>
@@ -419,18 +455,18 @@ export default function PatternPrintStudio() {
         {/* Right panel */}
         <div className="flex w-60 shrink-0 flex-col border-l border-border bg-card">
           <div className="flex shrink-0 border-b border-border text-xs">
-            {(["objects", "align"] as const).map((p) => (
+            {(["objects", "align", "shaping"] as const).map((p) => (
               <button
                 key={p}
                 type="button"
-                onClick={() => setPanel(p)}
+                onClick={() => showPanel(p)}
                 className={cn("flex-1 py-2 font-medium", panel === p ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
-                {p === "objects" ? `Objects${state ? ` (${state.objects.length})` : ""}` : "Align & Distribute"}
+                {p === "objects" ? `Objects${state ? ` (${state.objects.length})` : ""}` : p === "align" ? "Align" : "Shaping"}
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : <AlignPanel editor={editor} state={state} />)}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto">{editor && state && (panel === "objects" ? <ObjectsPanel editor={editor} state={state} /> : panel === "align" ? <AlignPanel editor={editor} state={state} /> : <ShapingPanel editor={editor} state={state} onResult={report} />)}</div>
         </div>
       </div>
 

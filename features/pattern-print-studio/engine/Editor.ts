@@ -2,10 +2,12 @@ import paper from "paper/dist/paper-core";
 import { AssetStore, newId } from "./assets";
 import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
+import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
 import { History } from "./history";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
 import type { NodeType } from "./node-geometry";
 import { DEFAULT_SIMPLIFY_TOLERANCE, ShapeTool, type NodeEditState, type OpenPathInfo, type ShapeMeta } from "./shape-tool";
+import { missingGlyphs, nodeCount, planShaping, textToOutlines, type ShapingOp, type ShapingPlan } from "./shaping";
 import { buildTargets, snapPoints, SNAP_PX, type SnapTargets } from "./snap";
 import { DEFAULT_PAGE, DEFAULT_SETTINGS, type DocSettings, type Guide, type Orientation, type Origin, type PageSize, type RasterAsset, type ToolId } from "./types";
 import { clamp, CSS_PX_PER_INCH, MAX_ZOOM_PCT, MIN_ZOOM_PCT } from "./units";
@@ -67,6 +69,17 @@ export interface EditorState {
   rotateMode: boolean;
   /** Shape tool (node editing) state; null in every other tool. */
   nodeEdit: NodeEditState | null;
+  /** Shaping panel: the chosen operation and what its live preview found. */
+  shaping: ShapingState | null;
+}
+
+export interface ShapingState {
+  op: ShapingOp;
+  keepSource: boolean;
+  keepTarget: boolean;
+  /** False when the operation can't be applied to the current selection (see `message`). */
+  ok: boolean;
+  message: string;
 }
 
 export interface ViewInfo {
@@ -147,6 +160,10 @@ export class Editor {
   private drag: DragState | null = null;
   private spaceDown = false;
   private spacePanned = false;
+  private shaping: { op: ShapingOp; keepSource: boolean; keepTarget: boolean } | null = null;
+  private shapingPlan: ShapingPlan | null = null;
+  private shapingMessage = "";
+  private shapingDirty = false;
   private fittedOnce = false;
 
   private state: EditorState;
@@ -207,6 +224,9 @@ export class Editor {
       },
       selectionChanged: () => this.history.setMeta(this.shape.meta()),
     });
+
+    // Text is drawn in the bundled font; redraw once it has arrived.
+    loadStudioFontFaces().then(() => this.ps.view?.requestUpdate()); // view is gone if the editor was already destroyed
 
     this.state = this.buildState();
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
@@ -273,6 +293,7 @@ export class Editor {
       snapLabel: this.snapLabel,
       rotateMode: this.rotateMode,
       nodeEdit: this.tool === "shape" ? this.shape.state() : null,
+      shaping: this.shaping ? { ...this.shaping, ok: !!this.shapingPlan, message: this.shapingMessage } : null,
     };
   }
 
@@ -334,6 +355,7 @@ export class Editor {
   }
   /** Records an undo step after a committed action. */
   commit() {
+    this.shapingDirty = true;
     if (this.tool === "shape") this.shape.validate();
     if (this.history.push(this.snapshot(), this.shape.meta())) this.markChanged();
     this.drawOverlay();
@@ -714,10 +736,199 @@ export class Editor {
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.nodeCanvas.width, this.nodeCanvas.height);
+    if (this.shaping && !this.drag) {
+      if (this.shapingDirty) this.computeShaping();
+      if (this.shapingPlan) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        this.strokePreview(ctx, this.shapingPlan.results.map((r) => r.item));
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+    }
     if (this.tool !== "shape") return;
     this.shape.validate();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.shape.draw(ctx, this.nodeCanvas.width / dpr, this.nodeCanvas.height / dpr);
+  }
+
+  /** Outlines not-yet-applied result shapes in pink on the overlay canvas. */
+  private strokePreview(ctx: CanvasRenderingContext2D, items: paper.PathItem[]) {
+    const ps = this.ps;
+    const zoom = ps.view.zoom;
+    const tl = ps.view.bounds.topLeft;
+    const X = (p: paper.Point) => (p.x - tl.x) * zoom;
+    const Y = (p: paper.Point) => (p.y - tl.y) * zoom;
+    ctx.strokeStyle = "#d946ef";
+    ctx.fillStyle = "rgba(217, 70, 239, 0.12)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (const item of items) {
+      for (const path of item instanceof ps.CompoundPath ? (item.children as paper.Path[]) : [item as paper.Path]) {
+        for (const c of path.curves) {
+          if (c.index === 0) ctx.moveTo(X(c.point1), Y(c.point1));
+          const h1 = c.point1.add(c.handle1);
+          const h2 = c.point2.add(c.handle2);
+          ctx.bezierCurveTo(X(h1), Y(h1), X(h2), Y(h2), X(c.point2), Y(c.point2));
+        }
+        if (path.closed) ctx.closePath();
+      }
+    }
+    ctx.fill("evenodd");
+    ctx.stroke();
+  }
+
+  // ---------------------------------------------------------------- convert to curves / combine / shaping
+  /** Replaces one item (text, or a rectangle/ellipse still marked as a shape) with plain curves. Groups are converted inside. */
+  private async convertItem(item: Item, notes: Set<string>): Promise<Item> {
+    const ps = this.ps;
+    if (item instanceof ps.Group) {
+      for (const c of [...item.children]) await this.convertItem(c, notes);
+      return item;
+    }
+    if (item instanceof ps.Path && item.data.shape) {
+      delete item.data.shape;
+      notes.add("converted");
+      return item;
+    }
+    if (!(item instanceof ps.PointText)) return item;
+    const font = await getOutlineFont(item.fontWeight);
+    const missing = missingGlyphs(item.content, font);
+    if (missing.length) notes.add(`missing:${missing.join("")}`);
+    if (!/arimo|arial|helvetica/i.test(String(item.fontFamily))) notes.add(`font:${item.fontFamily}`);
+    const outlines = textToOutlines(ps, item, font);
+    if (outlines.isEmpty()) return item;
+    outlines.data = item.data.id ? { id: item.data.id } : {};
+    outlines.name = item.name || `Text "${item.content.slice(0, 16)}"`;
+    outlines.visible = item.visible;
+    outlines.locked = item.locked;
+    item.replaceWith(outlines);
+    notes.add("converted");
+    return outlines;
+  }
+
+  /**
+   * Convert to curves (Ctrl+Q): text and rectangles/ellipses become editable
+   * outlines, in place. One undo step. Resolves to a message for the user.
+   */
+  async convertToCurves(): Promise<{ ok: boolean; message: string }> {
+    const nested = this.tool === "shape" ? this.shape.convertible : null;
+    // In the Shape tool only the clicked object converts, never the whole group it sits in.
+    if (this.tool === "shape" && !nested) return { ok: false, message: "Click the text, rectangle or ellipse you want to convert." };
+    const items = nested ? [nested] : [...this.selected];
+    if (!items.length) return { ok: false, message: "Select text, a rectangle or an ellipse to convert." };
+    const notes = new Set<string>();
+    const converted: Item[] = [];
+    try {
+      for (const it of items) converted.push(await this.convertItem(it, notes));
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : "Couldn't convert to curves." };
+    }
+    if (!notes.has("converted")) return { ok: false, message: "Nothing to convert — the selection is already curves." };
+    if (nested) this.shape.enter(converted[0]);
+    else this.selected = converted.map((c) => this.topLevel(c)).filter((c): c is Item => !!c);
+    this.commit();
+    const extra: string[] = [];
+    for (const n of notes) {
+      if (n.startsWith("missing:")) extra.push(`No outline for: ${n.slice(8)}`);
+      if (n.startsWith("font:")) extra.push(`"${n.slice(5)}" isn't available as outlines, so ${STUDIO_FONT} was used — check the shape`);
+    }
+    return { ok: true, message: ["Converted to curves", ...extra].join(". ") };
+  }
+
+  /** Combine (Ctrl+L): the selected curves become one curve with several subpaths; overlaps become holes. Takes the last selected object's look. */
+  combine(): { ok: boolean; message: string } {
+    const ps = this.ps;
+    if (this.selected.length < 2) return { ok: false, message: "Select two or more curves to combine." };
+    for (const it of this.selected) {
+      if (it instanceof ps.PointText) return { ok: false, message: "Convert the text to curves first (Ctrl+Q)." };
+      if (!(it instanceof ps.Path || it instanceof ps.CompoundPath)) return { ok: false, message: "Combine works on curves only — ungroup first, and bitmaps can't be combined." };
+    }
+    const ordered = [...this.selected].sort((a, b) => a.index - b.index);
+    const look = this.selected[this.selected.length - 1];
+    const cp = new ps.CompoundPath({ insert: false });
+    cp.copyAttributes(look, false);
+    cp.data = { id: newId() };
+    cp.fillRule = "evenodd";
+    cp.insertAbove(ordered[ordered.length - 1]);
+    for (const it of ordered) {
+      const pieces = it instanceof ps.CompoundPath ? [...it.children] : [it];
+      for (const p of pieces) {
+        delete p.data.id;
+        delete p.data.shape;
+        cp.addChild(p);
+      }
+      if (it instanceof ps.CompoundPath) it.remove();
+    }
+    this.selected = [cp];
+    this.commit();
+    return { ok: true, message: `Combined into one curve (${cp.children.length} subpaths)` };
+  }
+
+  /** Break apart (Ctrl+K): each subpath of a combined curve becomes its own object. */
+  breakApart(): { ok: boolean; message: string } {
+    const ps = this.ps;
+    const compounds = this.selected.filter((it): it is paper.CompoundPath => it instanceof ps.CompoundPath && it.children.length > 1);
+    if (!compounds.length) return { ok: false, message: "Select a combined curve (one with several subpaths) to break apart." };
+    const out: Item[] = this.selected.filter((it) => !compounds.includes(it as paper.CompoundPath));
+    for (const cp of compounds) {
+      for (const child of [...cp.children] as paper.Path[]) {
+        const own = { ...child.data };
+        child.copyAttributes(cp, false);
+        child.data = { ...own, id: newId() };
+        child.insertBelow(cp);
+        out.push(child);
+      }
+      cp.remove();
+    }
+    this.selected = out;
+    this.commit();
+    return { ok: true, message: `Broken apart into ${out.length} curves` };
+  }
+
+  private computeShaping() {
+    this.shapingDirty = false;
+    this.shapingPlan = null;
+    this.shapingMessage = "";
+    if (!this.shaping) return;
+    try {
+      const plan = planShaping(this.ps, this.selected, this.shaping.op);
+      this.shapingPlan = plan;
+      const nodes = plan.results.reduce((n, r) => n + nodeCount(this.ps, r.item), 0);
+      this.shapingMessage = `Result: ${plan.results.length} shape${plan.results.length === 1 ? "" : "s"}, ${nodes} nodes (pink preview)`;
+    } catch (err) {
+      // Paper's boolean code can throw on degenerate geometry; never let that reach the document.
+      this.shapingMessage = err instanceof Error && err.message ? err.message : "This shaping operation couldn't be worked out for these shapes.";
+    }
+  }
+
+  /** Shaping panel: choose an operation (or null to close). Shows a live preview; nothing changes until applyShaping(). */
+  setShaping(op: ShapingOp | null, opts: { keepSource?: boolean; keepTarget?: boolean } = {}) {
+    this.shaping = op ? { op, keepSource: opts.keepSource ?? this.shaping?.keepSource ?? false, keepTarget: opts.keepTarget ?? this.shaping?.keepTarget ?? false } : null;
+    this.shapingDirty = true;
+    this.shapingPlan = null;
+    this.shapingMessage = "";
+    this.drawOverlay();
+    this.emit();
+  }
+
+  /** Applies the previewed shaping result: one undo step, results stay exactly in place. */
+  applyShaping(): { ok: boolean; message: string } {
+    if (!this.shaping) return { ok: false, message: "Choose a shaping operation first." };
+    if (this.shapingDirty) this.computeShaping();
+    const plan = this.shapingPlan;
+    if (!plan) return { ok: false, message: this.shapingMessage || "Nothing to apply." };
+    const { keepSource, keepTarget } = this.shaping;
+    const results: Item[] = [];
+    for (const { item, target } of plan.results) {
+      item.data.id = keepTarget ? newId() : (target.data.id ?? newId());
+      item.insertAbove(target);
+      results.push(item);
+    }
+    if (!keepTarget) for (const t of plan.targets) t.remove();
+    if (!keepSource) for (const s of plan.sources) s.remove();
+    this.shapingPlan = null;
+    this.selected = results;
+    this.commit();
+    return { ok: true, message: "Shaping applied" };
   }
 
   // ---------------------------------------------------------------- shape tool (node editing)
@@ -820,6 +1031,7 @@ export class Editor {
       else if (i < 0) next.push(it);
     }
     this.selected = next;
+    this.shapingDirty = true;
     this.selectedGuideId = null;
     this.rotateMode = false;
     this.drawGuides();
@@ -1088,7 +1300,7 @@ export class Editor {
   addText(content: string, at: paper.Point, fontSizeIn = 1) {
     if (!content.trim()) return;
     const ps = this.ps;
-    const t = new ps.PointText({ point: at, content, fontFamily: "Arial", fontSize: fontSizeIn, insert: false });
+    const t = new ps.PointText({ point: at, content, fontFamily: STUDIO_FONT, fontSize: fontSizeIn, insert: false });
     t.fillColor = new ps.Color("#000000");
     t.data.id = newId();
     this.contentLayer.addChild(t);
@@ -1162,6 +1374,7 @@ export class Editor {
     this.guides = s.guides;
     if (s.page.width !== this.page.width || s.page.height !== this.page.height) this.setPage(s.page, false);
     this.selected = this.contentLayer.children.filter((c) => selectedIds.has(c.data.id));
+    this.shapingDirty = true;
     this.selectedGuideId = null;
     if (this.tool === "shape") {
       this.shape.restore(this.history.meta);

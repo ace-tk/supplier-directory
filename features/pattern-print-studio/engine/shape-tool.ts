@@ -121,6 +121,8 @@ export class ShapeTool {
   /** The curve edited last, so Space/Esc back to the Pick tool and in again returns to it. */
   private lastAddress: ItemAddress | null = null;
   private hint: string | null = null;
+  /** The object the hint is about (what Ctrl+Q would convert). */
+  private hintItem: Item | null = null;
   private nodes = new Set<string>();
   /** Selected segments: "subpath:index" of the node each one starts at. */
   private segs = new Set<string>();
@@ -178,6 +180,7 @@ export class ShapeTool {
     this.target = null;
     this.address = null;
     this.hint = null;
+    this.hintItem = null;
     if (item) {
       if (item.parent && this.isCompound(item.parent)) item = item.parent;
       const lastAddress = this.lastAddress;
@@ -186,6 +189,7 @@ export class ShapeTool {
         if (last && !this.hintFor(last)) item = last;
       }
       this.hint = this.hintFor(item);
+      this.hintItem = this.hint ? item : null;
       if (!this.hint) {
         this.target = item as EditTarget;
         this.address = this.addressOf(item);
@@ -204,6 +208,7 @@ export class ShapeTool {
     this.target = null;
     this.address = null;
     this.hint = null;
+    this.hintItem = null;
   }
 
   /** After the scene was rebuilt or changed by another command: re-find the edited object. */
@@ -424,6 +429,8 @@ export class ShapeTool {
       },
     });
     if (!hits.length) return null;
+    // Text or a bitmap on top is what was clicked, even if an outline passes behind it.
+    if (!(hits[0].item instanceof ps.Path)) return hits[0].item;
     let best = hits[0].item;
     let bestD = Infinity;
     for (const h of hits) {
@@ -1099,6 +1106,11 @@ export class ShapeTool {
     this.selectSegments([item.firstSegment, item.lastSegment]);
     this.host.selectionChanged();
     return item.bounds;
+  }
+
+  /** The text / rectangle / ellipse the convert-to-curves hint is showing for, if any. */
+  get convertible(): Item | null {
+    return this.hintItem && this.hintItem.isInserted() ? this.hintItem : null;
   }
 
   get hasTarget() {

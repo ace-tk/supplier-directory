@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Editor, EditorState } from "../engine/Editor";
+import { SHAPING_OPS } from "../engine/shaping";
 import type { ToolId } from "../engine/types";
 
 const TOOLS: { id: ToolId; label: string; key: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -56,6 +57,54 @@ export function Toolbox({ editor, tool }: { editor: Editor; tool: ToolId }) {
           <t.icon className="h-4 w-4" />
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Shaping (weld, trim, intersect…): pick an operation to see a live pink preview, then Apply. */
+export function ShapingPanel({ editor, state, onResult }: { editor: Editor; state: EditorState; onResult: (r: { ok: boolean; message: string }) => void }) {
+  const sh = state.shaping;
+  return (
+    <div className="flex flex-col gap-3 p-3 text-xs">
+      <p className="text-muted-foreground">Select two or more closed shapes. The last one you select is the target: the result keeps its fill and outline.</p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {SHAPING_OPS.map((op) => (
+          <button
+            key={op.id}
+            type="button"
+            title={op.help}
+            onClick={() => editor.setShaping(op.id)}
+            className={cn("rounded-md border border-border px-2 py-1.5 text-left hover:bg-accent", sh?.op === op.id && "border-primary bg-primary/10 text-primary")}
+          >
+            {op.label}
+          </button>
+        ))}
+      </div>
+      {sh && (
+        <>
+          <p className="text-muted-foreground">{SHAPING_OPS.find((o) => o.id === sh.op)?.help}.</p>
+          {sh.op !== "simplify" && (
+            <div className="flex flex-col gap-1.5">
+              <span className="font-medium text-foreground">Leave original</span>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={sh.keepSource} onChange={(e) => editor.setShaping(sh.op, { keepSource: e.target.checked })} /> Source objects
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={sh.keepTarget} onChange={(e) => editor.setShaping(sh.op, { keepTarget: e.target.checked })} /> Target object
+              </label>
+            </div>
+          )}
+          <p className={cn("rounded-md border px-2 py-1.5", sh.ok ? "border-fuchsia-300 text-fuchsia-700 dark:text-fuchsia-300" : "border-amber-300 text-amber-700 dark:text-amber-300")}>{sh.message || "Working…"}</p>
+          <button
+            type="button"
+            disabled={!sh.ok}
+            onClick={() => onResult(editor.applyShaping())}
+            className="rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-40"
+          >
+            Apply
+          </button>
+        </>
+      )}
     </div>
   );
 }
