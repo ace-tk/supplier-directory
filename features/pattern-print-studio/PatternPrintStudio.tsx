@@ -189,8 +189,10 @@ export default function PatternPrintStudio() {
       if (e.shiftKey && k === "PageDown") return e.preventDefault(), editor.order("back");
       if (k === "F4") return e.preventDefault(), e.shiftKey ? editor.fitPage() : editor.fitAll();
       if (k === "F2" && e.shiftKey) return e.preventDefault(), editor.fitSelection();
-      // In the Shape tool Delete never removes the whole object (node delete arrives with step 2C).
-      if (k === "Delete" || k === "Backspace") return e.preventDefault(), shapeTool ? undefined : editor.deleteSelection();
+      // In the Shape tool Delete removes the selected nodes, never the whole object.
+      if (k === "Delete" || k === "Backspace") return e.preventDefault(), shapeTool ? editor.deleteNodes() : editor.deleteSelection();
+      if (shapeTool && !e.altKey && (k === "+" || k === "=")) return e.preventDefault(), editor.addNodes();
+      if (shapeTool && !e.altKey && (k === "-" || k === "_")) return e.preventDefault(), editor.deleteNodes();
       // Shape tool: first Esc clears the node selection, the next returns to the object (Pick tool).
       if (k === "Escape") return shapeTool && editor.clearNodeSelection() ? undefined : st.tool !== "pick" ? editor.setTool("pick") : editor.clearSelection();
       if (k.startsWith("Arrow") && (shapeTool ? !!st.nodeEdit?.selected : st.selectionCount)) {

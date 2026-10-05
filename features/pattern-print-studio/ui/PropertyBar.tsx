@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, FlipHorizontal2, FlipVertical2, Link2, Link2Off, RotateCcw } from "lucide-react";
+import { ChevronDown, FlipHorizontal2, FlipVertical2, Link2, Link2Off, RotateCcw, TriangleAlert } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Editor, EditorState, RefPoint } from "../engine/Editor";
+import type { OpenPathInfo } from "../engine/shape-tool";
 import { NODE_TYPE_LABEL, type NodeType } from "../engine/node-geometry";
 import { formatUnits, MAX_ZOOM_PCT, MIN_ZOOM_PCT, UNIT_LABEL, type DisplayUnit } from "../engine/units";
 import { LengthField } from "./LengthField";
@@ -114,13 +115,97 @@ function ZoomControl({ editor, zoomPct, hasSelection }: { editor: Editor; zoomPc
   );
 }
 
-/** Shape tool: exact position of the selected node, or the bounding box of several. Ruler coordinates (y up). */
+// Simplify tolerance slider: 0–100 maps to 0.001"–0.5" on a log scale (fine control at the small end).
+const TOL_MIN = 0.001;
+const TOL_RANGE = 500;
+const sliderToTolerance = (v: number) => TOL_MIN * Math.pow(TOL_RANGE, v / 100);
+const toleranceToSlider = (t: number) => Math.min(100, Math.max(0, (100 * Math.log(t / TOL_MIN)) / Math.log(TOL_RANGE)));
+
+/** Check outlines: lists every open path so it can be closed before prints are placed inside (Phase 3). */
+function CheckOutlines({ editor, unit }: { editor: Editor; unit: DisplayUnit }) {
+  const [list, setList] = useState<OpenPathInfo[]>([]);
+  const [showLines, setShowLines] = useState(false);
+  const lines = list.filter((p) => p.nodes === 2).length;
+  const shown = showLines ? list : list.filter((p) => p.nodes > 2);
+  return (
+    <DropdownMenu onOpenChange={(open) => open && setList(editor.listOpenPaths())}>
+      <DropdownMenuTrigger
+        render={
+          <button type="button" title="List every open path in the document" className="h-6 shrink-0 rounded border border-border px-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground">
+            Check outlines
+          </button>
+        }
+      />
+      <DropdownMenuContent align="start" className="max-h-80 min-w-72 overflow-y-auto">
+        <div className="px-2 py-1.5 text-xs font-medium text-foreground">
+          {list.length === 0 ? "All outlines are closed" : `${list.length - lines} open outline${list.length - lines === 1 ? "" : "s"}${lines ? ` · ${lines} simple line${lines === 1 ? "" : "s"}` : ""}`}
+        </div>
+        {list.length > 0 && <div className="px-2 pb-1.5 text-[11px] text-muted-foreground">Prints can only be placed inside closed outlines. Click one to fix it: select its two end nodes, then Join or Close with line.</div>}
+        {shown.map((info, i) => (
+          <DropdownMenuItem key={i} onClick={() => editor.editOpenPath(info)}>
+            <span className="truncate">{info.label}</span>
+            <span className="ml-auto pl-3 font-mono text-[11px] text-muted-foreground">
+              {info.nodes} nodes · gap {formatUnits(info.gap, unit)} {UNIT_LABEL[unit]}
+            </span>
+          </DropdownMenuItem>
+        ))}
+        {lines > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem closeOnClick={false} onClick={() => setShowLines((v) => !v)}>
+              {showLines ? "Hide" : "Show"} simple lines (grainlines, notches)
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Shape tool: node position, node types, segment and structure commands. Positions are ruler coordinates (y up). */
 function NodeFields({ editor, state }: { editor: Editor; state: EditorState }) {
   const n = state.nodeEdit!;
   const unit = state.settings.units;
   const o = state.origin;
-  if (n.hint) return <span className="shrink-0 text-[11px] font-medium text-amber-600">{n.hint}</span>;
-  if (!n.hasTarget) return <span className="shrink-0 text-[11px] text-muted-foreground">Shape tool — click a curve to show its nodes</span>;
+  if (n.hint || !n.hasTarget) {
+    return (
+      <>
+        {n.hint ? <span className="shrink-0 text-[11px] font-medium text-amber-600">{n.hint}</span> : <span className="shrink-0 text-[11px] text-muted-foreground">Shape tool — click a curve to show its nodes</span>}
+        <Sep />
+        <CheckOutlines editor={editor} unit={unit} />
+      </>
+    );
+  }
+  if (n.simplify) {
+    const sv = n.simplify;
+    return (
+      <>
+        <span className="shrink-0 text-[11px] font-semibold text-foreground">Simplify</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">Tolerance</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={toleranceToSlider(sv.tolerance)}
+          aria-label="Simplify tolerance"
+          onChange={(e) => editor.previewSimplify(sliderToTolerance(Number(e.target.value)))}
+          className="h-1 w-40 shrink-0 accent-primary"
+        />
+        <LengthField label="±" inches={sv.tolerance} unit={unit} onCommit={(t) => t > 0 && editor.previewSimplify(t)} title="How far the simplified outline may move from the original" />
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-foreground" title="Node count before → after">
+          {sv.before} → {sv.after} nodes
+        </span>
+        <span className="shrink-0 text-[11px] text-fuchsia-600">pink = preview</span>
+        <TextBtn title="Replace the outline with the preview" active onClick={() => editor.applySimplify()}>
+          Apply
+        </TextBtn>
+        <TextBtn title="Keep the outline as it is (Esc)" onClick={() => editor.cancelSimplify()}>
+          Cancel
+        </TextBtn>
+      </>
+    );
+  }
   const b = n.bounds;
   return (
     <>
@@ -159,6 +244,51 @@ function NodeFields({ editor, state }: { editor: Editor; state: EditorState }) {
           Length {formatUnits(n.segmentLength, unit)} {UNIT_LABEL[unit]}
         </span>
       )}
+      <Sep />
+      <TextBtn title="Add a node at the middle of the selected segment (+). Double-click the outline to add one exactly there." disabled={!n.segments} onClick={() => editor.addNodes()}>
+        + Node
+      </TextBtn>
+      <TextBtn title="Delete the selected nodes (Delete or −). Double-click a node to delete it." disabled={!n.selected} onClick={() => editor.deleteNodes()}>
+        − Node
+      </TextBtn>
+      <TextBtn title="Break the outline apart at the selected node" disabled={!n.canBreak} onClick={() => editor.breakAtNodes()}>
+        Break
+      </TextBtn>
+      <TextBtn title="Join the two selected end nodes into one" disabled={!n.canJoin} onClick={() => editor.joinNodes()}>
+        Join
+      </TextBtn>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <button type="button" className="flex h-6 shrink-0 items-center gap-0.5 rounded border border-border px-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground">
+              More <ChevronDown className="h-3 w-3" />
+            </button>
+          }
+        />
+        <DropdownMenuContent align="start" className="min-w-64">
+          <DropdownMenuItem disabled={!n.open} onClick={() => editor.closeWithLine()}>
+            Extend curve to close (straight line)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => editor.toggleClosed()}>{n.open ? "Close path" : "Open path"}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => editor.reverseDirection()}>Reverse direction</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={n.selected < 2} onClick={() => editor.alignNodes("h")}>
+            Align nodes horizontally (same Y as last selected)
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={n.selected < 2} onClick={() => editor.alignNodes("v")}>
+            Align nodes vertically (same X as last selected)
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => editor.previewSimplify()}>Simplify (reduce nodes)…</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Sep />
+      {n.open && (
+        <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-amber-600" title="Prints can only be placed inside closed outlines (Phase 3). Select the two end nodes and use Join, or More → Extend curve to close.">
+          <TriangleAlert className="h-3.5 w-3.5" /> Open outline
+        </span>
+      )}
+      <CheckOutlines editor={editor} unit={unit} />
     </>
   );
 }

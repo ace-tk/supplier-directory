@@ -5,7 +5,7 @@ import { installHairlineMinimum } from "./hairline";
 import { History } from "./history";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
 import type { NodeType } from "./node-geometry";
-import { ShapeTool, type NodeEditState, type ShapeMeta } from "./shape-tool";
+import { DEFAULT_SIMPLIFY_TOLERANCE, ShapeTool, type NodeEditState, type OpenPathInfo, type ShapeMeta } from "./shape-tool";
 import { buildTargets, snapPoints, SNAP_PX, type SnapTargets } from "./snap";
 import { DEFAULT_PAGE, DEFAULT_SETTINGS, type DocSettings, type Guide, type Orientation, type Origin, type PageSize, type RasterAsset, type ToolId } from "./types";
 import { clamp, CSS_PX_PER_INCH, MAX_ZOOM_PCT, MIN_ZOOM_PCT } from "./units";
@@ -736,6 +736,56 @@ export class Editor {
   convertSegments(to: "line" | "curve") {
     this.shape.convertSegments(to);
   }
+  /** "+": a node at the middle of each selected segment. */
+  addNodes() {
+    this.shape.addNodes();
+  }
+  /** Delete / "-": removes the selected nodes, keeping the outline's shape as closely as possible. */
+  deleteNodes() {
+    this.shape.deleteNodes();
+  }
+  breakAtNodes() {
+    this.shape.breakAtNodes();
+  }
+  /** Joins the two selected loose ends into one node. */
+  joinNodes() {
+    this.shape.joinEnds(false);
+  }
+  /** Extend curve to close: connects the loose ends with a straight line. */
+  closeWithLine() {
+    this.shape.joinEnds(true);
+  }
+  toggleClosed() {
+    this.shape.toggleClosed();
+  }
+  reverseDirection() {
+    this.shape.reverseDirection();
+  }
+  alignNodes(axis: "h" | "v") {
+    this.shape.alignNodes(axis);
+  }
+  /** Reduce nodes: shows a preview at this tolerance (inches); nothing changes until applySimplify(). */
+  previewSimplify(tolerance = DEFAULT_SIMPLIFY_TOLERANCE) {
+    this.shape.previewSimplify(Math.max(1e-6, tolerance));
+  }
+  applySimplify() {
+    this.shape.applySimplify();
+  }
+  cancelSimplify() {
+    this.shape.cancelSimplify();
+  }
+  /** Check outlines: every open path in the document. */
+  listOpenPaths(): OpenPathInfo[] {
+    return this.shape.openPaths();
+  }
+  /** Jumps to an open path: Shape tool, loose ends selected, zoomed to fit. */
+  editOpenPath(info: OpenPathInfo) {
+    if (this.tool !== "shape") this.setTool("shape");
+    const bounds = this.shape.enterOpenPath(info.address);
+    if (bounds) this.fitRect(bounds.expand(Math.max(bounds.width, bounds.height) * 0.1 + 0.25));
+    this.drawOverlay();
+    this.emit();
+  }
   /** Nudge the selected nodes in display direction (dy positive = UP). */
   nudgeNodes(dxUnits: number, dyUp: number) {
     this.shape.translateNodes(dxUnits, -dyUp);
@@ -1239,8 +1289,13 @@ export class Editor {
     const wheel = (e: WheelEvent) => this.onWheel(e);
     const ctx = (e: MouseEvent) => e.preventDefault();
     const dbl = (e: MouseEvent) => {
-      // Double-click a selected guide → delete is via Delete key; double-click empty = nothing (Phase 2: node edit).
       e.preventDefault();
+      // Shape tool: double-click a node to delete it, the outline to add a node there.
+      if (this.tool !== "shape" || e.button !== 0) return;
+      const vp = this.viewPoint(e);
+      this.shape.doubleClick(vp, this.ps.view.viewToProject(vp));
+      this.drawOverlay();
+      this.emit();
     };
     c.addEventListener("pointerdown", down);
     c.addEventListener("pointermove", move);

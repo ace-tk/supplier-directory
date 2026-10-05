@@ -96,3 +96,74 @@ export function parseNodeTypes(value: unknown, count: number): NodeType[] | null
   if (typeof value !== "string" || value.length !== count || /[^csy]/.test(value)) return null;
   return value.split("") as NodeType[];
 }
+
+/** Cubic Bernstein weights at t. */
+function bernstein(t: number): [number, number, number, number] {
+  const m = 1 - t;
+  return [m * m * m, 3 * m * m * t, 3 * m * t * t, t * t * t];
+}
+
+/**
+ * Deleting a node: finds handle lengths for ONE curve from `a` to `c` that
+ * best follows the two curves it replaces. `dirA` / `dirC` are the unit
+ * tangent directions leaving a and c (kept, so the neighbours stay smooth);
+ * `samples` are points on the old shape with t = their fraction of its
+ * length. Least squares on the two lengths; falls back to a third of the
+ * chord when the fit is degenerate.
+ */
+export function fitHandleLengths(a: Vec, dirA: Vec, c: Vec, dirC: Vec, samples: { p: Vec; t: number }[]): { alpha: number; beta: number } {
+  const fallback = len({ x: c.x - a.x, y: c.y - a.y }) / 3;
+  const dd = dirA.x * dirC.x + dirA.y * dirC.y;
+  const ts = samples.map((s) => s.t);
+  let best: { alpha: number; beta: number } | null = null;
+  // Solve for the two lengths, then move each sample's t to the nearest point on the fitted curve and solve again.
+  for (let pass = 0; pass < 6; pass++) {
+    let s11 = 0;
+    let s12 = 0;
+    let s22 = 0;
+    let r1 = 0;
+    let r2 = 0;
+    samples.forEach(({ p }, i) => {
+      const [b0, b1, b2, b3] = bernstein(ts[i]);
+      const rx = p.x - (b0 + b1) * a.x - (b2 + b3) * c.x;
+      const ry = p.y - (b0 + b1) * a.y - (b2 + b3) * c.y;
+      s11 += b1 * b1;
+      s12 += b1 * b2 * dd;
+      s22 += b2 * b2;
+      r1 += b1 * (dirA.x * rx + dirA.y * ry);
+      r2 += b2 * (dirC.x * rx + dirC.y * ry);
+    });
+    const det = s11 * s22 - s12 * s12;
+    if (Math.abs(det) < 1e-12) break;
+    const alpha = (r1 * s22 - r2 * s12) / det;
+    const beta = (s11 * r2 - s12 * r1) / det;
+    if (!(alpha > 0) || !(beta > 0) || !Number.isFinite(alpha + beta)) break;
+    best = { alpha, beta };
+    // One Newton step per sample towards its closest point on this curve.
+    const p1 = { x: a.x + dirA.x * alpha, y: a.y + dirA.y * alpha };
+    const p2 = { x: c.x + dirC.x * beta, y: c.y + dirC.y * beta };
+    samples.forEach(({ p }, i) => {
+      const t = ts[i];
+      const m = 1 - t;
+      const [b0, b1, b2, b3] = bernstein(t);
+      const qx = b0 * a.x + b1 * p1.x + b2 * p2.x + b3 * c.x - p.x;
+      const qy = b0 * a.y + b1 * p1.y + b2 * p2.y + b3 * c.y - p.y;
+      const d1x = 3 * (m * m * (p1.x - a.x) + 2 * m * t * (p2.x - p1.x) + t * t * (c.x - p2.x));
+      const d1y = 3 * (m * m * (p1.y - a.y) + 2 * m * t * (p2.y - p1.y) + t * t * (c.y - p2.y));
+      const d2x = 6 * (m * (p2.x - 2 * p1.x + a.x) + t * (c.x - 2 * p2.x + p1.x));
+      const d2y = 6 * (m * (p2.y - 2 * p1.y + a.y) + t * (c.y - 2 * p2.y + p1.y));
+      const den = d1x * d1x + d1y * d1y + qx * d2x + qy * d2y;
+      if (Math.abs(den) > 1e-12) ts[i] = Math.min(1, Math.max(0, t - (qx * d1x + qy * d1y) / den));
+    });
+  }
+  return best ?? { alpha: fallback, beta: fallback };
+}
+
+/** Direction change at a node, in degrees (0 = straight through). `incoming` points into the node, `outgoing` away from it. */
+export function turnAngle(incoming: Vec, outgoing: Vec): number {
+  const a = len(incoming);
+  const b = len(outgoing);
+  if (a === 0 || b === 0) return 0;
+  const cos = Math.min(1, Math.max(-1, (incoming.x * outgoing.x + incoming.y * outgoing.y) / (a * b)));
+  return (Math.acos(cos) * 180) / Math.PI;
+}

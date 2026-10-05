@@ -1,5 +1,5 @@
 import type paper from "paper/dist/paper-core";
-import { constrainOpposite, curveDragOffsets, inferNodeType, parseNodeTypes, smoothedHandles, type NodeType } from "./node-geometry";
+import { constrainOpposite, curveDragOffsets, fitHandleLengths, inferNodeType, parseNodeTypes, smoothedHandles, turnAngle, type NodeType } from "./node-geometry";
 import { SNAP_PX, snapPoints, type SnapTargets } from "./snap";
 
 type Item = paper.Item;
@@ -15,6 +15,10 @@ const HANDLE_PX = 5;
 const PATH_HIT_PX = 6;
 const DRAG_START_PX = 3;
 const NODE_COLOR = "#2563eb";
+const PREVIEW_COLOR = "#d946ef";
+/** Simplify keeps any node that turns sharper than this as a corner. */
+const CORNER_DEG = 30;
+export const DEFAULT_SIMPLIFY_TOLERANCE = 0.01; // inches
 
 export const CONVERT_HINT = "Convert to curves (Ctrl+Q) to edit nodes";
 
@@ -53,6 +57,24 @@ export interface NodeEditState {
   hasLine: boolean;
   /** Total length of those segments, inches. */
   segmentLength: number | null;
+  /** Selected nodes that are the loose end of an open path. */
+  openEnds: number;
+  /** Exactly two loose ends are selected (they can be joined). */
+  canJoin: boolean;
+  /** A selected node can be split (it is not already a loose end). */
+  canBreak: boolean;
+  /** Reduce-nodes preview: nothing is changed until it is applied. */
+  simplify: { tolerance: number; before: number; after: number } | null;
+}
+
+/** An open path found by "Check outlines". */
+export interface OpenPathInfo {
+  address: ItemAddress;
+  /** Name (or kind) of the top-level object it belongs to. */
+  label: string;
+  nodes: number;
+  /** Distance between its two loose ends, inches. */
+  gap: number;
 }
 
 /** The slice of the Editor the Shape tool needs. */
@@ -104,11 +126,12 @@ export class ShapeTool {
   private segs = new Set<string>();
   private drag: ShapeDrag | null = null;
   private marqueeEnd: paper.Point | null = null;
+  private preview: { tolerance: number; before: number; paths: paper.Path[] } | null = null;
 
   constructor(private host: ShapeHost) {}
 
   // ---------------------------------------------------------------- target
-  private isCompound(item: Item): item is paper.CompoundPath {
+  private isCompound(item: Item): boolean {
     return item instanceof this.host.ps.CompoundPath;
   }
 
@@ -148,6 +171,7 @@ export class ShapeTool {
 
   /** Starts editing an object (or shows why it can't be edited). */
   enter(item: Item | null) {
+    this.preview = null;
     this.nodes.clear();
     this.segs.clear();
     this.drag = null;
@@ -173,6 +197,7 @@ export class ShapeTool {
 
   clear() {
     if (this.target && this.address) this.lastAddress = this.address;
+    this.preview = null;
     this.nodes.clear();
     this.segs.clear();
     this.drag = null;
@@ -415,6 +440,8 @@ export class ShapeTool {
   // ---------------------------------------------------------------- pointer
   /** Returns true if a drag started (the Editor then routes move/up here). */
   pointerDown(e: PointerEvent, vp: paper.Point, p: paper.Point): boolean {
+    // While a simplify preview is showing, the outline is frozen until Apply or Cancel.
+    if (this.preview) return false;
     const handle = this.hitHandle(vp);
     if (handle) {
       this.drag = { kind: "handle", seg: handle.seg, side: handle.side, grab: this.handlePoint(handle.seg, handle.side).subtract(p), moved: false };
@@ -582,6 +609,10 @@ export class ShapeTool {
 
   /** Esc: clears the node selection. Returns false when there was nothing to clear. */
   escape(): boolean {
+    if (this.preview) {
+      this.cancelSimplify();
+      return true;
+    }
     if (!this.nodes.size && !this.segs.size) return false;
     this.nodes.clear();
     this.segs.clear();
@@ -649,6 +680,427 @@ export class ShapeTool {
     if (changed) this.host.commit();
   }
 
+  // ---------------------------------------------------------------- structure (add / delete / break / join)
+  private isEnd(seg: paper.Segment): boolean {
+    return !seg.path.closed && (seg.isFirst() || seg.isLast());
+  }
+
+  /** Re-selects nodes after an edit that renumbered them. */
+  private selectSegments(segs: paper.Segment[]) {
+    const paths = this.paths();
+    this.nodes.clear();
+    this.segs.clear();
+    for (const seg of segs) {
+      const s = seg.path ? paths.indexOf(seg.path) : -1;
+      if (s >= 0) this.nodes.add(key(s, seg.index));
+    }
+  }
+
+  /** A single curve becomes a compound path so it can hold several pieces (after a break). */
+  private ensureCompound() {
+    if (!this.target || this.isCompound(this.target)) return;
+    const t = this.target as paper.Path;
+    const ps = this.host.ps;
+    const cp = new ps.CompoundPath({ insert: false });
+    cp.copyAttributes(t, false);
+    const own = { ...t.data };
+    cp.data = own.id ? { id: own.id } : {};
+    delete own.id;
+    cp.insertAbove(t);
+    t.data = own;
+    cp.addChild(t);
+    this.target = cp;
+  }
+
+  /** Tidies up after a structural edit: drops empty pieces, unwraps a compound left with one piece. */
+  private normalizeTarget() {
+    let t: EditTarget | null = this.target;
+    if (!t) return;
+    if (!this.isCompound(t)) {
+      if ((t as paper.Path).segments.length < 2) {
+        t.remove();
+        t = null;
+      }
+    } else {
+      for (const c of [...t.children] as paper.Path[]) if (c.segments.length < 2) c.remove();
+      if (t.children.length === 1) {
+        const child = t.children[0] as paper.Path;
+        const own = { ...child.data };
+        child.copyAttributes(t, false);
+        child.data = t.data.id ? { ...own, id: t.data.id } : own;
+        child.insertAbove(t);
+        t.remove();
+        t = child;
+      } else if (t.children.length === 0) {
+        t.remove();
+        t = null;
+      }
+    }
+    this.target = t;
+    if (!t) {
+      this.address = null;
+      this.nodes.clear();
+      this.segs.clear();
+      this.host.selectTop(null);
+      return;
+    }
+    this.address = this.addressOf(t);
+    this.host.selectTop(this.host.topLevel(t));
+  }
+
+  /**
+   * Runs an edit that adds, removes or re-orders nodes, keeping every
+   * surviving node's type (cusp / smooth / symmetrical) attached to it.
+   */
+  private structural(fn: () => paper.Segment[] | void) {
+    if (!this.target) return;
+    const types = new Map<paper.Segment, NodeType>();
+    for (const path of this.paths()) {
+      const t = this.typesOf(path);
+      path.segments.forEach((seg, i) => types.set(seg, t[i]));
+    }
+    const select = fn();
+    this.normalizeTarget();
+    for (const path of this.paths()) path.data.nt = path.segments.map((seg) => types.get(seg) ?? inferNodeType(seg.handleIn, seg.handleOut)).join("");
+    if (select) this.selectSegments(select);
+    else this.pruneNodes();
+    this.host.commit();
+  }
+
+  /** Adds a node exactly where the outline was double-clicked; the curve's shape does not change. */
+  private addNodeAt(hit: CurveHit) {
+    this.structural(() => {
+      const second = hit.curve.divideAtTime(hit.time);
+      return second ? [second.segment1] : [];
+    });
+  }
+
+  /** "+": adds a node at the middle (by length) of each selected segment. */
+  addNodes() {
+    const curves = this.actionCurves();
+    if (!curves.length) return;
+    this.structural(() => {
+      const added: paper.Segment[] = [];
+      // Back to front, so earlier curve indices stay valid.
+      for (const c of [...curves].sort((a, b) => b.index - a.index)) {
+        const second = c.divideAt(c.length / 2);
+        if (second) added.push(second.segment1);
+      }
+      return added;
+    });
+  }
+
+  /** Removes one node, re-fitting the neighbouring handles so the outline keeps its shape as closely as one curve can. */
+  private removeNode(seg: paper.Segment) {
+    const prev = seg.previous;
+    const next = seg.next;
+    const ps = this.host.ps;
+    if (!prev || !next || prev === next) return void seg.remove();
+    const c1 = prev.curve;
+    const c2 = seg.curve;
+    if (!c1.hasHandles() && !c2.hasHandles()) return void seg.remove();
+    const l1 = c1.length;
+    const total = l1 + c2.length;
+    const samples: { p: paper.Point; t: number }[] = [];
+    const N = 8;
+    for (let k = 1; k <= N; k++) samples.push({ p: c1.getPointAt((l1 * k) / N), t: (l1 * k) / N / total });
+    for (let k = 1; k < N; k++) samples.push({ p: c2.getPointAt((c2.length * k) / N), t: (l1 + (c2.length * k) / N) / total });
+    const dirA = (prev.handleOut.isZero() ? seg.point.subtract(prev.point) : prev.handleOut).normalize();
+    const dirC = (next.handleIn.isZero() ? seg.point.subtract(next.point) : next.handleIn).normalize();
+    const { alpha, beta } = fitHandleLengths(prev.point, dirA, next.point, dirC, samples);
+    seg.remove();
+    prev.handleOut = new ps.Point(dirA.multiply(alpha));
+    next.handleIn = new ps.Point(dirC.multiply(beta));
+  }
+
+  /** Delete / "-": removes the selected nodes. */
+  deleteNodes() {
+    const segs = this.selectedSegments();
+    if (!segs.length) return;
+    this.structural(() => {
+      for (const seg of [...segs].sort((a, b) => b.index - a.index)) if (seg.path) this.removeNode(seg);
+      return [];
+    });
+  }
+
+  /** Break apart: splits the outline at each selected node, leaving two loose ends there. */
+  breakAtNodes() {
+    const segs = this.selectedSegments().filter((s) => !this.isEnd(s));
+    if (!segs.length) return;
+    this.structural(() => {
+      this.ensureCompound();
+      const ends: paper.Segment[] = [];
+      for (const seg of [...segs].sort((a, b) => b.index - a.index)) {
+        const path = seg.path;
+        if (!path || this.isEnd(seg)) continue;
+        const wasClosed = path.closed;
+        const other = path.splitAt(seg.location);
+        if (wasClosed) ends.push(path.firstSegment, path.lastSegment);
+        else if (other) ends.push(path.lastSegment, other.firstSegment);
+      }
+      return ends;
+    });
+  }
+
+  /** The two selected loose ends, if exactly two are selected. */
+  private selectedEnds(): [paper.Segment, paper.Segment] | null {
+    const ends = this.selectedSegments().filter((s) => this.isEnd(s));
+    return ends.length === 2 && this.selectedSegments().length === 2 ? [ends[0], ends[1]] : null;
+  }
+
+  /**
+   * Join: merges two loose ends into one node (at their midpoint if they
+   * are apart). `withLine` connects them with a straight line instead
+   * ("Extend curve to close"). Works within one path or across two.
+   */
+  joinEnds(withLine: boolean) {
+    const pair = this.selectedEnds();
+    if (!pair) {
+      if (withLine) this.closeWithLine();
+      return;
+    }
+    const ps = this.host.ps;
+    const zero = () => new ps.Point(0, 0);
+    this.structural(() => {
+      let [a, b] = pair;
+      const A = a.path;
+      const B = b.path;
+      if (A === B) {
+        const first = A.firstSegment;
+        const last = A.lastSegment;
+        if (withLine) {
+          first.handleIn = zero();
+          last.handleOut = zero();
+          A.closed = true;
+          return [first, last];
+        }
+        first.point = first.point.add(last.point).divide(2);
+        first.handleIn = last.handleIn;
+        last.remove();
+        A.closed = true;
+        return [first];
+      }
+      // Make A end at `a` and B start at `b`, then append B to A.
+      if (a.isFirst()) A.reverse();
+      if (b.isLast()) B.reverse();
+      a = A.lastSegment;
+      b = B.firstSegment;
+      const moved = B.removeSegments();
+      B.remove();
+      if (withLine) {
+        a.handleOut = zero();
+        moved[0].handleIn = zero();
+        A.addSegments(moved);
+        return [a, moved[0]];
+      }
+      a.point = a.point.add(moved[0].point).divide(2);
+      a.handleOut = moved[0].handleOut;
+      A.addSegments(moved.slice(1));
+      return [a];
+    });
+  }
+
+  /** Paths the path-level commands act on: those with a selected node or segment, else every subpath. */
+  private actionPaths(): paper.Path[] {
+    const chosen = new Set<paper.Path>();
+    for (const s of this.selectedSegments()) chosen.add(s.path);
+    for (const c of this.selectedCurves()) chosen.add(c.path);
+    return chosen.size ? [...chosen] : this.paths();
+  }
+
+  /** Extend curve to close: joins each open path's start and end with a straight line. */
+  private closeWithLine() {
+    const open = this.actionPaths().filter((p) => !p.closed);
+    if (!open.length) return;
+    const ps = this.host.ps;
+    this.structural(() => {
+      for (const path of open) {
+        path.firstSegment.handleIn = new ps.Point(0, 0);
+        path.lastSegment.handleOut = new ps.Point(0, 0);
+        path.closed = true;
+      }
+    });
+  }
+
+  /** Close / open toggle. Opening removes the segment that runs from the last node back to the first. */
+  toggleClosed() {
+    const paths = this.actionPaths();
+    if (!paths.length) return;
+    this.structural(() => {
+      for (const path of paths) path.closed = !path.closed;
+    });
+  }
+
+  reverseDirection() {
+    const paths = this.actionPaths();
+    if (!paths.length) return;
+    const keep = this.selectedSegments();
+    this.structural(() => {
+      for (const path of paths) path.reverse();
+      return keep;
+    });
+  }
+
+  /** Lines the selected nodes up with the last one selected: "h" = on one horizontal line (same Y), "v" = same X. */
+  alignNodes(axis: "h" | "v") {
+    const segs = this.selectedSegments();
+    if (segs.length < 2) return;
+    const ref = this.pagePoint(segs[segs.length - 1]);
+    const ps = this.host.ps;
+    for (const seg of segs) {
+      const p = this.pagePoint(seg);
+      this.setPagePoint(seg, axis === "h" ? new ps.Point(p.x, ref.y) : new ps.Point(ref.x, p.y));
+    }
+    this.host.commit();
+  }
+
+  /** Double-click: on a node = delete it, on the outline = add a node exactly there. */
+  doubleClick(vp: paper.Point, p: paper.Point) {
+    if (!this.target || this.preview) return;
+    const node = this.hitNode(vp);
+    if (node) {
+      this.nodes = new Set([node.key]);
+      this.segs.clear();
+      this.deleteNodes();
+      return;
+    }
+    const hit = this.hitCurve(p);
+    if (hit) this.addNodeAt(hit);
+  }
+
+  // ---------------------------------------------------------------- simplify (reduce nodes)
+  private isCorner(seg: paper.Segment): boolean {
+    const prev = seg.previous;
+    const next = seg.next;
+    if (!prev || !next) return true;
+    const incoming = seg.handleIn.isZero() ? seg.point.subtract(prev.point) : seg.handleIn.multiply(-1);
+    const outgoing = seg.handleOut.isZero() ? next.point.subtract(seg.point) : seg.handleOut;
+    return turnAngle(incoming, outgoing) > CORNER_DEG;
+  }
+
+  /** Paper's curve fitter, run between corners so sharp corners stay sharp. */
+  private simplifiedCopy(path: paper.Path, tolerance: number): paper.Path {
+    const ps = this.host.ps;
+    const segs = path.segments;
+    const n = segs.length;
+    const out = new ps.Path({ insert: false, closed: path.closed });
+    // Paper's fitter compares SQUARED distances, so square our tolerance to make it a real distance in inches.
+    const fitError = tolerance * tolerance;
+    const corners: number[] = [];
+    for (let i = 0; i < n; i++) if (this.isCorner(segs[i])) corners.push(i);
+    if (n < 3) {
+      out.addSegments(segs.map((s) => s.clone()));
+      return out;
+    }
+    if (!corners.length) {
+      // A closed outline with no corners: fit it in one go.
+      out.addSegments(segs.map((s) => s.clone()));
+      out.simplify(fitError);
+      return out;
+    }
+    const runs: number[][] = [];
+    const last = path.closed ? corners.length : corners.length - 1;
+    for (let c = 0; c < last; c++) {
+      const from = corners[c];
+      const to = corners[(c + 1) % corners.length];
+      const run: number[] = [from];
+      for (let i = (from + 1) % n; ; i = (i + 1) % n) {
+        run.push(i);
+        if (i === to) break;
+      }
+      runs.push(run);
+    }
+    const result: paper.Segment[] = [];
+    runs.forEach((run, r) => {
+      const piece = new ps.Path({ insert: false, segments: run.map((i) => segs[i].clone()) });
+      piece.firstSegment.handleIn = new ps.Point(0, 0);
+      piece.lastSegment.handleOut = new ps.Point(0, 0);
+      if (run.length > 2) piece.simplify(fitError);
+      const fitted = piece.segments.map((s) => s.clone());
+      if (result.length) {
+        // The corner is shared: keep one node, with this run's outgoing handle.
+        result[result.length - 1].handleOut = fitted[0].handleOut;
+        fitted.shift();
+      }
+      if (path.closed && r === runs.length - 1) {
+        // The last run ends back on the first corner.
+        result[0].handleIn = fitted[fitted.length - 1].handleIn;
+        fitted.pop();
+      }
+      result.push(...fitted);
+    });
+    out.addSegments(result);
+    // A fitted curve that is really a straight line goes back to being a line.
+    for (const c of out.curves) if (c.hasHandles() && c.isStraight()) c.clearHandles();
+    return out;
+  }
+
+  /** Shows what Simplify would do at this tolerance (inches). Nothing changes until applySimplify(). */
+  previewSimplify(tolerance: number) {
+    if (!this.target) return;
+    const paths = this.paths();
+    this.nodes.clear();
+    this.segs.clear();
+    this.preview = {
+      tolerance,
+      before: paths.reduce((n, p) => n + p.segments.length, 0),
+      paths: paths.map((p) => this.simplifiedCopy(p, tolerance)),
+    };
+    this.host.selectionChanged();
+    this.host.changed();
+  }
+
+  applySimplify() {
+    const pv = this.preview;
+    if (!pv || !this.target) return;
+    this.preview = null;
+    this.paths().forEach((path, i) => {
+      const fitted = pv.paths[i];
+      if (!fitted) return;
+      path.removeSegments();
+      path.addSegments(fitted.segments.map((s) => s.clone()));
+      delete path.data.nt;
+    });
+    this.host.commit();
+  }
+
+  cancelSimplify() {
+    if (!this.preview) return;
+    this.preview = null;
+    this.host.changed();
+  }
+
+  // ---------------------------------------------------------------- check outlines
+  /** Every open path in the document (Phase 3 needs closed outlines to place prints in). */
+  openPaths(): OpenPathInfo[] {
+    const ps = this.host.ps;
+    const out: OpenPathInfo[] = [];
+    for (const path of this.host.contentLayer().getItems({ class: ps.Path }) as paper.Path[]) {
+      if (path.closed || path.segments.length < 2 || path.clipMask) continue;
+      const top = this.host.topLevel(path);
+      const address = this.addressOf(path);
+      if (!top || !top.visible || !address) continue;
+      out.push({
+        address,
+        label: top.name || (top instanceof ps.Group ? "Group" : "Curve"),
+        nodes: path.segments.length,
+        gap: this.pagePoint(path.firstSegment).getDistance(this.pagePoint(path.lastSegment)),
+      });
+    }
+    return out.sort((a, b) => b.nodes - a.nodes);
+  }
+
+  /** Opens an item found by openPaths() for editing, with its two loose ends selected. Returns its bounds. */
+  enterOpenPath(address: ItemAddress): paper.Rectangle | null {
+    const item = this.resolve(address);
+    if (!(item instanceof this.host.ps.Path)) return null;
+    this.enter(item);
+    if (!this.target) return null;
+    this.selectSegments([item.firstSegment, item.lastSegment]);
+    this.host.selectionChanged();
+    return item.bounds;
+  }
+
   get hasTarget() {
     return !!this.target;
   }
@@ -697,6 +1149,10 @@ export class ShapeTool {
       hasCurve: curves.some((c) => c.hasHandles()),
       hasLine: curves.some((c) => !c.hasHandles()),
       segmentLength: curves.length ? curves.reduce((n, c) => n + this.curveLength(c), 0) : null,
+      openEnds: segs.filter((s) => this.isEnd(s)).length,
+      canJoin: !!this.selectedEnds(),
+      canBreak: segs.some((s) => !this.isEnd(s)),
+      simplify: this.preview ? { tolerance: this.preview.tolerance, before: this.preview.before, after: this.preview.paths.reduce((n, p) => n + p.segments.length, 0) } : null,
     };
   }
 
@@ -720,6 +1176,32 @@ export class ShapeTool {
     const sx = (pt: paper.Point) => (pt.x - tl.x) * zoom;
     const sy = (pt: paper.Point) => (pt.y - tl.y) * zoom;
     const page = (path: paper.Path, pt: paper.Point) => (path.globalMatrix.isIdentity() ? pt : path.globalMatrix.transform(pt));
+
+    if (this.preview) {
+      // Simplify preview: the would-be outline and its nodes, over the untouched original.
+      const m = this.paths()[0]?.globalMatrix;
+      const at = (pt: paper.Point) => (m && !m.isIdentity() ? m.transform(pt) : pt);
+      ctx.strokeStyle = PREVIEW_COLOR;
+      ctx.fillStyle = PREVIEW_COLOR;
+      ctx.lineWidth = 1.5;
+      for (const path of this.preview.paths) {
+        ctx.beginPath();
+        for (const c of path.curves) {
+          const a = at(c.point1);
+          const b = at(c.point2);
+          const h1 = at(c.point1.add(c.handle1));
+          const h2 = at(c.point2.add(c.handle2));
+          if (c.index === 0) ctx.moveTo(sx(a), sy(a));
+          ctx.bezierCurveTo(sx(h1), sy(h1), sx(h2), sy(h2), sx(b), sy(b));
+        }
+        ctx.stroke();
+        for (const seg of path.segments) {
+          const pt = at(seg.point);
+          ctx.fillRect(Math.round(sx(pt)) - 2, Math.round(sy(pt)) - 2, 5, 5);
+        }
+      }
+      return;
+    }
 
     // Selected segments: highlighted along the curve.
     ctx.strokeStyle = NODE_COLOR;
