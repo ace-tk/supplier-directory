@@ -7,7 +7,7 @@
 // at before they go into the scene. Nothing here ever holds the whole
 // uncompressed picture in JS memory: libvips streams it.
 
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseFont, type Font } from "opentype.js";
 import sharp from "sharp";
@@ -16,6 +16,9 @@ import type { TextNode } from "../../engine/serialize";
 import type { ExportOptions, Rect } from "../options";
 import { buildExportScene, imageNeeds, type ExportScene, type SceneDoc } from "../scene";
 import { textOutlineData } from "../text-outline";
+import { setTiffResolution } from "../verify-tiff.mjs";
+import { BIGTIFF_BYTES } from "../options";
+import { EXPORT_ROOT } from "./asset-store";
 
 /** The SVG rasteriser cannot draw anything wider than 32,767 px, so wide pictures are drawn in strips of this width and joined. */
 export const STRIP_PX = 8192;
@@ -98,4 +101,79 @@ const svgInput = (svg: string) => sharp(Buffer.from(svg), { density: 72, limitIn
 export async function renderPng(scene: ExportScene): Promise<Buffer> {
   if (scene.widthPx > STRIP_PX * 3) throw new ExportError("This picture is too large for a PNG preview.");
   return svgInput(scene.svg()).png({ compressionLevel: 6 }).toBuffer();
+}
+
+export interface TiffResult {
+  file: string;
+  width: number;
+  height: number;
+  bytes: number;
+  bigTiff: boolean;
+  strips: number;
+  /** Seconds spent drawing the strips, and joining + compressing them. */
+  renderSeconds: number;
+  writeSeconds: number;
+}
+
+export type ExportStep = "rendering" | "stitching" | "compressing";
+
+/**
+ * Writes the scene as a print-ready TIFF: 8-bit RGB (RGB + alpha when the
+ * background is transparent), LZW, the sRGB profile embedded, and the
+ * resolution tags set to exactly `dpi` so it opens at its true size.
+ *
+ * A wide picture is drawn strip by strip into temporary files and then
+ * joined by libvips, which streams rows from the strips straight into the
+ * output — the whole uncompressed image is never in memory.
+ */
+export async function renderTiff(scene: ExportScene, file: string, opts: { dpi: number; transparent: boolean; onProgress?: (step: ExportStep, fraction: number) => void; signal?: AbortSignal; /** Strip width, px (tests use a small one). */ stripPx?: number }): Promise<TiffResult> {
+  const { widthPx: W, heightPx: H } = scene;
+  const stripPx = Math.max(16, Math.min(STRIP_PX, opts.stripPx ?? STRIP_PX));
+  const count = Math.ceil(W / stripPx);
+  const channels = opts.transparent ? 4 : 3;
+  const bigTiff = W * H * channels > BIGTIFF_BYTES;
+  const work = path.join(EXPORT_ROOT, "tmp", `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const stop = () => {
+    if (opts.signal?.aborted) throw new ExportError("The export was cancelled.");
+  };
+  const finish = (img: sharp.Sharp) => (opts.transparent ? img.ensureAlpha() : img.flatten({ background: "#ffffff" }).removeAlpha());
+  await mkdir(work, { recursive: true });
+  await mkdir(path.dirname(file), { recursive: true });
+  try {
+    const t0 = Date.now();
+    let source: sharp.Sharp;
+    if (count === 1) {
+      opts.onProgress?.("rendering", 0);
+      source = svgInput(scene.svg());
+    } else {
+      const parts: string[] = [];
+      for (let i = 0; i < count; i++) {
+        stop();
+        opts.onProgress?.("rendering", i / count);
+        const x0 = i * stripPx;
+        const part = path.join(work, `strip-${i}.tif`);
+        // Strips are working files: fast, lossless, and read back row by row when joined.
+        await finish(svgInput(scene.svg(x0, Math.min(stripPx, W - x0)))).tiff({ compression: "lzw", predictor: "horizontal" }).toFile(part);
+        parts.push(part);
+      }
+      opts.onProgress?.("stitching", 0);
+      // Every cell of the join is one strip wide; the last strip is narrower, so the surplus on the right is cut off.
+      source = sharp(parts, { join: { across: count, halign: "left", valign: "top" }, limitInputPixels: false }).extract({ left: 0, top: 0, width: W, height: H });
+    }
+    const t1 = Date.now();
+    stop();
+    opts.onProgress?.("compressing", 0);
+    const info = await finish(source)
+      .withIccProfile("srgb")
+      .tiff({ compression: "lzw", predictor: "horizontal", xres: opts.dpi / 25.4, yres: opts.dpi / 25.4, resolutionUnit: "inch", bigtiff: bigTiff })
+      .toFile(file);
+    await setTiffResolution(file, opts.dpi);
+    if (info.width !== W || info.height !== H) throw new ExportError(`The export came out ${info.width} × ${info.height} px instead of ${W} × ${H} px.`);
+    return { file, width: W, height: H, bytes: (await stat(file)).size, bigTiff, strips: count, renderSeconds: (t1 - t0) / 1000, writeSeconds: (Date.now() - t1) / 1000 };
+  } catch (err) {
+    await rm(file, { force: true });
+    throw err;
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
 }

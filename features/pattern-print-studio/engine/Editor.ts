@@ -1718,7 +1718,8 @@ export class Editor {
     const visible = cull ? mask.bounds.intersect(view.expand(Math.max(view.width, view.height) * 0.1)) : mask.bounds;
     const rep = new ps.Group({ insert: false });
     rep.data = { derived: true, pcRepeat: true };
-    clip.insertChild(1, rep);
+    // Above the mask and the frame's fill backing, below nothing else: tiles are the only print here.
+    clip.insertChild(clip.children.filter((c) => c.data?.pcMask || c.data?.pcFill).length, rep);
     this.repeatInfo.delete(pc);
     if (visible.width <= 0 || visible.height <= 0) return;
     const cover = coverInRepeatSpace(r, tile, rectOf(visible));

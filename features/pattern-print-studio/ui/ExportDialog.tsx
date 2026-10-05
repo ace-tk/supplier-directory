@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Editor, EditorState, PreflightIssue } from "../engine/Editor";
-import { requestPreview, uploadOriginals, type PreviewResult } from "../export/client";
+import { requestPreview, requestTiff, saveBlob, uploadOriginals, type PreviewResult } from "../export/client";
 import { BUILT_IN_PRESETS, clampDpi, DEFAULT_EXPORT, DPI_MAX, DPI_MIN, estimateExport, exportFileName, formatBytes, formatDuration, type AreaKind, type ExportOptions, type ExportPreset } from "../export/options";
 import { usedAssets } from "../export/scene";
 import { formatUnits, UNIT_LABEL } from "../engine/units";
@@ -118,6 +118,31 @@ function ExportBody({ editor, state, api, onClose }: { editor: Editor; state: Ed
       if (!ctl.signal.aborted) setError(err instanceof Error ? err.message : "The preview could not be made.");
     } finally {
       if (!ctl.signal.aborted) setBusy(null);
+    }
+  }
+
+  /** Step 4B: a real TIFF from the export renderer at 40 DPI, to check sizes and correctness before full resolution is switched on. */
+  const TEST_DPI = 40;
+  const [testing, setTesting] = useState<string | null>(null);
+  const [tested, setTested] = useState<string | null>(null);
+  async function testExport() {
+    if (!area) return;
+    setError(null);
+    setTested(null);
+    try {
+      const { doc, assets } = editor.exportDocument();
+      const used = usedAssets(doc);
+      setTesting("Sending original images…");
+      const list = await uploadOriginals(api, assets, used);
+      setTesting("Rendering the TIFF…");
+      const name = exportFileName(state.docName, area.label, TEST_DPI, new Date(), "tiff");
+      const out = await requestTiff(api, { doc, assets: list, area: area.rect, options: { ...opts, format: "tiff", dpi: TEST_DPI }, fileName: name });
+      saveBlob(out.blob, name);
+      setTested(`${name} — ${out.info.width} × ${out.info.height} px, ${formatBytes(out.info.bytes)}, made in ${(out.info.ms / 1000).toFixed(1)} s`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The export could not be made.");
+    } finally {
+      setTesting(null);
     }
   }
 
@@ -326,12 +351,16 @@ function ExportBody({ editor, state, api, onClose }: { editor: Editor; state: Ed
 
       <DialogFooter>
         <span className="mr-auto self-center text-xs text-muted-foreground" role="status" data-export-status>
-          {blocked ? (area ? "Fix the problems marked in red to export." : "Choose an area to export.") : needsConfirm ? "Tick “Export anyway” to export with warnings." : "Ready. The full-size export itself arrives in the next step (4B / 4C)."}
+          {testing ?? (tested ? `Downloaded ${tested}` : blocked ? (area ? "Fix the problems marked in red to export." : "Choose an area to export.") : needsConfirm ? "Tick “Export anyway” to export with warnings." : "Ready. Full-size export (150 / 300 DPI) arrives in step 4C; the 40 DPI test file uses the same renderer.")}
         </span>
         <Button variant="outline" onClick={onClose}>
           Close
         </Button>
-        <Button disabled title="Full-size export is built in steps 4B and 4C">
+        <Button variant="outline" disabled={blocked || needsConfirm || !!testing || opts.format !== "tiff"} onClick={testExport} title="A real TIFF from the export renderer, at 40 DPI, to check sizes and correctness">
+          {testing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+          Test export at 40 DPI
+        </Button>
+        <Button disabled title="Full-size export is built in step 4C">
           Export {opts.format === "pdf" ? "PDF" : "TIFF"}
         </Button>
       </DialogFooter>

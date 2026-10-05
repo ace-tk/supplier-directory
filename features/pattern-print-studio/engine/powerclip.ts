@@ -16,6 +16,12 @@ type Item = paper.Item;
  *   [frame]       the real outline, the same path the Shape tool edits
  * The mask is a generated copy of the frame (data.derived) and is never
  * saved; only the frame, the contents and the settings are.
+ *
+ * A frame that has a fill (pattern files often shade their pieces) would
+ * hide the print, because the frame is drawn on top. So while it is a
+ * frame its fill is shown by a generated backing shape UNDER the print
+ * (data.pcFill) and remembered in frame.data.pcFill; the saved document and
+ * Extract still give the outline its own fill back.
  */
 export interface PowerClipSettings {
   /** Contents move, rotate and scale with the frame. Off: the frame moves and the print stays. */
@@ -175,6 +181,23 @@ export function syncMask(ps: PaperScope, pc: Item, clipped = true) {
   mask.fillColor = null;
   mask.strokeColor = null;
   clip.insertChild(0, mask);
+  // The frame's own fill goes underneath the print (see the note at the top of this file).
+  for (const c of [...clip.children]) if (c.data?.pcFill) c.remove();
+  if (frame.fillColor) {
+    frame.data = { ...frame.data, pcFill: frame.fillColor.alpha < 1 ? frame.fillColor.toCSS(false) : frame.fillColor.toCSS(true) };
+    frame.fillColor = null;
+  }
+  if (frame.data?.pcFill) {
+    const backing = frame.clone({ insert: false, deep: true });
+    backing.data = { derived: true, pcFill: true };
+    for (const c of backing.children ?? []) c.data = {};
+    backing.name = "";
+    backing.visible = true;
+    backing.locked = false;
+    backing.strokeColor = null;
+    backing.fillColor = new ps.Color(frame.data.pcFill);
+    clip.insertChild(1, backing);
+  }
   clip.clipped = clipped;
 }
 
@@ -215,6 +238,12 @@ export function wrapInPowerClip(ps: PaperScope, frame: Item, contents: Item[], s
 export function unwrapPowerClip(pc: Item): { frame: Item; contents: Item[] } {
   const frame = frameOf(pc);
   const contents = contentsOf(pc);
+  if (frame.data?.pcFill) {
+    // The outline gets its own fill back.
+    const { pcFill, ...rest } = frame.data;
+    frame.fillColor = pcFill;
+    frame.data = rest;
+  }
   frame.insertAbove(pc);
   let above: Item = frame;
   for (const c of contents) {

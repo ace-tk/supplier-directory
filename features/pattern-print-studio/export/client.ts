@@ -70,3 +70,28 @@ export async function requestPreview(api: string, body: { doc: SceneDoc; assets:
   if (!res.ok) throw new Error(await message(res, "The preview could not be made."));
   return (await res.json()) as PreviewResult;
 }
+
+export interface TiffDownload {
+  blob: Blob;
+  fileName: string;
+  info: { width: number; height: number; dpi: number; bytes: number; strips: number; tiles: number; warnings: string[]; ms: number };
+}
+
+/** A low-resolution TIFF made straight away by the export renderer (step 4B; full-size exports are background jobs). */
+export async function requestTiff(api: string, body: { doc: SceneDoc; assets: { id: string; hash: string; name: string }[]; area: Rect; options: ExportOptions; fileName: string }, signal?: AbortSignal): Promise<TiffDownload> {
+  const res = await fetch(`${api}/tiff`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
+  if (!res.ok) throw new Error(await message(res, "The export could not be made."));
+  return { blob: await res.blob(), fileName: body.fileName, info: JSON.parse(res.headers.get("X-Pps-Export") ?? "{}") };
+}
+
+/** Hands a file to the browser's download. */
+export function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

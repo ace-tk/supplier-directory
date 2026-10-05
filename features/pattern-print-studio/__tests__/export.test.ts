@@ -1,10 +1,15 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { gate, gateLevel } from "../export/gate";
 import { areaLabel, clampDpi, estimateExport, exportFileName, mirrorX, pixelSize, sizesArea, unionRects, type ExportOptions } from "../export/options";
 import { bleedClip, buildExportScene, flattenSegs, imageNeeds, type SceneDoc } from "../export/scene";
-import { prepareScene, renderPng } from "../export/server/render";
+import { prepareScene, renderPng, renderTiff } from "../export/server/render";
+import { readTiffTags, verifyTiff } from "../export/verify-tiff.mjs";
 import { validateExportRequest } from "../export/server/handlers";
 import { defaultRepeat } from "../engine/repeat";
 import type { PathNode, SceneNode, Seg } from "../engine/serialize";
@@ -255,5 +260,111 @@ describe("export render (the same path the preview and the final file use)", () 
   });
   it("a missing original stops the export with the file's name", async () => {
     await expect(prepareScene({ doc: sampleDoc(), area: AREA, options: OPTS, originalPath: () => null, assetName: () => "floral.png" })).rejects.toThrow(/floral\.png.*missing/);
+  });
+});
+
+describe("TIFF output + the verification script", () => {
+  const original = (id: string) => (id === "tile" ? path.join(FIXTURES, "repeat-tile.png") : null);
+  const tiff = async (dir: string, name: string, options: Partial<ExportOptions> = {}, stripPx?: number) => {
+    const o = { ...OPTS, dpi: 40, ...options };
+    const scene = await prepareScene({ doc: sampleDoc(), area: AREA, options: o, originalPath: original });
+    return renderTiff(scene, path.join(dir, name), { dpi: o.dpi, transparent: o.background === "transparent", stripPx });
+  };
+
+  it("a 40 DPI export passes every check: size, DPI tags, 8-bit RGB, LZW, sRGB profile", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "pps-test-"));
+    try {
+      const out = await tiff(dir, "plain.tif");
+      expect([out.width, out.height]).toEqual([480, 320]);
+      const v = await verifyTiff(out.file, { widthIn: 12, heightIn: 8, dpi: 40 });
+      expect(v.checks.filter((c) => !c.ok)).toEqual([]);
+      // the resolution is stored as the exact fraction 40/1, in inches
+      expect(v.tags.xResolution).toMatchObject({ numerator: 40, denominator: 1 });
+      expect(v.tags.yResolution).toMatchObject({ numerator: 40, denominator: 1 });
+      expect(v.tags.resolutionUnit).toBe(2);
+      // and an image library agrees
+      const meta = await sharp(out.file).metadata();
+      expect(meta.density).toBe(40);
+      expect(meta.channels).toBe(3);
+      expect(meta.icc).toBeTruthy();
+
+      // the script catches a wrong size or DPI
+      expect((await verifyTiff(out.file, { widthIn: 12, heightIn: 8, dpi: 150 })).ok).toBe(false);
+      expect((await verifyTiff(out.file, { widthIn: 163.75, heightIn: 37.694, dpi: 40 })).ok).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("mirror on / off is verified against the un-mirrored export", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "pps-test-"));
+    try {
+      const plain = await tiff(dir, "plain.tif");
+      const again = await tiff(dir, "again.tif");
+      const mirrored = await tiff(dir, "mirror.tif", { mirror: true });
+      const size = { widthIn: 12, heightIn: 8, dpi: 40 };
+      const mv = await verifyTiff(mirrored.file, { ...size, mirror: true, reference: plain.file });
+      expect(mv.checks.filter((c) => !c.ok)).toEqual([]);
+      expect((await verifyTiff(again.file, { ...size, mirror: false, reference: plain.file })).ok).toBe(true);
+      // a file that was NOT mirrored fails the mirror check, and the other way round
+      expect((await verifyTiff(again.file, { ...size, mirror: true, reference: plain.file })).ok).toBe(false);
+      expect((await verifyTiff(mirrored.file, { ...size, mirror: false, reference: plain.file })).ok).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("a picture drawn in strips is identical, pixel for pixel, to one drawn in one go", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "pps-test-"));
+    try {
+      const whole = await tiff(dir, "whole.tif", { dpi: 96, cutLines: true, sizeLabels: true });
+      const strips = await tiff(dir, "strips.tif", { dpi: 96, cutLines: true, sizeLabels: true }, 200); // 1152 px wide = 6 strips, the last one narrower
+      expect(whole.strips).toBe(1);
+      expect(strips.strips).toBe(6);
+      expect([strips.width, strips.height]).toEqual([1152, 768]);
+      const a = await sharp(whole.file).raw().toBuffer();
+      const b = await sharp(strips.file).raw().toBuffer();
+      expect(b.length).toBe(a.length);
+      let differing = 0;
+      let worst = 0;
+      for (let i = 0; i < a.length; i++) {
+        const d = Math.abs(a[i] - b[i]);
+        if (d) differing++;
+        if (d > worst) worst = d;
+      }
+      // antialiasing at a strip edge may differ by a rounding step; nothing more
+      expect(worst).toBeLessThanOrEqual(2);
+      expect(differing / a.length).toBeLessThan(0.001);
+      expect((await verifyTiff(strips.file, { widthIn: 12, heightIn: 8, dpi: 96 })).ok).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("transparent background writes RGB + alpha", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "pps-test-"));
+    try {
+      const out = await tiff(dir, "alpha.tif", { background: "transparent" });
+      expect((await verifyTiff(out.file, { widthIn: 12, heightIn: 8, dpi: 40, transparent: true })).ok).toBe(true);
+      expect((await readTiffTags(out.file)).samplesPerPixel).toBe(4);
+      expect((await verifyTiff(out.file, { widthIn: 12, heightIn: 8, dpi: 40 })).ok).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("the script runs from the command line and sets its exit code", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "pps-test-"));
+    try {
+      const out = await tiff(dir, "plain.tif");
+      const script = path.join(__dirname, "..", "export", "verify-tiff.mjs");
+      const run = promisify(execFile);
+      const good = await run(process.execPath, [script, out.file, "--width", "12", "--height", "8", "--dpi", "40"]);
+      expect(good.stdout).toMatch(/All checks passed/);
+      expect(good.stdout).not.toMatch(/FAIL/);
+      await expect(run(process.execPath, [script, out.file, "--width", "12", "--height", "8", "--dpi", "300"])).rejects.toMatchObject({ code: 1 });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -211,3 +211,39 @@ describe("fitting a print in a frame", () => {
     expect(dpiLevel(99.9)).toBe("bad");
   });
 });
+
+describe("a frame with its own fill", () => {
+  const ps = new paper.PaperScope();
+  ps.setup(new ps.Size(100, 100));
+
+  it("the fill is drawn UNDER the print, never over it; saving and Extract give the outline its fill back", () => {
+    const frame = new ps.Path.Rectangle({ point: [0, 0], size: [10, 10], insert: false });
+    frame.fillColor = new ps.Color("#e6e7e8");
+    frame.strokeColor = new ps.Color("#000000");
+    const print = new ps.Path.Circle({ center: [5, 5], radius: 3, insert: false });
+    print.fillColor = new ps.Color("#ff0000");
+    const pc = assemblePowerClip(ps, frame, [print], { lock: true });
+    ps.project.activeLayer.addChild(pc);
+    // the outline itself no longer paints a fill on top of the print
+    expect(frame.fillColor).toBeNull();
+    const clip = clipGroupOf(pc);
+    const order = clip.children.map((c) => (c.data.pcMask ? "mask" : c.data.pcFill ? "fill" : "print"));
+    expect(order).toEqual(["mask", "fill", "print"]);
+    expect(clip.children[1].fillColor?.toCSS(true)).toBe("#e6e7e8");
+    expect(contentsOf(pc)).toEqual([print]);
+    // rebuilding the clip (node edits, bleed changes) keeps exactly one backing
+    syncMask(ps, pc);
+    syncMask(ps, pc);
+    expect(clipGroupOf(pc).children.filter((c) => c.data.pcFill)).toHaveLength(1);
+    // the saved document still has the fill on the outline
+    const node = toNode(ps, pc);
+    expect(node && node.t === "powerclip" && node.frame.style?.fill).toBe("#e6e7e8");
+    const again = fromNode(ps, node!, () => null)!;
+    expect(JSON.stringify(toNode(ps, again))).toBe(JSON.stringify(node));
+    expect(clipGroupOf(again).children.filter((c) => c.data.pcFill)).toHaveLength(1);
+    // Extract: a normal filled outline again
+    const out = unwrapPowerClip(pc);
+    expect(out.frame.fillColor?.toCSS(true)).toBe("#e6e7e8");
+    expect(out.frame.data.pcFill).toBeUndefined();
+  });
+});

@@ -181,6 +181,8 @@ export function toNode(ps: PaperScope, item: Item): SceneNode | null {
     const frame = frameOf(item);
     const f = frame ? toNode(ps, frame) : null;
     if (!f || (f.t !== "path" && f.t !== "compound")) return null;
+    // While it is a frame, the outline's fill is drawn by a generated backing under the print; the saved outline keeps its fill.
+    if (frame.data?.pcFill) f.style = { ...f.style, fill: frame.data.pcFill };
     const node: PowerClipNode = { t: "powerclip", ...baseOf(item), pc: { ...item.data.pc }, frame: f, contents: contentsOf(item).map((c) => toNode(ps, c)).filter((c): c is SceneNode => !!c) };
     const holder = tileHolderOf(item);
     if (holder && item.data.pc.repeat) node.tile = [holder.bounds.x, holder.bounds.y, holder.bounds.width, holder.bounds.height];

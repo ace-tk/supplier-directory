@@ -1,11 +1,15 @@
 // Request handlers for the export API. They hold no auth logic — the
 // route files under app/api decide who may call them.
 
-import { DPI_MAX, DPI_MIN, PREVIEW_DPI, type ExportOptions, type Rect } from "../options";
+import { createReadStream } from "node:fs";
+import { rm } from "node:fs/promises";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { DPI_MAX, DPI_MIN, pixelSize, PREVIEW_DPI, safeNamePart, type ExportOptions, type Rect } from "../options";
 import type { SceneDoc } from "../scene";
 import { usedAssets } from "../scene";
-import { assetPath, AssetUploadError, hasAsset, isHash, saveAsset } from "./asset-store";
-import { ExportError, prepareScene, renderPng } from "./render";
+import { assetPath, AssetUploadError, EXPORT_ROOT, hasAsset, isHash, saveAsset } from "./asset-store";
+import { ExportError, prepareScene, renderPng, renderTiff } from "./render";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
@@ -99,5 +103,54 @@ export async function preview(request: Request): Promise<Response> {
   } catch (err) {
     if (err instanceof ExportError) return json({ error: err.message }, 422);
     return json({ error: "The preview could not be rendered." }, 500);
+  }
+}
+
+/** Step 4B: TIFFs are made while the request waits, so they are kept small. Full-size exports run as background jobs (4C). */
+export const DIRECT_DPI_MIN = 20;
+export const DIRECT_DPI_MAX = 72;
+const DIRECT_MAX_PIXELS = 40e6;
+
+/**
+ * POST: a low-resolution TIFF, rendered straight away and sent back as a
+ * download. The same scene, rasteriser and TIFF writer as the full-size
+ * export — used to check correctness before high resolutions are switched on.
+ */
+export async function tiffNow(request: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Bad request." }, 400);
+  }
+  const problem = validateExportRequest(body);
+  if (problem) return json({ error: problem }, 400);
+  const req = body as ExportRequest & { fileName?: string };
+  const dpi = req.options.dpi;
+  if (dpi < DIRECT_DPI_MIN || dpi > DIRECT_DPI_MAX) return json({ error: `A direct export must be between ${DIRECT_DPI_MIN} and ${DIRECT_DPI_MAX} DPI.` }, 400);
+  const px = pixelSize(req.area, dpi);
+  if (px.width * px.height > DIRECT_MAX_PIXELS) return json({ error: "This area is too large for a direct export." }, 400);
+  const missing = await missingAssets(req);
+  if (missing.length) return json({ error: "Some original images have not been uploaded yet.", missing }, 409);
+  const file = path.join(EXPORT_ROOT, "out", `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.tif`);
+  try {
+    const t0 = Date.now();
+    const scene = await prepareScene(renderInputOf(req, dpi));
+    const out = await renderTiff(scene, file, { dpi, transparent: req.options.background === "transparent", signal: request.signal });
+    const stream = createReadStream(file);
+    stream.on("close", () => void rm(file, { force: true }));
+    const name = safeNamePart((req.fileName ?? "export").replace(/\.tiff?$/i, ""), "export") + ".tif";
+    return new Response(Readable.toWeb(stream) as ReadableStream, {
+      headers: {
+        "Content-Type": "image/tiff",
+        "Content-Length": String(out.bytes),
+        "Content-Disposition": `attachment; filename="${name}"`,
+        "X-Pps-Export": JSON.stringify({ width: out.width, height: out.height, dpi, bytes: out.bytes, strips: out.strips, tiles: scene.tiles, warnings: scene.warnings, ms: Date.now() - t0 }),
+      },
+    });
+  } catch (err) {
+    await rm(file, { force: true });
+    if (err instanceof ExportError) return json({ error: err.message }, 422);
+    return json({ error: "The export could not be rendered." }, 500);
   }
 }
