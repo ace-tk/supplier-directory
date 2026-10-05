@@ -13,6 +13,8 @@ export function useExportJobs(api: string, docId: string | null) {
   const [jobs, setJobs] = useState<ExportJob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const known = useRef(new Map<string, ExportJob["status"]>());
+  const asked = useRef(0);
+  const applied = useRef(0);
 
   const download = useCallback(
     async (job: ExportJob) => {
@@ -29,8 +31,13 @@ export function useExportJobs(api: string, docId: string | null) {
 
   const refresh = useCallback(async () => {
     if (!docId) return;
+    // Requests can overlap (the one-second poll, a click on Refresh, a job just started). An answer that was
+    // asked for before a newer one must not overwrite it.
+    const turn = ++asked.current;
     try {
       const list = await listExports(api, docId);
+      if (turn < applied.current) return;
+      applied.current = turn;
       setError(null);
       for (const job of list) {
         const before = known.current.get(job.id);

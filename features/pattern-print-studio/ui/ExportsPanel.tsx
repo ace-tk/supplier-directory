@@ -59,7 +59,8 @@ export function ExportsPanel({ api, docId, docName, exports, onOpenExport }: { a
               </span>
             </div>
             <span className="text-muted-foreground">
-              {job.area} · {job.dpi} DPI · {job.widthPx.toLocaleString("en-US")} × {job.heightPx.toLocaleString("en-US")} px{job.bytes ? ` · ${formatBytes(job.bytes)}` : ""} · {when(job.createdAt)}
+              {job.area} · {job.format === "pdf" ? `PDF · ${job.widthIn.toFixed(2)} × ${job.heightIn.toFixed(2)} in` : `${job.dpi} DPI · ${job.widthPx.toLocaleString("en-US")} × ${job.heightPx.toLocaleString("en-US")} px`}
+              {job.bytes ? ` · ${formatBytes(job.bytes)}` : ""} · {when(job.createdAt)}
               {job.status === "done" && job.seconds ? ` · took ${formatDuration(job.seconds)}` : ""}
             </span>
             {isActive(job) && <Bar job={job} />}
@@ -112,7 +113,7 @@ export function ExportProgressChip({ api, exports }: { api: string; exports: Exp
       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
       <div className="grid min-w-0 flex-1 gap-1">
         <span className="truncate text-foreground" title={job.fileName}>
-          Exporting {job.area} at {job.dpi} DPI — {pct}% · {STEP_LABEL[job.step]}
+          Exporting {job.area} {job.format === "pdf" ? "as PDF" : `at ${job.dpi} DPI`} — {pct}% · {STEP_LABEL[job.step]}
         </span>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${pct}%` }} />

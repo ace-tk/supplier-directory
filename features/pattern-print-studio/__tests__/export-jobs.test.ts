@@ -17,7 +17,7 @@ import { verifyTiff } from "../export/verify-tiff.mjs";
 const API = "/api/test";
 const USER = `vitest-${process.pid}-${Date.now()}`;
 const FIXTURE = path.join(__dirname, "fixtures", "repeat-tile.png");
-const OPTS: ExportOptions = { format: "tiff", dpi: 72, mirror: false, cutLines: false, cutLineWidthPt: 1, sizeLabels: false, background: "white" };
+const OPTS: ExportOptions = { format: "tiff", dpi: 72, mirror: false, cutLines: false, cutLineWidthPt: 1, sizeLabels: false, background: "white", pdfDownsample: true, pdfLiveText: false };
 const AREA = { x: 0, y: 0, w: 12, h: 8 };
 
 afterAll(() => rm(path.join(EXPORT_ROOT, "jobs", USER), { recursive: true, force: true }));
@@ -154,7 +154,6 @@ describe("export jobs", () => {
     const hash = await upload(await readFile(FIXTURE));
     await expect(createJob(API, USER, { docId: "../etc", request: request(hash) })).rejects.toBeInstanceOf(JobError);
     await expect(createJob(API, USER, { docId: "doc-bad-1", request: request(hash, { dpi: 20 }) })).rejects.toThrow(/between 72 and 600/);
-    await expect(createJob(API, USER, { docId: "doc-bad-1", request: request(hash, { format: "pdf" }) })).rejects.toThrow(/TIFF/);
     await expect(createJob(API, USER, { docId: "doc-bad-1", kind: "calibration", dpi: 5000 })).rejects.toThrow(/between 72 and 600/);
     await expect(listJobs(API, USER, "x")).rejects.toBeInstanceOf(JobError);
   });

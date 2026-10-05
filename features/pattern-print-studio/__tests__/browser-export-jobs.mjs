@@ -116,9 +116,27 @@ export default async function run() {
   ok('Calibration test: a 10 × 10 in TIFF, 1,500 × 1,500 px at 150 DPI', !!cal && cal.status === 'done' && cal.widthPx === 1500 && cal.heightPx === 1500 && /^Leggings-Floral_Calibration_150dpi_/.test(cal.fileName), cal && `${cal.fileName}, ${(cal.bytes / 1e3).toFixed(0)} KB in ${cal.seconds.toFixed(1)} s`);
   if (hasHelper && cal) { const v = await helper('verify-url', { url: cal.download.url, name: 'calibration-150.tif', expect: { widthIn: 10, heightIn: 10, dpi: 150 } }); ok('…it passes the verification script (150/1 DPI tags, sRGB, LZW)', v.ok, (v.checks || []).filter((c) => !c.ok).map((c) => c.name).join(', ') || 'all checks pass'); }
 
+  // ---------------------------------------------------------------- editable PDF (4D)
+  key('e', { ctrlKey: true }); await until(() => dlg() && /Export for production/.test(dlg().textContent)); await ticks(20);
+  box('PDF').click(); await ticks(20);
+  const info = (k) => { const e = dlg().querySelector(`[data-info="${k}"]`); return e ? e.textContent.trim() : ''; };
+  ok('PDF format: the page is shown in points (163.75 × 37.694 in = 11790 × 2713.97 pt), with the PDF options', info('points') === '11790.00 × 2713.97 pt' && /Vector, editable/.test(info('vector')) && !!box('Downsample images above 300 effective DPI') && box('Downsample images above 300 effective DPI').checked && !!box('Keep text editable') && !box('Keep text editable').checked, `${info('points')} · ${info('vector')}`);
+  ok('…the file name has no DPI: {document}_{area}_{date}.pdf', /^Leggings-Floral_All-sizes_\d{4}-\d\d-\d\d_\d{4}\.pdf$/.test(info('name')), info('name'));
+  box('Include cut lines').click(); await ticks(10); if (box('Export anyway')) { box('Export anyway').click(); await ticks(20); }
+  const tp = performance.now(); dbtn('Export PDF').click(); await until(() => !dlg(), 30000);
+  let pj; await until(async () => { pj = (await list()).find((j) => j.format === 'pdf'); return pj && pj.status !== 'queued' && pj.status !== 'running'; }, 120000, 300); report.pdf = pj;
+  ok('Export PDF runs as a background job and finishes', !!pj && pj.status === 'done' && pj.bytes > 10000, pj && `${pj.fileName}, ${(pj.bytes / 1e6).toFixed(2)} MB in ${pj.seconds.toFixed(1)} s (${((performance.now() - tp) / 1000).toFixed(1)} s incl. upload), peak memory ${pj.peakMemoryMb} MB`);
+  const pdfRow = () => rows().find((r) => /PDF · 163\.75 × 37\.69 in/.test(r.textContent) && r.dataset.status === 'done');
+  for (let i = 0; i < 16 && !pdfRow(); i++) { refreshList(); await list(); await sleep(500); await ticks(40); }
+  ok('…the export list shows it as a PDF with its size in inches', !!pdfRow() && !!btn('Download', pdfRow()), rows().map((r) => `${r.dataset.status}: ${r.textContent.slice(0, 90)}`).join(' | '));
+  if (pj && pj.download) { const r = await fetch(pj.download.url); const b = await r.blob(); const head = await b.slice(0, 5).text();
+    ok('…the signed link downloads it as application/pdf', r.ok && r.headers.get('content-type') === 'application/pdf' && head === '%PDF-' && b.size === pj.bytes && r.headers.get('content-disposition').includes('.pdf'));
+    const pc = await helper('pdf-check', { url: pj.download.url, name: 'full.pdf' }).catch(() => null); report.pdfCheck = pc;
+    if (pc && pc.page) ok('read back on the server: page 11790 × 2713.968 pt, 3 layers, images stored once, one tile object per repeat', Math.abs(pc.page.width - 11790) < 1e-6 && Math.abs(pc.page.height - 2713.968) < 1e-6 && pc.layers.join(',') === 'Print,Cut lines,Size labels' && pc.images === 2 && pc.forms === 18, JSON.stringify(pc)); }
+
   // ---------------------------------------------------------------- the list
   refreshList(); await sleep(1500); const all = await list();
-  ok('the export list holds this document\'s exports, newest first, with their status', all.length >= 4 && all.every((j, i) => i === 0 || all[i - 1].createdAt >= j.createdAt) && rows().length === all.length, all.map((j) => `${j.area} ${j.dpi} ${j.status}`).join(' · '));
+  ok('the export list holds this document\'s exports, newest first, with their status', all.length >= 5 && all.every((j, i) => i === 0 || all[i - 1].createdAt >= j.createdAt) && rows().length === all.length, all.map((j) => `${j.area} ${j.dpi} ${j.status}`).join(' · '));
   const other = (await (await fetch(`${API}/jobs?doc=some-other-document`)).json()).jobs;
   ok('another document has its own (empty) list', Array.isArray(other) && other.length === 0);
   } catch (e) { R.push('FAIL 4C test stopped — ' + e.message + ' @ ' + ((e.stack || '').split('\n')[1] || '').trim()); }

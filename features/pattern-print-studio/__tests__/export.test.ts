@@ -15,7 +15,7 @@ import { defaultRepeat } from "../engine/repeat";
 import type { PathNode, SceneNode, Seg } from "../engine/serialize";
 
 const FIXTURES = path.join(__dirname, "fixtures");
-const OPTS: ExportOptions = { format: "tiff", dpi: 50, mirror: false, cutLines: false, cutLineWidthPt: 2, sizeLabels: false, background: "white" };
+const OPTS: ExportOptions = { format: "tiff", dpi: 50, mirror: false, cutLines: false, cutLineWidthPt: 2, sizeLabels: false, background: "white", pdfDownsample: true, pdfLiveText: false };
 
 const rect = (x: number, y: number, w: number, h: number, style: PathNode["style"] = { stroke: "#000000", strokeWidth: 0.01 }): PathNode => ({
   t: "path",
@@ -84,7 +84,9 @@ describe("export arithmetic", () => {
   it("file name: {document}_{area}_{dpi}dpi_{YYYY-MM-DD_HHmm}", () => {
     const when = new Date(2026, 9, 5, 19, 30);
     expect(exportFileName("Leggings Floral", "All-sizes", 150, when, "tiff")).toBe("Leggings-Floral_All-sizes_150dpi_2026-10-05_1930.tif");
-    expect(exportFileName("  a/b\\c: d?  ", areaLabel("sizes", ["XL"]), 300, new Date(2026, 0, 2, 3, 4), "pdf")).toBe("abc-d_XL_300dpi_2026-01-02_0304.pdf");
+    expect(exportFileName("  a/b\\c: d?  ", areaLabel("sizes", ["XL"]), 300, new Date(2026, 0, 2, 3, 4), "tiff")).toBe("abc-d_XL_300dpi_2026-01-02_0304.tif");
+    // a PDF is vector, so its name carries no DPI
+    expect(exportFileName("Leggings Floral", "All-sizes", 150, when, "pdf")).toBe("Leggings-Floral_All-sizes_2026-10-05_1930.pdf");
     expect(exportFileName("", areaLabel("selection"), 72, when, "tiff")).toBe("Untitled_Selection_72dpi_2026-10-05_1930.tif");
     expect(areaLabel("page")).toBe("All-sizes");
     expect(areaLabel("sizes", ["S", "M"])).toBe("S-M");

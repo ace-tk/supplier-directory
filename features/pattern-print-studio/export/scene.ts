@@ -88,21 +88,23 @@ const outlineData = (n: PathNode | CompoundNode) => (n.t === "path" ? pathData(n
  * bleed (holes in the outline shrink by the same amount). The same offset
  * code the editor uses, so the export matches the screen.
  */
-export function bleedClip(frame: PathNode | CompoundNode, bleed: number): { d: string; box: Rect } {
+export function bleedClip(frame: PathNode | CompoundNode, bleed: number): { d: string; box: Rect; polygons: Pt[][] | null } {
   const paths = frame.t === "path" ? [frame] : frame.children;
-  if (!(bleed > 0)) return { d: outlineData(frame), box: outlineBox(frame, 0) };
+  if (!(bleed > 0)) return { d: outlineData(frame), box: outlineBox(frame, 0), polygons: null };
   const contours = paths.filter((p) => p.closed && p.segs.length > 1).map((p) => flattenSegs(p.segs, true));
-  let d = "";
+  const polygons: Pt[][] = [];
   contours.forEach((pts, i) => {
     if (pts.length < 3) return;
     const isHole = contours.filter((other, j) => j !== i && other.length >= 3 && pointInPolygon(pts[0], other)).length % 2 === 1;
-    d += polyData(offsetOutline(pts, bleed, { tolerance: FLATNESS, inward: isHole }).points);
+    const grown = offsetOutline(pts, bleed, { tolerance: FLATNESS, inward: isHole }).points;
+    if (grown.length >= 3) polygons.push(grown);
   });
-  return { d: d || outlineData(frame), box: outlineBox(frame, bleed) };
+  if (!polygons.length) return { d: outlineData(frame), box: outlineBox(frame, bleed), polygons: null };
+  return { d: polygons.map(polyData).join(""), box: outlineBox(frame, bleed), polygons };
 }
 
 /** Box around an outline's nodes and handles (always contains the outline), grown by `pad`. */
-function outlineBox(n: PathNode | CompoundNode, pad: number): Rect {
+export function outlineBox(n: PathNode | CompoundNode, pad: number): Rect {
   let l = Infinity;
   let t = Infinity;
   let r = -Infinity;
@@ -136,8 +138,8 @@ function styleAttrs(s: StyleJSON | undefined): string {
 }
 
 /** Label text that was converted to curves in the studio keeps its wording in its name. */
-const isConvertedLabel = (n: SceneNode) => /^Text "(.+)"$/.test(n.name ?? "");
-const hasFill = (n: SceneNode) => !!n.style?.fill && n.style.fill !== "none";
+export const isConvertedLabel = (n: SceneNode) => /^Text "(.+)"$/.test(n.name ?? "");
+export const hasFill = (n: SceneNode) => !!n.style?.fill && n.style.fill !== "none";
 
 /** The bleed that applies to a PowerClip: its own, or the document's (shown on screen or not). */
 export function bleedFor(pc: { bleed?: number }, settings: SceneDoc["settings"]): number {

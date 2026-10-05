@@ -24,6 +24,10 @@ export interface ExportOptions {
   /** Include the size / piece label text. */
   sizeLabels: boolean;
   background: "white" | "transparent";
+  /** PDF: shrink images that have more than 300 DPI at their printed size (keeps the file size sane). */
+  pdfDownsample: boolean;
+  /** PDF: keep text as editable text (Helvetica / Arial) instead of outlines. */
+  pdfLiveText: boolean;
 }
 
 export type AreaKind = "page" | "sizes" | "selection";
@@ -40,7 +44,7 @@ export const DPI_MAX = 600;
 /** The dialog's quick preview. Rendered by exactly the same code as the final export, just at this resolution. */
 export const PREVIEW_DPI = 20;
 
-export const DEFAULT_EXPORT: ExportOptions = { format: "tiff", dpi: 150, mirror: false, cutLines: false, cutLineWidthPt: 0.5, sizeLabels: false, background: "white" };
+export const DEFAULT_EXPORT: ExportOptions = { format: "tiff", dpi: 150, mirror: false, cutLines: false, cutLineWidthPt: 0.5, sizeLabels: false, background: "white", pdfDownsample: true, pdfLiveText: false };
 
 export interface ExportPreset {
   id: string;
@@ -94,11 +98,15 @@ export function safeNamePart(text: string, fallback: string): string {
   return s || fallback;
 }
 
-/** {document}_{area}_{dpi}dpi_{YYYY-MM-DD_HHmm}.tif — in local time. */
+/** {document}_{area}_{dpi}dpi_{YYYY-MM-DD_HHmm}.tif — in local time. A PDF is vector, so its name has no DPI: {document}_{area}_{date}.pdf. */
 export function exportFileName(docName: string, areaLabel: string, dpi: number, when: Date, format: ExportFormat): string {
   const stamp = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}_${pad(when.getHours())}${pad(when.getMinutes())}`;
-  return `${safeNamePart(docName, "Untitled")}_${safeNamePart(areaLabel, "Area")}_${dpi}dpi_${stamp}.${format === "pdf" ? "pdf" : "tif"}`;
+  const base = `${safeNamePart(docName, "Untitled")}_${safeNamePart(areaLabel, "Area")}`;
+  return format === "pdf" ? `${base}_${stamp}.pdf` : `${base}_${dpi}dpi_${stamp}.tif`;
 }
+
+/** Images in a PDF are kept at up to this many pixels per printed inch when "downsample" is on. */
+export const PDF_IMAGE_DPI = 300;
 
 export function areaLabel(kind: AreaKind, sizes: string[] = []): string {
   if (kind === "page") return "All-sizes";

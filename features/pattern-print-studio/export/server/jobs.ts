@@ -7,7 +7,7 @@
 // between strips (a few seconds at most at 150 DPI, longer at 300).
 
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AUTH_SECRET } from "@/lib/auth-secret";
 import { DPI_MAX, DPI_MIN, exportFileName, pixelSize, safeNamePart } from "../options";
@@ -24,12 +24,16 @@ export interface JobRecord {
   id: string;
   docId: string;
   kind: "export" | "calibration";
+  format: "tiff" | "pdf";
   fileName: string;
   /** "All-sizes", "XL", "Selection", "Calibration". */
   area: string;
   dpi: number;
   widthPx: number;
   heightPx: number;
+  /** The export area, inches. */
+  widthIn: number;
+  heightIn: number;
   status: JobStatus;
   step: JobStep;
   /** 0–1. */
@@ -61,7 +65,7 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
 const userKey = (userId: string) => safeNamePart(userId, "user").slice(0, 64);
 const docDir = (userId: string, docId: string) => path.join(EXPORT_ROOT, "jobs", userKey(userId), docId);
 const jobDir = (userId: string, docId: string, id: string) => path.join(docDir(userId, docId), id);
-const outputPath = (userId: string, job: Pick<JobRecord, "docId" | "id">) => path.join(jobDir(userId, job.docId, job.id), "output.tif");
+const outputPath = (userId: string, job: Pick<JobRecord, "docId" | "id" | "format">) => path.join(jobDir(userId, job.docId, job.id), job.format === "pdf" ? "output.pdf" : "output.tif");
 
 // Shared by every route handler in this server process (route bundles may each load this module).
 interface Shared {
@@ -89,7 +93,13 @@ async function readJob(dir: string): Promise<JobRecord | null> {
     return null;
   }
 }
-const writeJob = (userId: string, job: JobRecord) => writeFile(path.join(jobDir(userId, job.docId, job.id), "job.json"), JSON.stringify(job));
+/** Written to a side file and renamed into place, so a reader never sees a half-written record. */
+async function writeJob(userId: string, job: JobRecord) {
+  const file = path.join(jobDir(userId, job.docId, job.id), "job.json");
+  const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  await writeFile(tmp, JSON.stringify(job));
+  await rename(tmp, file);
+}
 
 // ---------------------------------------------------------------- signed, expiring download links
 function sign(userId: string, docId: string, id: string, exp: number): string {
@@ -101,7 +111,7 @@ function linkFor(api: string, userId: string, job: JobRecord): { url: string; ex
   return { url: `${api}/jobs/${job.id}/download?${q}`, expiresAt: exp };
 }
 /** Checks a download link. Returns the file and its name, or null if the link is wrong or has expired. */
-export async function resolveDownload(id: string, params: URLSearchParams): Promise<{ file: string; fileName: string; bytes: number } | null> {
+export async function resolveDownload(id: string, params: URLSearchParams): Promise<{ file: string; fileName: string; bytes: number; contentType: string } | null> {
   const docId = params.get("doc");
   const user = params.get("u") ?? "";
   const exp = Number(params.get("exp"));
@@ -114,7 +124,7 @@ export async function resolveDownload(id: string, params: URLSearchParams): Prom
   if (!job || job.status !== "done") return null;
   const file = outputPath(user, job);
   try {
-    return { file, fileName: job.fileName, bytes: (await stat(file)).size };
+    return { file, fileName: job.fileName, bytes: (await stat(file)).size, contentType: job.format === "pdf" ? "application/pdf" : "image/tiff" };
   } catch {
     return null;
   }
@@ -177,35 +187,39 @@ export async function createJob(api: string, userId: string, body: CreateJobBody
     const dpi = Number(body.dpi);
     if (!Number.isInteger(dpi) || dpi < DPI_MIN || dpi > DPI_MAX) throw new JobError(`DPI must be a whole number between ${DPI_MIN} and ${DPI_MAX}.`);
     const px = Math.round(CALIBRATION_IN * dpi);
-    record = { docId: body.docId, kind, fileName: exportFileName(body.docName ?? "Untitled", "Calibration", dpi, new Date(), "tiff"), area: "Calibration", dpi, widthPx: px, heightPx: px };
+    record = { docId: body.docId, kind, format: "tiff", fileName: exportFileName(body.docName ?? "Untitled", "Calibration", dpi, new Date(), "tiff"), area: "Calibration", dpi, widthPx: px, heightPx: px, widthIn: CALIBRATION_IN, heightIn: CALIBRATION_IN };
   } else {
     const problem = validateExportRequest(body.request);
     if (problem) throw new JobError(problem);
     const req = body.request as ExportRequest;
     const dpi = req.options.dpi;
     if (!Number.isInteger(dpi) || dpi < DPI_MIN || dpi > DPI_MAX) throw new JobError(`DPI must be a whole number between ${DPI_MIN} and ${DPI_MAX}.`);
-    if (req.options.format !== "tiff") throw new JobError("Only TIFF export is available yet.");
+    const format = req.options.format === "pdf" ? "pdf" : "tiff";
     const byId = new Map(req.assets.map((a) => [a.id, a]));
     const missing: string[] = [];
     for (const id of usedAssets(req.doc)) if (!byId.has(id) || !(await hasAsset(byId.get(id)!.hash))) missing.push(id);
     if (missing.length) throw new JobError("Some original images have not been uploaded yet.", 409, { missing });
-    const px = pixelSize(req.area, dpi);
+    // A PDF is vector: it has no pixel size of its own.
+    const px = format === "pdf" ? { width: 0, height: 0 } : pixelSize(req.area, dpi);
     const area = safeNamePart(body.areaLabel ?? "Area", "Area");
-    record = { docId: body.docId, kind, fileName: exportFileName(req.doc.name, area, dpi, new Date(), "tiff"), area, dpi, widthPx: px.width, heightPx: px.height };
+    record = { docId: body.docId, kind, format, fileName: exportFileName(req.doc.name, area, dpi, new Date(), format), area, dpi, widthPx: px.width, heightPx: px.height, widthIn: req.area.w, heightIn: req.area.h };
   }
   const job: JobRecord = { ...record, id: randomUUID(), status: "queued", step: "waiting", progress: 0, createdAt: (shared.stamp = Math.max(Date.now(), shared.stamp + 1)) };
-  await mkdir(jobDir(userId, job.docId, job.id), { recursive: true });
-  await writeFile(path.join(jobDir(userId, job.docId, job.id), "request.json"), JSON.stringify({ ...body, kind }));
-  await writeJob(userId, job);
-  const created = { ...job };
-  enqueue(userId, job, { ...body, kind });
-  return created;
-}
-
-function enqueue(userId: string, job: JobRecord, body: CreateJobBody) {
+  // Marked as live BEFORE its record is written: a list request arriving in between must not take it for a job
+  // left over from a server restart.
   const control = new AbortController();
   shared.active.set(job.id, control);
-  shared.line = shared.line.then(() => run(userId, job, body, control)).catch(() => undefined);
+  try {
+    await mkdir(jobDir(userId, job.docId, job.id), { recursive: true });
+    await writeFile(path.join(jobDir(userId, job.docId, job.id), "request.json"), JSON.stringify({ ...body, kind }));
+    await writeJob(userId, job);
+  } catch (err) {
+    shared.active.delete(job.id);
+    throw err;
+  }
+  const created = { ...job };
+  shared.line = shared.line.then(() => run(userId, job, { ...body, kind }, control)).catch(() => undefined);
+  return created;
 }
 
 async function run(userId: string, job: JobRecord, body: CreateJobBody, control: AbortController) {
@@ -244,9 +258,19 @@ async function run(userId: string, job: JobRecord, body: CreateJobBody, control:
   try {
     if (control.signal.aborted) throw new ExportError("The export was cancelled.");
     await update({ status: "running", step: "preparing", progress: 0.01 }, true);
-    const scene = job.kind === "calibration" ? await calibrationScene(body.docName ?? "Untitled", job.dpi) : await prepareScene(renderInputOf(body.request as ExportRequest, job.dpi));
-    const transparent = job.kind === "export" && (body.request as ExportRequest).options.background === "transparent";
-    const out = await renderTiff(scene, outputPath(userId, job), { dpi: job.dpi, transparent, onProgress, signal: control.signal, stripPx: JOB_STRIP_PX });
+    let out: { file: string; bytes: number };
+    if (job.format === "pdf") {
+      const { renderPdf } = await import("./pdf");
+      out = await renderPdf(renderInputOf(body.request as ExportRequest, job.dpi), outputPath(userId, job), {
+        signal: control.signal,
+        // Embedding the images is the slow part; writing the vector page and saving are quick.
+        onProgress: (step, fraction) => void update({ step, progress: Math.max(job.progress, step === "preparing" ? 0.02 + 0.6 * fraction : step === "rendering" ? 0.62 + 0.28 * fraction : 0.92) }, fraction === 0),
+      });
+    } else {
+      const scene = job.kind === "calibration" ? await calibrationScene(body.docName ?? "Untitled", job.dpi) : await prepareScene(renderInputOf(body.request as ExportRequest, job.dpi));
+      const transparent = job.kind === "export" && (body.request as ExportRequest).options.background === "transparent";
+      out = await renderTiff(scene, outputPath(userId, job), { dpi: job.dpi, transparent, onProgress, signal: control.signal, stripPx: JOB_STRIP_PX });
+    }
     if (control.signal.aborted) {
       await rm(out.file, { force: true });
       throw new ExportError("The export was cancelled.");

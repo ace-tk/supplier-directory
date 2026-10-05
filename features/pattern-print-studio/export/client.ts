@@ -79,11 +79,14 @@ export interface ExportJob {
   id: string;
   docId: string;
   kind: "export" | "calibration";
+  format: "tiff" | "pdf";
   fileName: string;
   area: string;
   dpi: number;
   widthPx: number;
   heightPx: number;
+  widthIn: number;
+  heightIn: number;
   status: JobStatus;
   step: "waiting" | "preparing" | "rendering" | "stitching" | "compressing" | "saving" | "done";
   progress: number;

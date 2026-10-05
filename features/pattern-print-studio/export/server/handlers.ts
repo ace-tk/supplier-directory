@@ -166,6 +166,6 @@ export async function jobDownload(id: string, request: Request): Promise<Respons
   const found = await resolveDownload(id, new URL(request.url).searchParams);
   if (!found) return json({ error: "This download link is not valid any more. Ask for a new link in the export list." }, 403);
   return new Response(Readable.toWeb(createReadStream(found.file)) as ReadableStream, {
-    headers: { "Content-Type": "image/tiff", "Content-Length": String(found.bytes), "Content-Disposition": `attachment; filename="${found.fileName}"`, "Cache-Control": "private, no-store" },
+    headers: { "Content-Type": found.contentType, "Content-Length": String(found.bytes), "Content-Disposition": `attachment; filename="${found.fileName}"`, "Cache-Control": "private, no-store" },
   });
 }

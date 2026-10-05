@@ -260,6 +260,23 @@ function ExportBody({ editor, state, api, onClose, onStarted }: { editor: Editor
                 <option value="transparent">Transparent</option>
               </select>
             </label>
+            {opts.format === "pdf" && (
+              <div className="grid gap-1.5 border-t border-border pt-1.5" role="group" aria-label="PDF options">
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-0.5" checked={opts.pdfDownsample} onChange={(e) => change({ pdfDownsample: e.target.checked })} />
+                  <span>
+                    Downsample images above 300 effective DPI <span className="text-muted-foreground">— keeps the file size sane</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-0.5" checked={opts.pdfLiveText} onChange={(e) => change({ pdfLiveText: e.target.checked })} />
+                  <span>
+                    Keep text editable <span className="text-muted-foreground">— as Helvetica / Arial text; off = outlines (safest)</span>
+                  </span>
+                </label>
+                <span className="text-muted-foreground">A PDF always has all three layers (Print, Cut lines, Size labels). The two options above decide which are switched on when it is opened.</span>
+              </div>
+            )}
             <span className="text-muted-foreground">Bleed is always included, as set in the Checks tab ({formatUnits(state.settings.bleed.amount, unit)} {UNIT_LABEL[unit]}).</span>
           </div>
 
@@ -270,16 +287,29 @@ function ExportBody({ editor, state, api, onClose, onStarted }: { editor: Editor
                 <dd className="font-mono" data-info="inches">
                   {formatUnits(area.rect.w, "in")} × {formatUnits(area.rect.h, "in")} in
                 </dd>
-                <dt className="text-muted-foreground">Pixels</dt>
-                <dd className="font-mono" data-info="pixels">
-                  {est.width.toLocaleString("en-US")} × {est.height.toLocaleString("en-US")} px
-                </dd>
-                <dt className="text-muted-foreground">File size</dt>
-                <dd data-info="bytes">
-                  about {formatBytes(est.fileBytes)} <span className="text-muted-foreground">({formatBytes(est.rawBytes)} uncompressed{est.bigTiff && opts.format === "tiff" ? ", BigTIFF" : ""})</span>
-                </dd>
-                <dt className="text-muted-foreground">Time</dt>
-                <dd data-info="time">about {formatDuration(est.seconds)}</dd>
+                {opts.format === "pdf" ? (
+                  <>
+                    <dt className="text-muted-foreground">Page</dt>
+                    <dd className="font-mono" data-info="points">
+                      {(area.rect.w * 72).toFixed(2)} × {(area.rect.h * 72).toFixed(2)} pt
+                    </dd>
+                    <dt className="text-muted-foreground">Content</dt>
+                    <dd data-info="vector">Vector, editable; images at original quality{opts.pdfDownsample ? " (300 DPI at most)" : ""}</dd>
+                  </>
+                ) : (
+                  <>
+                    <dt className="text-muted-foreground">Pixels</dt>
+                    <dd className="font-mono" data-info="pixels">
+                      {est.width.toLocaleString("en-US")} × {est.height.toLocaleString("en-US")} px
+                    </dd>
+                    <dt className="text-muted-foreground">File size</dt>
+                    <dd data-info="bytes">
+                      about {formatBytes(est.fileBytes)} <span className="text-muted-foreground">({formatBytes(est.rawBytes)} uncompressed{est.bigTiff ? ", BigTIFF" : ""})</span>
+                    </dd>
+                    <dt className="text-muted-foreground">Time</dt>
+                    <dd data-info="time">about {formatDuration(est.seconds)}</dd>
+                  </>
+                )}
                 <dt className="text-muted-foreground">File name</dt>
                 <dd className="break-all font-mono" data-info="name">
                   {fileName}
@@ -346,12 +376,12 @@ function ExportBody({ editor, state, api, onClose, onStarted }: { editor: Editor
 
       <DialogFooter>
         <span className="mr-auto self-center text-xs text-muted-foreground" role="status" data-export-status>
-          {starting ?? (blocked ? (area ? "Fix the problems marked in red to export." : "Choose an area to export.") : needsConfirm ? "Tick “Export anyway” to export with warnings." : opts.format === "pdf" ? "PDF export arrives in step 4D." : "Ready. The export runs in the background; you can keep working.")}
+          {starting ?? (blocked ? (area ? "Fix the problems marked in red to export." : "Choose an area to export.") : needsConfirm ? "Tick “Export anyway” to export with warnings." : "Ready. The export runs in the background; you can keep working.")}
         </span>
         <Button variant="outline" onClick={onClose}>
           Close
         </Button>
-        <Button disabled={blocked || needsConfirm || !!starting || opts.format !== "tiff"} onClick={startJob} title={opts.format === "pdf" ? "PDF export is built in step 4D" : "Start the export in the background"}>
+        <Button disabled={blocked || needsConfirm || !!starting} onClick={startJob} title="Start the export in the background">
           {starting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
           Export {opts.format === "pdf" ? "PDF" : "TIFF"}
         </Button>
