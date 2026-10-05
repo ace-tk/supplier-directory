@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { ChevronDown, FlipHorizontal2, FlipVertical2, Link2, Link2Off, RotateCcw, TriangleAlert } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { Editor, EditorState, RefPoint } from "../engine/Editor";
+import { DPI_BAD, DPI_WARN } from "../engine/clip-fit";
+import type { ClipFit, Editor, EditorState, RefPoint } from "../engine/Editor";
 import type { OpenPathInfo } from "../engine/shape-tool";
 import { NODE_TYPE_LABEL, type NodeType } from "../engine/node-geometry";
 import { formatUnits, MAX_ZOOM_PCT, MIN_ZOOM_PCT, UNIT_LABEL, type DisplayUnit } from "../engine/units";
@@ -293,6 +295,100 @@ function NodeFields({ editor, state }: { editor: Editor; state: EditorState }) {
   );
 }
 
+/** Rotation in degrees, counter-clockwise. Shows the live value; commits on Enter or blur. */
+function AngleField({ value, onCommit, title }: { value: number; onCommit: (deg: number) => void; title: string }) {
+  const shown = (Math.abs(value) < 0.0005 ? 0 : value).toFixed(3);
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title={title}>
+      <RotateCcw className="h-3 w-3" />
+      <input
+        value={draft ?? shown}
+        aria-label={title}
+        onFocus={(e) => {
+          setDraft(shown);
+          e.currentTarget.select();
+        }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const v = draft === null ? NaN : parseFloat(draft);
+          setDraft(null);
+          if (Number.isFinite(v) && Math.abs(v - value) > 1e-9) onCommit(v);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setDraft(null);
+            e.stopPropagation();
+            e.currentTarget.blur();
+          }
+        }}
+        className="h-6 w-16 rounded border border-border bg-background px-1 text-right font-mono text-[11px] text-foreground tabular-nums outline-none focus:border-primary"
+      />
+      °
+    </label>
+  );
+}
+
+const FITS: { id: ClipFit; label: string; title: string }[] = [
+  { id: "center", label: "Center", title: "Center the print in the frame" },
+  { id: "fit", label: "Fit", title: "Fit: the whole print visible inside the frame" },
+  { id: "fill", label: "Fill", title: "Fill: the print covers the whole frame, no gaps" },
+  { id: "stretch", label: "Stretch", title: "Stretch the print to the frame's exact proportions (asks first if that distorts it)" },
+  { id: "top", label: "Top", title: "Align top-centre of the print to top-centre of the frame (waistband placement)" },
+];
+
+/** Editing a PowerClip's contents: the print's position, size and rotation relative to the frame, quick fits and DPI. */
+function ClipFields({ editor, state }: { editor: Editor; state: EditorState }) {
+  const c = state.clipContent!;
+  const unit = state.settings.units;
+  const fit = (mode: ClipFit) => {
+    if (mode === "stretch" && c.stretchDistorts) {
+      // Ask before distorting.
+      toast.warning("Stretch changes the print's proportions to match the frame, so the artwork will be distorted.", { action: { label: "Stretch anyway", onClick: () => editor.fitClipContent("stretch") } });
+      return;
+    }
+    editor.fitClipContent(mode);
+  };
+  return (
+    <>
+      <span className="shrink-0 text-[11px] font-semibold text-foreground" title="Measured from the frame's anchor point to the print's same point">
+        Print in frame
+      </span>
+      <RefPointPicker value={state.refPoint} onChange={(p) => editor.setRefPoint(p)} />
+      <LengthField label="X" inches={c.x} unit={unit} onCommit={(x) => editor.setClipContent({ x })} title="Print's anchor point, right of the frame's anchor point" />
+      <LengthField label="Y" inches={c.y} unit={unit} onCommit={(y) => editor.setClipContent({ y })} title="Print's anchor point, above the frame's anchor point" />
+      <LengthField label="W" inches={c.w} unit={unit} onCommit={(w) => editor.setClipContent({ w })} title="Print width (its own width, not the rotated box)" />
+      <LengthField label="H" inches={c.h} unit={unit} onCommit={(h) => editor.setClipContent({ h })} title="Print height" />
+      <IconBtn title={state.lockAspect ? "Proportional (lock aspect) — on" : "Proportional (lock aspect) — off"} onClick={() => editor.setLockAspect(!state.lockAspect)} active={state.lockAspect}>
+        {state.lockAspect ? <Link2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
+      </IconBtn>
+      <AngleField value={c.rotation} onCommit={(rotation) => editor.setClipContent({ rotation })} title="Print rotation in degrees (counter-clockwise)" />
+      <Sep />
+      {FITS.map((f) => (
+        <TextBtn key={f.id} title={f.title} onClick={() => fit(f.id)}>
+          {f.label}
+        </TextBtn>
+      ))}
+      {c.dpi !== null && (
+        <>
+          <Sep />
+          <span
+            role={c.dpiLevel === "ok" ? undefined : "alert"}
+            className={cn(
+              "shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
+              c.dpiLevel === "bad" ? "bg-red-100 font-semibold text-red-700 dark:bg-red-950 dark:text-red-300" : c.dpiLevel === "low" ? "bg-yellow-100 font-semibold text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300" : "text-muted-foreground"
+            )}
+            title={`Effective resolution at this size, from the original image file. Below ${DPI_WARN} DPI may look soft; below ${DPI_BAD} DPI will look blurry.`}
+          >
+            {Math.round(c.dpi)} DPI{c.dpiLevel === "bad" ? " — print may look blurry" : c.dpiLevel === "low" ? " — low" : ""}
+          </span>
+        </>
+      )}
+    </>
+  );
+}
+
 export function PropertyBar({ editor, state }: { editor: Editor; state: EditorState }) {
   const unit = state.settings.units;
   const b = state.selectionBounds;
@@ -331,6 +427,8 @@ export function PropertyBar({ editor, state }: { editor: Editor; state: EditorSt
 
       {state.nodeEdit ? (
         <NodeFields editor={editor} state={state} />
+      ) : state.clipContent ? (
+        <ClipFields editor={editor} state={state} />
       ) : (
         <>
           {/* Selection */}

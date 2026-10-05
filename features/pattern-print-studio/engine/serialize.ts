@@ -27,6 +27,8 @@ interface NodeBase {
   hidden?: boolean;
   locked?: boolean;
   clipMask?: boolean;
+  /** Rotation applied to a print inside a PowerClip, degrees counter-clockwise (so it can be shown and edited later). */
+  rot?: number;
   style?: StyleJSON;
 }
 
@@ -128,6 +130,7 @@ function baseOf(item: Item): NodeBase {
   if (!item.visible) b.hidden = true;
   if (item.locked) b.locked = true;
   if (item.clipMask) b.clipMask = true;
+  if (typeof item.data?.rot === "number" && item.data.rot) b.rot = item.data.rot;
   return b;
 }
 
@@ -137,6 +140,7 @@ function applyBase(item: Item, n: NodeBase) {
   if (n.hidden) item.visible = false;
   if (n.locked) item.locked = true;
   if (n.clipMask) item.clipMask = true;
+  if (n.rot) item.data.rot = n.rot;
 }
 
 function pathNode(p: paper.Path): PathNode {

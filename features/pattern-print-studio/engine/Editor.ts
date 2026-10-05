@@ -6,6 +6,7 @@ import { getOutlineFont, loadStudioFontFaces, STUDIO_FONT } from "./fonts";
 import { History } from "./history";
 import { clipGroupOf, clipOwner, contentsOf, DEFAULT_CLIP, frameOf, insideClipContents, isClosedOutline, isDerived, isPowerClip, syncMask, unwrapPowerClip, wrapInPowerClip } from "./powerclip";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
+import { anchorOf, dpiLevel, effectiveDpi, fillScale, fitScale } from "./clip-fit";
 import type { NodeType } from "./node-geometry";
 import { DEFAULT_SIMPLIFY_TOLERANCE, ShapeTool, type NodeEditState, type OpenPathInfo, type ShapeMeta } from "./shape-tool";
 import { missingGlyphs, nodeCount, planShaping, textToOutlines, type ShapingOp, type ShapingPlan } from "./shaping";
@@ -51,6 +52,28 @@ export interface ObjectEntry {
   role: "object" | "clip" | "content";
 }
 
+/** The print being adjusted inside a frame. Positions are the print's anchor point relative to the frame's same anchor point. */
+export interface ClipContentState {
+  /** Inches, right of the frame's anchor. */
+  x: number;
+  /** Inches, ABOVE the frame's anchor (like the rulers). */
+  y: number;
+  /** The print's own width and height (not its rotated bounding box). */
+  w: number;
+  h: number;
+  /** Degrees, counter-clockwise. */
+  rotation: number;
+  /** Several prints are selected: they are treated as one box. */
+  multiple: boolean;
+  /** Effective DPI of a bitmap at its current size, from the ORIGINAL file. Null for vectors. */
+  dpi: number | null;
+  dpiLevel: "ok" | "low" | "bad" | null;
+  /** The print's proportions differ from the frame's (Stretch would distort it). */
+  stretchDistorts: boolean;
+}
+
+export type ClipFit = "center" | "fit" | "fill" | "stretch" | "top";
+
 /** The PowerClip the floating Edit / Finish / Extract / Lock bar belongs to. */
 export interface ClipState {
   id: string;
@@ -93,6 +116,8 @@ export interface EditorState {
   shaping: ShapingState | null;
   /** The active PowerClip (selected, or being edited), if any. */
   clip: ClipState | null;
+  /** While editing a PowerClip: the selected print, measured against the frame. */
+  clipContent: ClipContentState | null;
   /** "Place inside frame" is waiting for a click on an outline. */
   placing: boolean;
   /** After a right-mouse drag onto an outline: where to show the "PowerClip inside" menu (client px). */
@@ -333,6 +358,7 @@ export class Editor {
       nodeEdit: this.tool === "shape" ? this.shape.state() : null,
       shaping: this.shaping ? { ...this.shaping, ok: !!this.shapingPlan, message: this.shapingMessage } : null,
       clip: this.clipState(),
+      clipContent: this.clipContentState(),
       placing: !!this.placing,
       clipMenu: this.clipMenu ? { x: this.clipMenu.x, y: this.clipMenu.y } : null,
     };
@@ -1289,6 +1315,154 @@ export class Editor {
     this.updateSettings({ cutLines: { ...this.settings.cutLines, visible: !this.settings.cutLines.visible } });
   }
 
+  // ---------------------------------------------------------------- PowerClip: exact adjustment inside the frame
+  /** A print's own size, rotation (degrees counter-clockwise) and DPI. Bitmaps carry these in their matrix; vectors remember their rotation. */
+  private printMetrics(it: Item): { w: number; h: number; rot: number; dpi: number | null } {
+    const ps = this.ps;
+    if (it instanceof ps.Raster) {
+      const m = it.matrix;
+      const w = Math.hypot(m.a, m.b) * it.width;
+      const h = Math.hypot(m.c, m.d) * it.height;
+      const asset = this.assets.get(it.data.assetId);
+      return { w, h, rot: (-Math.atan2(m.b, m.a) * 180) / Math.PI, dpi: asset && w > 0 && h > 0 ? effectiveDpi(asset.pxWidth, asset.pxHeight, w, h) : null };
+    }
+    const rot = typeof it.data?.rot === "number" ? it.data.rot : 0;
+    if (!rot) return { w: it.bounds.width, h: it.bounds.height, rot: 0, dpi: null };
+    const flat = it.clone({ insert: false, deep: true });
+    flat.rotate(rot, it.bounds.center);
+    return { w: flat.bounds.width, h: flat.bounds.height, rot, dpi: null };
+  }
+
+  /** Effective DPI of a bitmap at its current printed size (null for anything else). */
+  printDpi(it: Item): number | null {
+    return it instanceof this.ps.Raster ? this.printMetrics(it).dpi : null;
+  }
+
+  /** The prints being adjusted (selected contents of the PowerClip being edited) and the frame's box. */
+  private clipEditing(): { items: Item[]; frame: paper.Rectangle; box: paper.Rectangle; single: Item | null; w: number; h: number; rot: number; dpi: number | null } | null {
+    const pc = this.clipEdit;
+    const box = pc ? this.selectionBounds() : null;
+    if (!pc || !box || !this.selected.length) return null;
+    const single = this.selected.length === 1 ? this.selected[0] : null;
+    const m = single ? this.printMetrics(single) : { w: box.width, h: box.height, rot: 0, dpi: null };
+    return { items: this.selected, frame: frameOf(pc).bounds, box, single, ...m };
+  }
+
+  private clipContentState(): ClipContentState | null {
+    const e = this.clipEditing();
+    if (!e) return null;
+    const a = anchorOf(rectOf(e.box), this.refPoint);
+    const f = anchorOf(rectOf(e.frame), this.refPoint);
+    const frameRatio = e.frame.width / e.frame.height;
+    return {
+      x: a.x - f.x,
+      y: f.y - a.y,
+      w: e.w,
+      h: e.h,
+      rotation: e.rot,
+      multiple: !e.single,
+      dpi: e.dpi,
+      dpiLevel: e.dpi === null ? null : dpiLevel(e.dpi),
+      stretchDistorts: Math.abs(e.w / e.h - frameRatio) > 0.005 * frameRatio || Math.abs(e.rot) > 1e-9,
+    };
+  }
+
+  /** Remembers a rotation on vector prints (bitmaps keep it in their matrix). Stored in the range −180…180. */
+  private trackRotation(items: Item[], degreesCcw: number) {
+    if (!this.clipEdit || !degreesCcw) return;
+    for (const it of items) if (!(it instanceof this.ps.Raster)) it.data.rot = ((((it.data?.rot ?? 0) + degreesCcw + 180) % 360) + 360) % 360 - 180;
+  }
+
+  /** Scales prints along their OWN width / height (a rotated print is not skewed), about a fixed point. */
+  private scalePrints(items: Item[], sx: number, sy: number, about: paper.Point, rot: number) {
+    for (const it of items) {
+      if (rot) it.rotate(rot, about);
+      it.scale(sx, sy, about);
+      if (rot) it.rotate(-rot, about);
+    }
+  }
+
+  /** Moves the selected prints so their anchor point sits at `target` (page inches). */
+  private alignPrints(items: Item[], ref: number, target: { x: number; y: number }) {
+    const b = this.selectionBounds();
+    if (!b) return;
+    const a = anchorOf(rectOf(b), ref);
+    const d = new this.ps.Point(target.x - a.x, target.y - a.y);
+    for (const it of items) it.translate(d);
+  }
+
+  /**
+   * Exact values for the print inside the frame (property bar, edit mode).
+   * x / y: the print's anchor relative to the frame's anchor (y up).
+   * w / h: the print's own size. rotation: degrees counter-clockwise.
+   */
+  setClipContent(patch: { x?: number; y?: number; w?: number; h?: number; rotation?: number }) {
+    const e = this.clipEditing();
+    if (!e) return;
+    const ps = this.ps;
+    const anchor = anchorOf(rectOf(e.box), this.refPoint);
+    if (patch.w !== undefined || patch.h !== undefined) {
+      let sx = patch.w !== undefined && e.w > 0 ? patch.w / e.w : 1;
+      let sy = patch.h !== undefined && e.h > 0 ? patch.h / e.h : 1;
+      if (this.lockAspect) {
+        if (patch.w !== undefined) sy = sx;
+        else sx = sy;
+      }
+      if (Number.isFinite(sx) && Number.isFinite(sy) && sx > 0 && sy > 0) {
+        this.scalePrints(e.items, sx, sy, new ps.Point(anchor), e.rot);
+        this.alignPrints(e.items, this.refPoint, anchor); // the anchor point stays exactly where it was
+      }
+    }
+    if (patch.rotation !== undefined && Number.isFinite(patch.rotation)) {
+      const delta = patch.rotation - e.rot;
+      const c = this.selectionBounds()!.center;
+      for (const it of e.items) it.rotate(-delta, c);
+      this.trackRotation(e.items, delta);
+    }
+    if (patch.x !== undefined || patch.y !== undefined) {
+      const f = anchorOf(rectOf(e.frame), this.refPoint);
+      const cur = anchorOf(rectOf(this.selectionBounds()!), this.refPoint);
+      this.alignPrints(e.items, this.refPoint, { x: patch.x !== undefined ? f.x + patch.x : cur.x, y: patch.y !== undefined ? f.y - patch.y : cur.y });
+    }
+    this.commit();
+  }
+
+  /**
+   * Quick fits, measured on the frame's bounding box:
+   *   center  — middle of the print on the middle of the frame
+   *   fit     — the whole print visible inside the frame
+   *   fill    — the print covers the whole frame, no gaps
+   *   stretch — exactly the frame's box (distorts the print; the UI asks first)
+   *   top     — top-centre of the print on top-centre of the frame (waistband placement)
+   * Fit and Fill then line up at the chosen anchor point. One undo step.
+   */
+  fitClipContent(mode: ClipFit) {
+    const e = this.clipEditing();
+    if (!e) return;
+    const ps = this.ps;
+    const F = rectOf(e.frame);
+    const center = new ps.Point(e.box.center);
+    if (mode === "fit" || mode === "fill") {
+      const s = mode === "fit" ? fitScale(e.w, e.h, e.rot, F.w, F.h) : fillScale(e.w, e.h, e.rot, F.w, F.h);
+      if (Number.isFinite(s) && s > 0) for (const it of e.items) it.scale(s, center);
+      // A rotated print only covers the frame when it is centred on it.
+      const ref = mode === "fill" && e.rot ? 4 : this.refPoint;
+      this.alignPrints(e.items, ref, anchorOf(F, ref));
+    } else if (mode === "stretch") {
+      if (e.rot) {
+        for (const it of e.items) it.rotate(e.rot, center);
+        this.trackRotation(e.items, -e.rot);
+      }
+      const b = this.selectionBounds()!;
+      if (b.width > 0 && b.height > 0) for (const it of e.items) it.scale(F.w / b.width, F.h / b.height, b.center);
+      this.alignPrints(e.items, 4, anchorOf(F, 4));
+    } else {
+      const ref = mode === "top" ? 1 : 4;
+      this.alignPrints(e.items, ref, anchorOf(F, ref));
+    }
+    this.commit();
+  }
+
   // ---------------------------------------------------------------- trace bitmap
   /** The single selected bitmap, for the Trace dialog. Null if the selection isn't exactly one bitmap. */
   async getTraceSource(): Promise<TraceSource | null> {
@@ -1546,6 +1720,8 @@ export class Editor {
     const b = this.selectionBounds();
     if (!b) return;
     for (const it of this.selected) this.tf(it, (t) => t.scale(axis === "h" ? -1 : 1, axis === "v" ? -1 : 1, b.center));
+    // A mirror turns a remembered rotation the other way.
+    if (this.clipEdit) for (const it of this.selected) if (typeof it.data?.rot === "number") it.data.rot = -it.data.rot;
     this.commit();
   }
 
@@ -1554,6 +1730,7 @@ export class Editor {
     if (!b || !degrees) return;
     // Screen/ruler convention: positive = counter-clockwise (y up).
     for (const it of this.selected) this.tf(it, (t) => t.rotate(-degrees, b.center));
+    this.trackRotation(this.selected, degrees);
     this.commit();
   }
 
@@ -2279,8 +2456,12 @@ export class Editor {
         else this.onNotice?.(this.placeInside(contents, target));
         break;
       }
-      case "scale":
       case "rotate":
+        // Handles turn clockwise-positive on screen; rotations are stored counter-clockwise.
+        this.trackRotation(this.selected, -d.applied);
+        this.commit();
+        break;
+      case "scale":
         this.commit();
         break;
       case "marquee": {

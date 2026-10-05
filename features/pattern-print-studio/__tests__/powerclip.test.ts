@@ -157,3 +157,57 @@ describe("PowerClip", () => {
     expect(svg.indexOf('<path id="front"')).toBeGreaterThan(svg.indexOf("clip-path="));
   });
 });
+
+describe("fitting a print in a frame", () => {
+  it("anchor points on a box", async () => {
+    const { anchorOf } = await import("../engine/clip-fit");
+    const b = { x: 10, y: 20, w: 4, h: 6 };
+    expect(anchorOf(b, 0)).toEqual({ x: 10, y: 20 });
+    expect(anchorOf(b, 1)).toEqual({ x: 12, y: 20 });
+    expect(anchorOf(b, 4)).toEqual({ x: 12, y: 23 });
+    expect(anchorOf(b, 8)).toEqual({ x: 14, y: 26 });
+  });
+
+  it("Fit keeps the whole print inside; Fill covers the frame; both keep proportions", async () => {
+    const { fitScale, fillScale } = await import("../engine/clip-fit");
+    // a 16 × 16 print in a 10 × 30 frame
+    expect(fitScale(16, 16, 0, 10, 30)).toBeCloseTo(10 / 16, 12);
+    expect(fillScale(16, 16, 0, 10, 30)).toBeCloseTo(30 / 16, 12);
+    // a wide print in a tall frame
+    expect(fitScale(20, 5, 0, 10, 30)).toBeCloseTo(0.5, 12);
+    expect(fillScale(20, 5, 0, 10, 30)).toBeCloseTo(6, 12);
+  });
+
+  it("a rotated print: Fit uses its rotated box, Fill makes its corners reach past the frame", async () => {
+    const { fitScale, fillScale, rotatedSize } = await import("../engine/clip-fit");
+    const r = rotatedSize(16, 16, 15);
+    expect(r.w).toBeCloseTo(16 * (Math.cos(Math.PI / 12) + Math.sin(Math.PI / 12)), 12);
+    const fit = fitScale(16, 16, 15, 10, 30);
+    expect(r.w * fit).toBeLessThanOrEqual(10 + 1e-9);
+    expect(r.h * fit).toBeLessThanOrEqual(30 + 1e-9);
+    // Fill at 15°: every corner of the 10 × 30 frame must lie inside the scaled, rotated print.
+    const s = fillScale(16, 16, 15, 10, 30);
+    const c = Math.cos(Math.PI / 12);
+    const sn = Math.sin(Math.PI / 12);
+    for (const [x, y] of [[5, 15], [-5, 15], [5, -15], [-5, -15]]) {
+      expect(Math.abs(x * c + y * sn)).toBeLessThanOrEqual((16 * s) / 2 + 1e-9);
+      expect(Math.abs(-x * sn + y * c)).toBeLessThanOrEqual((16 * s) / 2 + 1e-9);
+    }
+    // …and it is the smallest such scale: a little less leaves a gap.
+    const t = s * 0.999;
+    expect([[5, 15], [-5, 15]].some(([x, y]) => Math.abs(x * c + y * sn) > (16 * t) / 2 || Math.abs(-x * sn + y * c) > (16 * t) / 2)).toBe(true);
+    // A rotated print needs to be bigger than an upright one to fill the same frame.
+    expect(s).toBeGreaterThan(fillScale(16, 16, 0, 10, 30));
+  });
+
+  it("effective DPI comes from the original pixels and the printed size, with yellow / red limits", async () => {
+    const { effectiveDpi, dpiLevel } = await import("../engine/clip-fit");
+    expect(effectiveDpi(1600, 1600, 16, 16)).toBe(100);
+    expect(effectiveDpi(3000, 1500, 10, 10)).toBe(150); // the weaker direction counts
+    expect(dpiLevel(300)).toBe("ok");
+    expect(dpiLevel(150)).toBe("ok");
+    expect(dpiLevel(149.9)).toBe("low");
+    expect(dpiLevel(100)).toBe("low");
+    expect(dpiLevel(99.9)).toBe("bad");
+  });
+});
