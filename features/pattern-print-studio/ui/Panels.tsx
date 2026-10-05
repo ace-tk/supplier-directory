@@ -18,6 +18,7 @@ import {
   Hand,
   Lock,
   MousePointer2,
+  Spline,
   Square,
   Type,
   Unlock,
@@ -29,6 +30,7 @@ import type { ToolId } from "../engine/types";
 
 const TOOLS: { id: ToolId; label: string; key: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "pick", label: "Pick tool", key: "V / Space", icon: MousePointer2 },
+  { id: "shape", label: "Shape tool — edit nodes", key: "F10 / N / Space", icon: Spline },
   { id: "rectangle", label: "Rectangle tool", key: "F6", icon: Square },
   { id: "ellipse", label: "Ellipse tool", key: "F7", icon: Circle },
   { id: "text", label: "Text tool", key: "F8", icon: Type },

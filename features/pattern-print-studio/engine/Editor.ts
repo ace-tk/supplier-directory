@@ -4,6 +4,7 @@ import { rebuildGrid } from "./grid";
 import { installHairlineMinimum } from "./hairline";
 import { History } from "./history";
 import { collectAssetIds, fromNode, toNode, type SceneNode } from "./serialize";
+import { ShapeTool, type NodeEditState, type ShapeMeta } from "./shape-tool";
 import { buildTargets, snapPoints, SNAP_PX, type SnapTargets } from "./snap";
 import { DEFAULT_PAGE, DEFAULT_SETTINGS, type DocSettings, type Guide, type Orientation, type Origin, type PageSize, type RasterAsset, type ToolId } from "./types";
 import { clamp, CSS_PX_PER_INCH, MAX_ZOOM_PCT, MIN_ZOOM_PCT } from "./units";
@@ -63,6 +64,8 @@ export interface EditorState {
   cursor: { x: number; y: number } | null;
   snapLabel: string | null;
   rotateMode: boolean;
+  /** Shape tool (node editing) state; null in every other tool. */
+  nodeEdit: NodeEditState | null;
 }
 
 export interface ViewInfo {
@@ -84,7 +87,8 @@ type DragState =
   | { kind: "create"; shape: "rectangle" | "ellipse"; start: paper.Point; targets: SnapTargets }
   | { kind: "zoomRect"; start: paper.Point; startClient: paper.Point }
   | { kind: "guide"; guideId: string; orientation: Orientation; created: boolean; targets: SnapTargets }
-  | { kind: "origin"; targets: SnapTargets };
+  | { kind: "origin"; targets: SnapTargets }
+  | { kind: "shape" };
 
 const HANDLE_PX = 7;
 const HIT_PX = 5;
@@ -107,6 +111,9 @@ export class Editor {
   readonly ps: paper.PaperScope;
   readonly assets = new AssetStore();
   private canvas: HTMLCanvasElement;
+  /** 2D canvas above the Paper canvas for node markers (cheap to redraw, never part of the document). */
+  private nodeCanvas: HTMLCanvasElement;
+  private shape!: ShapeTool;
   private pageLayer!: paper.Layer;
   private pageRect: paper.Path | null = null;
   private gridLayer!: paper.Layer;
@@ -132,12 +139,13 @@ export class Editor {
   private snapLabel: string | null = null;
   private snapMarker: paper.Point | null = null;
   private marqueeRect: paper.Rectangle | null = null;
-  private history = new History(100);
+  private history = new History<ShapeMeta>(100);
   private unsaved = false;
   private draftDirty = false;
   private clipboard: SceneNode[] = [];
   private drag: DragState | null = null;
   private spaceDown = false;
+  private spacePanned = false;
   private fittedOnce = false;
 
   private state: EditorState;
@@ -149,6 +157,10 @@ export class Editor {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
+    this.nodeCanvas = document.createElement("canvas");
+    this.nodeCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none";
+    this.nodeCanvas.setAttribute("aria-hidden", "true");
+    canvas.insertAdjacentElement("afterend", this.nodeCanvas);
     installHairlineMinimum();
     this.ps = new paper.PaperScope();
     this.ps.setup(canvas);
@@ -169,6 +181,32 @@ export class Editor {
     this.overlayLayer = new ps.Layer({ name: "overlay" });
     this.contentLayer.activate();
 
+    this.shape = new ShapeTool({
+      ps,
+      contentLayer: () => this.contentLayer,
+      px: () => this.px,
+      topLevel: (item) => this.topLevel(item),
+      idOf: (item) => this.idOf(item),
+      snapTargets: (skip, excludeBounds) => this.snapTargets(true, { skip, excludeBounds }),
+      setSnap: (label, at) => {
+        this.snapLabel = label;
+        this.snapMarker = at ? new ps.Point(at.x, at.y) : null;
+      },
+      setMarquee: (r) => {
+        this.marqueeRect = r;
+      },
+      selectTop: (item) => {
+        this.selected = item ? [item] : [];
+        this.selectedGuideId = null;
+      },
+      commit: () => this.commit(),
+      changed: () => {
+        this.drawOverlay();
+        this.emit();
+      },
+      selectionChanged: () => this.history.setMeta(this.shape.meta()),
+    });
+
     this.state = this.buildState();
     this.resizeObserver = new ResizeObserver(() => this.handleResize());
     this.resizeObserver.observe(canvas.parentElement ?? canvas);
@@ -181,6 +219,7 @@ export class Editor {
   destroy() {
     this.resizeObserver.disconnect();
     for (const c of this.cleanup) c();
+    this.nodeCanvas.remove();
     this.ps.project.remove();
     this.listeners.clear();
     this.viewListeners.clear();
@@ -232,6 +271,7 @@ export class Editor {
       cursor: this.cursor,
       snapLabel: this.snapLabel,
       rotateMode: this.rotateMode,
+      nodeEdit: this.tool === "shape" ? this.shape.state() : null,
     };
   }
 
@@ -293,7 +333,8 @@ export class Editor {
   }
   /** Records an undo step after a committed action. */
   commit() {
-    if (this.history.push(this.snapshot())) this.markChanged();
+    if (this.tool === "shape") this.shape.validate();
+    if (this.history.push(this.snapshot(), this.shape.meta())) this.markChanged();
     this.drawOverlay();
     this.emit();
   }
@@ -306,6 +347,9 @@ export class Editor {
     const h = host.clientHeight;
     if (w <= 0 || h <= 0) return;
     this.ps.view.viewSize = new this.ps.Size(w, h);
+    const dpr = window.devicePixelRatio || 1;
+    this.nodeCanvas.width = Math.round(w * dpr);
+    this.nodeCanvas.height = Math.round(h * dpr);
     if (!this.fittedOnce) {
       // First real layout: fit the page (the constructor may run before layout).
       this.fittedOnce = true;
@@ -425,12 +469,30 @@ export class Editor {
     this.updateSettings({ grid: { ...this.settings.grid, visible: !this.settings.grid.visible } });
   }
 
+  private toolCursor(tool = this.tool) {
+    return tool === "pan" ? "grab" : tool === "zoom" ? "zoom-in" : tool === "pick" || tool === "shape" ? "default" : "crosshair";
+  }
+
   setTool(tool: ToolId) {
+    const was = this.tool;
     this.tool = tool;
     this.rotateMode = false;
-    this.canvas.style.cursor = tool === "pan" ? "grab" : tool === "zoom" ? "zoom-in" : tool === "pick" ? "default" : "crosshair";
+    this.marqueeRect = null;
+    if (tool === "shape" && was !== "shape") {
+      // Start on the selected object, like switching to the Shape tool in Corel.
+      this.shape.enter(this.selected.length === 1 ? this.selected[0] : null);
+    } else if (tool !== "shape" && was === "shape") {
+      this.shape.clear();
+      this.history.setMeta(this.shape.meta());
+    }
+    this.canvas.style.cursor = this.toolCursor();
     this.drawOverlay();
     this.emit();
+  }
+
+  /** Space tap: Shape tool ⇄ Pick tool (any other tool returns to Pick). */
+  toggleShapePick() {
+    this.setTool(this.tool === "pick" ? "shape" : "pick");
   }
 
   setRefPoint(p: RefPoint) {
@@ -538,7 +600,7 @@ export class Editor {
   }
 
   // ---------------------------------------------------------------- snapping
-  private snapTargets(includeSelection = false): SnapTargets {
+  private snapTargets(includeSelection = false, opts: { skip?: Set<paper.Segment>; excludeBounds?: Item | null } = {}): SnapTargets {
     const vb = this.ps.view.bounds.expand(this.ps.view.bounds.width * 0.5);
     const others = this.contentLayer.children.filter((c) => c.visible && (includeSelection || !this.selected.includes(c)));
     const objectBounds: { left: number; right: number; top: number; bottom: number }[] = [];
@@ -547,11 +609,11 @@ export class Editor {
     for (const it of others) {
       const b = it.bounds;
       if (!b.intersects(vb)) continue;
-      objectBounds.push({ left: b.left, right: b.right, top: b.top, bottom: b.bottom });
+      if (it !== opts.excludeBounds) objectBounds.push({ left: b.left, right: b.right, top: b.top, bottom: b.bottom });
       if (nodePoints.length < 50000) {
         const paths = it instanceof ps.Path ? [it] : (it.getItems({ class: ps.Path }) as paper.Path[]);
         if (it instanceof ps.CompoundPath) paths.push(...(it.children as paper.Path[]));
-        for (const p of paths) for (const s of p.segments) nodePoints.push({ x: s.point.x, y: s.point.y });
+        for (const p of paths) for (const s of p.segments) if (!opts.skip?.has(s)) nodePoints.push({ x: s.point.x, y: s.point.y });
       }
     }
     return buildTargets({
@@ -642,6 +704,39 @@ export class Editor {
       mk.strokeScaling = false;
       add(mk);
     }
+    this.drawNodeMarkers();
+  }
+
+  private drawNodeMarkers() {
+    const ctx = this.nodeCanvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.nodeCanvas.width, this.nodeCanvas.height);
+    if (this.tool !== "shape") return;
+    this.shape.validate();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.shape.draw(ctx, this.nodeCanvas.width / dpr, this.nodeCanvas.height / dpr);
+  }
+
+  // ---------------------------------------------------------------- shape tool (node editing)
+  selectAllNodes() {
+    this.shape.selectAll();
+  }
+  /** Esc in the Shape tool. Returns false when no nodes were selected (caller then leaves the tool). */
+  clearNodeSelection(): boolean {
+    return this.shape.escape();
+  }
+  /** Nudge the selected nodes in display direction (dy positive = UP). */
+  nudgeNodes(dxUnits: number, dyUp: number) {
+    this.shape.translateNodes(dxUnits, -dyUp);
+  }
+  /** Exact position of the single selected node, in ruler coordinates (inches, y UP from the origin). */
+  setNodePosition(patch: { x?: number; y?: number }) {
+    this.shape.setNodePoint({
+      x: patch.x !== undefined ? this.origin.x + patch.x : undefined,
+      y: patch.y !== undefined ? this.origin.y - patch.y : undefined,
+    });
   }
 
   private hitHandle(viewPoint: paper.Point): { handle: number; rotate: boolean } | null {
@@ -1009,6 +1104,11 @@ export class Editor {
     if (s.page.width !== this.page.width || s.page.height !== this.page.height) this.setPage(s.page, false);
     this.selected = this.contentLayer.children.filter((c) => selectedIds.has(c.data.id));
     this.selectedGuideId = null;
+    if (this.tool === "shape") {
+      this.shape.restore(this.history.meta);
+      // That step was made outside the Shape tool: keep editing the selected object.
+      if (!this.shape.hasTarget && this.selected.length === 1) this.shape.enter(this.selected[0]);
+    } else this.shape.clear();
     this.markChanged();
     this.viewChanged();
   }
@@ -1052,6 +1152,7 @@ export class Editor {
     this.guides = doc.guides ?? [];
     this.selected = [];
     this.selectedGuideId = null;
+    this.shape.clear();
     this.contentLayer.removeChildren();
     for (const n of doc.objects) {
       const it = fromNode(this.ps, n, (id) => this.assets.getProxy(id));
@@ -1067,6 +1168,7 @@ export class Editor {
 
   newDocument(page: PageSize, units: DocSettings["units"], name = "Untitled") {
     this.assets.clear();
+    this.shape.clear();
     this.contentLayer.removeChildren();
     this.selected = [];
     this.guides = [];
@@ -1156,7 +1258,14 @@ export class Editor {
   setSpaceDown(v: boolean) {
     if (this.spaceDown === v) return;
     this.spaceDown = v;
-    if (!this.drag) this.canvas.style.cursor = v ? "grab" : this.tool === "pan" ? "grab" : this.tool === "zoom" ? "zoom-in" : this.tool === "pick" ? "default" : "crosshair";
+    if (v) this.spacePanned = false;
+    if (!this.drag) this.canvas.style.cursor = v ? "grab" : this.toolCursor();
+  }
+  /** True if Space was used to pan since it went down (so its release is not a tap). */
+  takeSpacePanned(): boolean {
+    const p = this.spacePanned;
+    this.spacePanned = false;
+    return p;
   }
 
   private onWheel(e: WheelEvent) {
@@ -1184,6 +1293,7 @@ export class Editor {
 
     if (e.button === 1 || this.spaceDown || (this.tool === "pan" && e.button === 0)) {
       e.preventDefault();
+      if (this.spaceDown) this.spacePanned = true;
       this.drag = { kind: "pan", startClient: new this.ps.Point(e.clientX, e.clientY), startCenter: this.ps.view.center };
       this.canvas.style.cursor = "grabbing";
       return;
@@ -1201,6 +1311,11 @@ export class Editor {
     }
     if (this.tool === "text") {
       this.onTextRequest?.({ x: p.x, y: p.y });
+      return;
+    }
+
+    if (this.tool === "shape") {
+      if (this.shape.pointerDown(e, vp, p)) this.drag = { kind: "shape" };
       return;
     }
 
@@ -1255,6 +1370,8 @@ export class Editor {
         const h = this.hitHandle(vp);
         const cursors = ["nwse-resize", "ns-resize", "nesw-resize", "ew-resize", "nwse-resize", "ns-resize", "nesw-resize", "ew-resize"];
         this.canvas.style.cursor = h ? (h.rotate ? "alias" : cursors[h.handle]) : this.guideAt(vp) ? "move" : "default";
+      } else if (this.tool === "shape" && !this.spaceDown) {
+        this.canvas.style.cursor = this.shape.cursorAt(vp);
       }
       this.emit();
       return;
@@ -1349,6 +1466,9 @@ export class Editor {
         this.viewChanged();
         break;
       }
+      case "shape":
+        this.shape.pointerMove(e, p);
+        break;
     }
     this.drawOverlay();
     this.emit();
@@ -1363,7 +1483,7 @@ export class Editor {
     if (!d) return;
     switch (d.kind) {
       case "pan":
-        this.canvas.style.cursor = this.spaceDown || this.tool === "pan" ? "grab" : "default";
+        this.canvas.style.cursor = this.spaceDown ? "grab" : this.toolCursor();
         break;
       case "move":
         if (d.moved) this.commit();
@@ -1393,6 +1513,8 @@ export class Editor {
           shape.strokeColor = new ps.Color("#000000");
           shape.strokeWidth = NEW_SHAPE_STROKE;
           shape.data.id = newId();
+          // Stays a "shape" until converted to curves (Ctrl+Q); the Shape tool shows a hint for it.
+          shape.data.shape = d.shape;
           this.contentLayer.addChild(shape);
           this.selected = [shape];
           this.commit();
@@ -1419,6 +1541,9 @@ export class Editor {
       }
       case "origin":
         this.markChanged();
+        break;
+      case "shape":
+        this.shape.pointerUp(e);
         break;
     }
     this.snapLabel = null;

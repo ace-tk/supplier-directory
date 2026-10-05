@@ -96,6 +96,37 @@ function ZoomControl({ editor, zoomPct, hasSelection }: { editor: Editor; zoomPc
   );
 }
 
+/** Shape tool: exact position of the selected node, or the bounding box of several. Ruler coordinates (y up). */
+function NodeFields({ editor, state }: { editor: Editor; state: EditorState }) {
+  const n = state.nodeEdit!;
+  const unit = state.settings.units;
+  const o = state.origin;
+  if (n.hint) return <span className="shrink-0 text-[11px] font-medium text-amber-600">{n.hint}</span>;
+  if (!n.hasTarget) return <span className="shrink-0 text-[11px] text-muted-foreground">Shape tool — click a curve to show its nodes</span>;
+  const b = n.bounds;
+  return (
+    <>
+      <span className="shrink-0 text-[11px] font-semibold text-foreground">{b ? "Nodes" : "Node"}</span>
+      {b ? (
+        <>
+          <LengthField label="X" inches={b.x - o.x} unit={unit} disabled onCommit={() => {}} title="Left edge of the selected nodes (from ruler origin)" />
+          <LengthField label="Y" inches={o.y - (b.y + b.h)} unit={unit} disabled onCommit={() => {}} title="Bottom edge of the selected nodes (up from ruler origin)" />
+          <LengthField label="W" inches={b.w} unit={unit} disabled onCommit={() => {}} title="Width of the selected nodes" />
+          <LengthField label="H" inches={b.h} unit={unit} disabled onCommit={() => {}} title="Height of the selected nodes" />
+        </>
+      ) : (
+        <>
+          <LengthField label="X" inches={n.point ? n.point.x - o.x : null} unit={unit} onCommit={(x) => editor.setNodePosition({ x })} title="Node X (from ruler origin)" />
+          <LengthField label="Y" inches={n.point ? o.y - n.point.y : null} unit={unit} onCommit={(y) => editor.setNodePosition({ y })} title="Node Y (up from ruler origin)" />
+        </>
+      )}
+      <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground" title="Selected nodes / total nodes">
+        {n.selected} / {n.total} nodes
+      </span>
+    </>
+  );
+}
+
 export function PropertyBar({ editor, state }: { editor: Editor; state: EditorState }) {
   const unit = state.settings.units;
   const b = state.selectionBounds;
@@ -132,39 +163,45 @@ export function PropertyBar({ editor, state }: { editor: Editor; state: EditorSt
       <LengthField label="Y" inches={state.settings.duplicateOffset.y} unit={unit} onCommit={(y) => editor.updateSettings({ duplicateOffset: { ...state.settings.duplicateOffset, y } })} title="Duplicate offset Y (up)" />
       <Sep />
 
-      {/* Selection */}
-      <RefPointPicker value={state.refPoint} onChange={(p) => editor.setRefPoint(p)} />
-      <LengthField label="X" inches={refX} unit={unit} onCommit={(x) => editor.setSelectionGeometry({ x })} title="Selection X (reference point, from ruler origin)" />
-      <LengthField label="Y" inches={refY} unit={unit} onCommit={(y) => editor.setSelectionGeometry({ y })} title="Selection Y (reference point, up from ruler origin)" />
-      <LengthField label="W" inches={b ? b.w : null} unit={unit} onCommit={(w) => editor.setSelectionGeometry({ w })} title="Selection width" />
-      <LengthField label="H" inches={b ? b.h : null} unit={unit} onCommit={(h) => editor.setSelectionGeometry({ h })} title="Selection height" />
-      <IconBtn title={state.lockAspect ? "Proportional (lock aspect) — on" : "Proportional (lock aspect) — off"} onClick={() => editor.setLockAspect(!state.lockAspect)} active={state.lockAspect}>
-        {state.lockAspect ? <Link2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
-      </IconBtn>
-      <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title="Rotate selection by this angle (counter-clockwise)">
-        <RotateCcw className="h-3 w-3" />
-        <input
-          value={angle}
-          disabled={!b}
-          onChange={(e) => setAngle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              const a = parseFloat(angle);
-              if (Number.isFinite(a)) editor.rotateSelection(a);
-              setAngle("0");
-            }
-          }}
-          className="h-6 w-12 rounded border border-border bg-background px-1 text-right font-mono text-[11px] outline-none focus:border-primary disabled:opacity-40"
-        />
-        °
-      </label>
-      <IconBtn title="Mirror horizontally" onClick={() => editor.flip("h")} disabled={!b}>
-        <FlipHorizontal2 className="h-3.5 w-3.5" />
-      </IconBtn>
-      <IconBtn title="Mirror vertically" onClick={() => editor.flip("v")} disabled={!b}>
-        <FlipVertical2 className="h-3.5 w-3.5" />
-      </IconBtn>
-      {state.selectedText && (
+      {state.nodeEdit ? (
+        <NodeFields editor={editor} state={state} />
+      ) : (
+        <>
+          {/* Selection */}
+          <RefPointPicker value={state.refPoint} onChange={(p) => editor.setRefPoint(p)} />
+          <LengthField label="X" inches={refX} unit={unit} onCommit={(x) => editor.setSelectionGeometry({ x })} title="Selection X (reference point, from ruler origin)" />
+          <LengthField label="Y" inches={refY} unit={unit} onCommit={(y) => editor.setSelectionGeometry({ y })} title="Selection Y (reference point, up from ruler origin)" />
+          <LengthField label="W" inches={b ? b.w : null} unit={unit} onCommit={(w) => editor.setSelectionGeometry({ w })} title="Selection width" />
+          <LengthField label="H" inches={b ? b.h : null} unit={unit} onCommit={(h) => editor.setSelectionGeometry({ h })} title="Selection height" />
+          <IconBtn title={state.lockAspect ? "Proportional (lock aspect) — on" : "Proportional (lock aspect) — off"} onClick={() => editor.setLockAspect(!state.lockAspect)} active={state.lockAspect}>
+            {state.lockAspect ? <Link2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
+          </IconBtn>
+          <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title="Rotate selection by this angle (counter-clockwise)">
+            <RotateCcw className="h-3 w-3" />
+            <input
+              value={angle}
+              disabled={!b}
+              onChange={(e) => setAngle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const a = parseFloat(angle);
+                  if (Number.isFinite(a)) editor.rotateSelection(a);
+                  setAngle("0");
+                }
+              }}
+              className="h-6 w-12 rounded border border-border bg-background px-1 text-right font-mono text-[11px] outline-none focus:border-primary disabled:opacity-40"
+            />
+            °
+          </label>
+          <IconBtn title="Mirror horizontally" onClick={() => editor.flip("h")} disabled={!b}>
+            <FlipHorizontal2 className="h-3.5 w-3.5" />
+          </IconBtn>
+          <IconBtn title="Mirror vertically" onClick={() => editor.flip("v")} disabled={!b}>
+            <FlipVertical2 className="h-3.5 w-3.5" />
+          </IconBtn>
+        </>
+      )}
+      {state.selectedText && !state.nodeEdit && (
         <>
           <Sep />
           <label className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground" title="Font size (points)">

@@ -61,7 +61,7 @@ export interface RasterAsset {
   dpi: number;
 }
 
-export type ToolId = "pick" | "rectangle" | "ellipse" | "text" | "zoom" | "pan";
+export type ToolId = "pick" | "shape" | "rectangle" | "ellipse" | "text" | "zoom" | "pan";
 
 export const DEFAULT_SETTINGS: DocSettings = {
   units: "in",

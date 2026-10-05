@@ -33,7 +33,10 @@ const IMPORT_ACCEPT = ".svg,.pdf,.png,.jpg,.jpeg,.tif,.tiff,.dxf";
 const noopSubscribe = () => () => {};
 const nullState = () => null;
 
-const TOOL_KEYS: Record<string, ToolId> = { v: "pick", z: "zoom", h: "pan", F6: "rectangle", F7: "ellipse", F8: "text" };
+// F10 is CorelDRAW's Shape tool key; N is a second key for keyboards where F10 is a media key.
+const TOOL_KEYS: Record<string, ToolId> = { v: "pick", n: "shape", F10: "shape", z: "zoom", h: "pan", F6: "rectangle", F7: "ellipse", F8: "text" };
+/** A Space press shorter than this (with no panning) toggles Shape ⇄ Pick; longer = hold-to-pan. */
+const SPACE_TAP_MS = 250;
 
 function isTypingTarget(t: EventTarget | null) {
   const el = t as HTMLElement | null;
@@ -45,6 +48,7 @@ export default function PatternPrintStudio() {
   const openInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const pdfBytesRef = useRef<{ bytes: ArrayBuffer; name: string } | null>(null);
+  const spaceDownAt = useRef(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const state = useSyncExternalStore(editor?.subscribe ?? noopSubscribe, editor?.getState ?? nullState, nullState) as EditorState | null;
 
@@ -150,9 +154,11 @@ export default function PatternPrintStudio() {
       const st = editor.getState();
       if (k === " ") {
         e.preventDefault();
+        if (!e.repeat) spaceDownAt.current = performance.now();
         editor.setSpaceDown(true);
         return;
       }
+      const shapeTool = st.tool === "shape";
       if (mod) {
         const lower = k.toLowerCase();
         const handled = () => e.preventDefault();
@@ -162,7 +168,7 @@ export default function PatternPrintStudio() {
         if (lower === "c") return handled(), editor.copy();
         if (lower === "x") return handled(), editor.cut();
         if (lower === "v") return handled(), editor.paste();
-        if (lower === "a") return handled(), editor.selectAll();
+        if (lower === "a") return handled(), shapeTool ? editor.selectAllNodes() : editor.selectAll();
         if (lower === "g") return handled(), editor.group();
         if (lower === "u") return handled(), editor.ungroup();
         if (k === "'" || e.code === "Quote") return handled(), editor.toggleGrid();
@@ -181,14 +187,17 @@ export default function PatternPrintStudio() {
       if (e.shiftKey && k === "PageDown") return e.preventDefault(), editor.order("back");
       if (k === "F4") return e.preventDefault(), e.shiftKey ? editor.fitPage() : editor.fitAll();
       if (k === "F2" && e.shiftKey) return e.preventDefault(), editor.fitSelection();
-      if (k === "Delete" || k === "Backspace") return e.preventDefault(), editor.deleteSelection();
-      if (k === "Escape") return st.tool !== "pick" ? editor.setTool("pick") : editor.clearSelection();
-      if (k.startsWith("Arrow") && st.selectionCount) {
+      // In the Shape tool Delete never removes the whole object (node delete arrives with step 2C).
+      if (k === "Delete" || k === "Backspace") return e.preventDefault(), shapeTool ? undefined : editor.deleteSelection();
+      // Shape tool: first Esc clears the node selection, the next returns to the object (Pick tool).
+      if (k === "Escape") return shapeTool && editor.clearNodeSelection() ? undefined : st.tool !== "pick" ? editor.setTool("pick") : editor.clearSelection();
+      if (k.startsWith("Arrow") && (shapeTool ? !!st.nodeEdit?.selected : st.selectionCount)) {
         e.preventDefault();
         const step = st.settings.nudge * (e.shiftKey ? 10 : 1);
         const dx = k === "ArrowLeft" ? -step : k === "ArrowRight" ? step : 0;
         const dy = k === "ArrowUp" ? step : k === "ArrowDown" ? -step : 0;
-        editor.nudge(dx, dy);
+        if (shapeTool) editor.nudgeNodes(dx, dy);
+        else editor.nudge(dx, dy);
         return;
       }
       const tool = TOOL_KEYS[k] ?? TOOL_KEYS[k.toLowerCase()];
@@ -198,7 +207,11 @@ export default function PatternPrintStudio() {
       }
     };
     const up = (e: KeyboardEvent) => {
-      if (e.key === " ") editor.setSpaceDown(false);
+      if (e.key !== " ") return;
+      editor.setSpaceDown(false);
+      const held = performance.now() - spaceDownAt.current;
+      spaceDownAt.current = 0;
+      if (!isTypingTarget(e.target) && held < SPACE_TAP_MS && !editor.takeSpacePanned()) editor.toggleShapePick();
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -423,7 +436,17 @@ export default function PatternPrintStudio() {
             : `Page ${formatUnits(state?.page.width ?? 0, unit)} × ${formatUnits(state?.page.height ?? 0, unit)} ${UNIT_LABEL[unit]}`}
         </span>
         {state?.snapLabel && <span className="text-fuchsia-600">↳ {state.snapLabel}</span>}
-        {state && state.selectionCount > 0 && <span>{state.selectionCount} selected{state.rotateMode ? " · rotate mode (click again to switch)" : ""}</span>}
+        {state?.nodeEdit ? (
+          <span>
+            {state.nodeEdit.hint
+              ? state.nodeEdit.hint
+              : state.nodeEdit.hasTarget
+                ? `${state.nodeEdit.subpaths > 1 ? "Compound curve" : "Curve"} on Layer 1 · ${state.nodeEdit.total} nodes · ${state.nodeEdit.selected} selected${state.nodeEdit.open ? " · open path" : ""}`
+                : "Shape tool · click a curve to edit its nodes"}
+          </span>
+        ) : (
+          state && state.selectionCount > 0 && <span>{state.selectionCount} selected{state.rotateMode ? " · rotate mode (click again to switch)" : ""}</span>
+        )}
         <span className="ml-auto">{draftSavedAt ? `Draft autosaved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Autosaves a draft every 30s"}</span>
       </div>
 
