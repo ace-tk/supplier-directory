@@ -43,6 +43,7 @@ import {
   UserSearch,
   Contact,
   Palette,
+  Network,
 } from "lucide-react";
 import type { Role } from "@/types/auth";
 
@@ -78,6 +79,8 @@ export function permissionForAdminHref(href: string): string | null {
   if (href.startsWith("/shop")) return "shop.view";
   if (href.startsWith("/marketing")) return "marketing.view";
   if (href.startsWith("/settings")) return "settings.manage";
+  // "*" is held only by ADMIN, so this page is admin-only (no team preset has it).
+  if (href.startsWith("/business-structure")) return "*";
   return null;
 }
 
@@ -112,7 +115,10 @@ export function roleHome(role: string): string {
 export const ADMIN_NAV_GROUPS: NavGroup[] = [
   {
     group: "Overview",
-    items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Business Structure", href: "/business-structure", icon: Network },
+    ],
   },
   {
     group: "Team",
