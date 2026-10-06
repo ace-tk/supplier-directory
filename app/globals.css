@@ -56,8 +56,8 @@
 :root {
   --radius: 0.75rem;
 
-  /* Light mode — clean, airy, premium */
-  --background: oklch(0.99 0 0);
+  /* Light mode — a layered canvas: a faint grey workspace, white cards and sidebar on top */
+  --background: oklch(0.95 0.006 264);
   --foreground: oklch(0.13 0.01 264);
 
   --card: oklch(1 0 0);
@@ -103,7 +103,7 @@
   --chart-5: oklch(0.6 0.2 330);
 
   /* Sidebar */
-  --sidebar: oklch(0.975 0.002 264);
+  --sidebar: oklch(0.99 0.002 264);
   --sidebar-foreground: oklch(0.13 0.01 264);
   --sidebar-primary: oklch(0.5 0.22 264);
   --sidebar-primary-foreground: oklch(0.98 0 0);

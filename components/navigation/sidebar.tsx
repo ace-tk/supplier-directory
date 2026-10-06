@@ -151,6 +151,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
                         transition={{ duration: 0.2, ease: "easeInOut" }}
                       />
                     )}
+                    {isActive && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-sidebar-primary" />}
                     <item.icon
                       className={cn(
                         "relative z-10 h-4 w-4 shrink-0",
