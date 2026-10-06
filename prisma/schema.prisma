@@ -154,6 +154,7 @@ model User {
   garmentDesigns     GarmentDesign[]      @relation("GarmentDesignOwner")
   garmentBackDesigns GarmentBackDesign[]  @relation("GarmentBackDesignOwner")
   hitCollectionProposals HitCollectionProposal[] @relation("HitCollectionProposalOwner")
+  collectionProposals CollectionProposal[] @relation("CollectionProposalOwner")
   embroideryDesigns  EmbroideryDesign[]   @relation("EmbroideryDesignOwner")
 
   passwordResetTokens PasswordResetToken[]
@@ -2677,6 +2678,50 @@ model HitCollectionProposalVersion {
   gridCount    Int
   order        Int    @default(0)
 
+  createdAt DateTime @default(now())
+
+  @@index([proposalId])
+}
+
+// ─── Module: Design Studio — Collection Proposal ───────────────────────
+// Admin-only. A bestseller read once into a plan (a shared "Core DNA" and N
+// complete looks), then one image per look. Each version is one board; a
+// new count or Regenerate appends a version and never overwrites one.
+model CollectionProposal {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("CollectionProposalOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Collection")
+
+  // The uploaded bestseller photos (1–9 data URLs), preserved exactly as sent.
+  sourceImages String[] @db.Text
+
+  versions CollectionProposalVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model CollectionProposalVersion {
+  id         String             @id @default(cuid())
+  proposalId String
+  proposal   CollectionProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Looks in the board (1–9).
+  collectionCount Int
+  // The one model shared by every look (the plan's model line).
+  model           String   @db.Text
+  // The six Core DNA keywords shown on the board.
+  coreDNA         String[] @db.Text
+  // The plan for each look: { title, details[3], description }, in board order.
+  looks           Json
+  // One generated image per look, in board order. Empty until the version is complete.
+  lookImages      String[] @db.Text
+
+  order     Int      @default(0)
   createdAt DateTime @default(now())
 
   @@index([proposalId])

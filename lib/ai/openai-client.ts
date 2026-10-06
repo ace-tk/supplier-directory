@@ -56,6 +56,8 @@ export interface RunVisionChatCompletionParams {
   images: string[];
   model?: string;
   maxTokens?: number;
+  /** When true, the model is asked to reply with a single JSON object (the caller parses it). */
+  json?: boolean;
 }
 
 /** Same shared client as runChatCompletion, extended to accept image inputs
@@ -68,11 +70,13 @@ export async function runVisionChatCompletion({
   images,
   model = "gpt-4o-mini",
   maxTokens = 600,
+  json = false,
 }: RunVisionChatCompletionParams): Promise<string> {
   const client = getOpenAIClient();
   const completion = await client.chat.completions.create({
     model,
     max_tokens: maxTokens,
+    ...(json ? { response_format: { type: "json_object" as const } } : {}),
     messages: [
       { role: "system", content: system },
       {

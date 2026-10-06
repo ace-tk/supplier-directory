@@ -44,8 +44,7 @@ export const garmentStudioSections: GarmentStudioSection[] = [
     cards: [
       // Not in designStudioWorkflows (same as Pattern to Garment): that list also drives the hero's pill nav.
       { title: "Hit Collection Proposal", description: "Extend a bestseller into cohesive style variations while preserving its core design language.", image: img("hit-collection.jpg"), href: "/design-studio/hit-collection-proposal" },
-      // TODO: route
-      { title: "Collection Proposal", description: "Build a cohesive collection proposal around a bestseller with aligned themes, categories and design language.", image: img("collection-proposal.jpg") },
+      { title: "Collection Proposal", description: "Build a cohesive collection proposal around a bestseller with aligned themes, categories and design language.", image: img("collection-proposal.jpg"), href: "/design-studio/collection-proposal" },
       // TODO: route
       { title: "Detail to Design", description: "Turn a neckline, sleeve, pocket or other detail reference into multiple apparel concepts.", image: img("detail-to-design.jpg") },
       // TODO: route
