@@ -153,6 +153,7 @@ model User {
   repeatPrintDesigns RepeatPrintDesign[]  @relation("RepeatPrintDesignOwner")
   garmentDesigns     GarmentDesign[]      @relation("GarmentDesignOwner")
   garmentBackDesigns GarmentBackDesign[]  @relation("GarmentBackDesignOwner")
+  hitCollectionProposals HitCollectionProposal[] @relation("HitCollectionProposalOwner")
   embroideryDesigns  EmbroideryDesign[]   @relation("EmbroideryDesignOwner")
 
   passwordResetTokens PasswordResetToken[]
@@ -2629,6 +2630,56 @@ model GarmentBackDesignVersion {
   createdAt DateTime @default(now())
 
   @@index([designId])
+}
+
+// ─── Module: Design Studio — Hit Collection Proposal ───────────────────
+// Admin-only. Extends one bestseller (1–9 reference photos of the SAME
+// style) into a sheet of cohesive variations that keep its design
+// language. Same shape as GarmentBackDesign: a parent row holding the
+// untouched uploads and settings, plus append-only generated versions.
+
+model HitCollectionProposal {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("HitCollectionProposalOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Collection")
+
+  // The uploaded bestseller photos (1–9 data URLs), preserved exactly as
+  // sent — every generation and Regenerate conditions on these, never on
+  // an earlier AI result.
+  sourceImages String[] @db.Text
+
+  // "Tops", "Dresses"… — keeps every variation inside the same category.
+  styleCategory String
+  // The AI's read of the bestseller's design language, reused as
+  // grounding text for each generation.
+  analysis      String? @db.Text
+
+  versions HitCollectionProposalVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model HitCollectionProposalVersion {
+  id         String                @id @default(cuid())
+  proposalId String
+  proposal   HitCollectionProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // One image holding the whole grid of variations.
+  image        String @db.Text
+  // "on-model" | "flat-lay" | "original"
+  outputFormat String
+  // Variations in the grid (1–9).
+  gridCount    Int
+  order        Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([proposalId])
 }
 
 // ─── Module: Design Studio — Print → Embroidery ────────────────────────
