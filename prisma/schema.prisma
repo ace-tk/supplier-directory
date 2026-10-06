@@ -155,6 +155,12 @@ model User {
   garmentBackDesigns GarmentBackDesign[]  @relation("GarmentBackDesignOwner")
   hitCollectionProposals HitCollectionProposal[] @relation("HitCollectionProposalOwner")
   collectionProposals CollectionProposal[] @relation("CollectionProposalOwner")
+  businessEntities       BusinessEntity[]        @relation("BusinessEntityOwner")
+  businesses             Business[]              @relation("BusinessOwner")
+  businessLocations      BusinessLocation[]      @relation("BusinessLocationOwner")
+  businessMembers        BusinessMember[]        @relation("BusinessMemberOwner")
+  businessMemberLinks    BusinessMember[]        @relation("BusinessMemberUser")
+  businessAssignments    BusinessAssignment[]    @relation("BusinessAssignmentOwner")
   embroideryDesigns  EmbroideryDesign[]   @relation("EmbroideryDesignOwner")
 
   passwordResetTokens PasswordResetToken[]
@@ -2725,6 +2731,156 @@ model CollectionProposalVersion {
   createdAt DateTime @default(now())
 
   @@index([proposalId])
+}
+
+// ─── Module: Business Structure ──────────────────────────────────────
+// Admin-only. The organisation: a legal entity, the businesses under it,
+// their locations, the members and what each member does (an assignment)
+// with its tool access. "code" is the human ID shown in the setup tables
+// (E001, B001, L001, M001, A001), unique per owner. Saving the setup tables
+// replaces the owner's rows in one transaction.
+enum BusinessLocationType {
+  RETAIL_STORE
+  WAREHOUSE
+  OFFICE
+}
+
+model BusinessEntity {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("BusinessEntityOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  code              String
+  legalName         String
+  gstin             String?
+  registeredAddress String?
+
+  businesses Business[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, code])
+}
+
+model Business {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("BusinessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  entityId String
+  entity   BusinessEntity @relation(fields: [entityId], references: [id], onDelete: Restrict)
+
+  code               String
+  name               String
+  operationalAddress String?
+
+  locations   BusinessLocation[]
+  assignments BusinessAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, code])
+  @@index([entityId])
+}
+
+model BusinessLocation {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("BusinessLocationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  code    String
+  type    BusinessLocationType
+  name    String
+  address String?
+  mapPin  String?
+
+  assignments BusinessAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, code])
+  @@index([businessId])
+}
+
+model BusinessMember {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("BusinessMemberOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Set when the member's email matches an existing SupplyBase user. Never creates a user.
+  userId String?
+  user   User?   @relation("BusinessMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  code     String
+  name     String
+  mobile   String?
+  email    String?
+  photoUrl String?
+
+  assignments BusinessAssignment[] @relation("BusinessAssignmentMember")
+  reports     BusinessAssignment[] @relation("BusinessAssignmentReportsTo")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, code])
+  @@index([userId])
+}
+
+model BusinessAssignment {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("BusinessAssignmentOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  code String
+
+  memberId String
+  member   BusinessMember @relation("BusinessAssignmentMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  locationId String
+  location   BusinessLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  // One of the 12 designations in lib/business-structure.ts.
+  designation String
+
+  // Who this member reports to (a member, not an assignment). Null for the top.
+  reportsToMemberId String?
+  reportsTo         BusinessMember? @relation("BusinessAssignmentReportsTo", fields: [reportsToMemberId], references: [id], onDelete: SetNull)
+
+  toolAccess BusinessToolAccess[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, code])
+  @@index([memberId])
+  @@index([businessId])
+  @@index([locationId])
+  @@index([reportsToMemberId])
+}
+
+model BusinessToolAccess {
+  id           String             @id @default(cuid())
+  assignmentId String
+  assignment   BusinessAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  // One of the 19 tools in lib/business-structure.ts.
+  tool       String
+  canView    Boolean @default(false)
+  canCreate  Boolean @default(false)
+  canEdit    Boolean @default(false)
+  canApprove Boolean @default(false)
+
+  @@unique([assignmentId, tool])
 }
 
 // ─── Module: Design Studio — Print → Embroidery ────────────────────────
