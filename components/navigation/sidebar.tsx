@@ -51,7 +51,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
                 SupplyBase
               </span>
               {portalLabel && (
-                <span className="block text-[10px] text-muted-foreground leading-tight truncate">
+                <span className="block text-[10px] text-sidebar-foreground/60 leading-tight truncate">
                   {portalLabel}
                 </span>
               )}
@@ -67,7 +67,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
                   type="button"
                   onClick={() => setCollapsed(!collapsed)}
                   aria-label="Expand sidebar"
-                  className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/50 transition-all duration-150"
+                  className="flex items-center justify-center w-6 h-6 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150"
                 />
               }
             >
@@ -81,7 +81,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
             onClick={() => setCollapsed(!collapsed)}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
-            className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/50 transition-all duration-150"
+            className="flex items-center justify-center w-6 h-6 rounded-md shrink-0 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all duration-150"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
@@ -97,7 +97,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
         }) })).filter((group) => group.items.length > 0).map((group) => (
           <div key={group.group}>
             {!collapsed && (
-              <p className="px-2 mb-1.5 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              <p className="px-2 mb-1.5 text-xs font-medium uppercase tracking-widest text-sidebar-foreground/60">
                 {group.group}
               </p>
             )}
@@ -265,9 +265,9 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-sidebar-foreground truncate">{user.name}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{ROLE_LABELS[user.role]}</p>
+                <p className="text-[11px] text-sidebar-foreground/60 truncate">{ROLE_LABELS[user.role]}</p>
               </div>
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ChevronRight className="h-3.5 w-3.5 text-sidebar-foreground/60 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           ))}
 
