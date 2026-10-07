@@ -12,18 +12,22 @@ import {
   Plus,
   ShieldCheck,
   Loader2,
-  UserCheck,
   Truck,
   UserSquare2,
   Pencil,
+  ChevronDown,
+  ChevronUp,
+  Settings2,
+  UserPlus,
+  Check,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type SetupData, LocationType, nextCode } from "@/lib/business-structure";
+import { type SetupData, LocationType, nextCode, TOOLS, AccessRow, MemberEntityAssignmentRow } from "@/lib/business-structure";
 import { saveBusinessSetupAction, type AssignedBusinessData } from "@/services/business-structure";
 
 interface BusinessStructureTreeProps {
@@ -39,6 +43,10 @@ export function BusinessStructureTree({
   onSaved,
   onOpenTab,
 }: BusinessStructureTreeProps) {
+  // Top Pool Bar Toggle
+  const [showPool, setShowPool] = useState(true);
+
+  // Add/Edit Location Modals
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<LocationType>("WAREHOUSE");
   const [locName, setLocName] = useState("");
@@ -46,11 +54,23 @@ export function BusinessStructureTree({
   const [locMapPin, setLocMapPin] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Edit location state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingLocCode, setEditingLocCode] = useState<string | null>(null);
 
-  // Company information (defaults to Company 1 / First Entity if empty)
+  // Entity Assignment Modal for Team Member
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedMemberCode, setSelectedMemberCode] = useState<string | null>(null);
+
+  // Member Tool Access Modal
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [selectedAccessAssignmentCode, setSelectedAccessAssignmentCode] = useState<string | null>(null);
+  const [selectedTool, setSelectedTool] = useState<string>("Content Management");
+  const [toolView, setToolView] = useState(true);
+  const [toolCreate, setToolCreate] = useState(false);
+  const [toolEdit, setToolEdit] = useState(false);
+  const [toolApprove, setToolApprove] = useState(false);
+
+  // Defaults for Company 1
   const entity = saved.entities[0] ?? {
     code: "E001",
     legalName: "Company 1 Legal Entity",
@@ -68,6 +88,8 @@ export function BusinessStructureTree({
   const warehouses = saved.locations.filter((l) => l.type === "WAREHOUSE");
   const stores = saved.locations.filter((l) => l.type === "RETAIL_STORE");
   const backOffices = saved.locations.filter((l) => l.type === "OFFICE");
+
+  const memberEntityAssignments = saved.memberEntityAssignments ?? [];
 
   const openAddModal = (type: LocationType) => {
     setModalType(type);
@@ -94,7 +116,6 @@ export function BusinessStructureTree({
     }
     setSaving(true);
 
-    // Ensure entity & business exist in draft if empty
     const entities = saved.entities.length
       ? saved.entities
       : [{ code: entity.code, legalName: entity.legalName, gstin: entity.gstin, registeredAddress: entity.registeredAddress }];
@@ -165,8 +186,141 @@ export function BusinessStructureTree({
     }
   };
 
+  // Toggle entity assignment for a team member
+  const toggleMemberEntityAssignment = async (memberCode: string, entityType: "BUYER" | "SUPPLIER" | "FREELANCER", entityId: string, entityName: string) => {
+    setSaving(true);
+    const current = saved.memberEntityAssignments ?? [];
+    const exists = current.some((a) => a.memberCode === memberCode && a.entityType === entityType && a.entityId === entityId);
+
+    let updatedList: MemberEntityAssignmentRow[];
+    if (exists) {
+      updatedList = current.filter((a) => !(a.memberCode === memberCode && a.entityType === entityType && a.entityId === entityId));
+    } else {
+      updatedList = [...current, { memberCode, entityType, entityId, entityName }];
+    }
+
+    const updatedSetup: SetupData = {
+      ...saved,
+      memberEntityAssignments: updatedList,
+    };
+
+    const res = await saveBusinessSetupAction(updatedSetup);
+    setSaving(false);
+
+    if (res.success) {
+      onSaved(res.data);
+      toast.success(exists ? `Removed ${entityName} assignment` : `Assigned ${entityName} to member`);
+    } else {
+      toast.error(res.errors.join(", "));
+    }
+  };
+
+  // Save specific tool access for assignment (e.g. Content Management access)
+  const handleSaveToolAccess = async () => {
+    if (!selectedAccessAssignmentCode) return;
+    setSaving(true);
+
+    const existingAccess = saved.access.filter((a) => a.assignmentCode !== selectedAccessAssignmentCode || a.tool !== selectedTool);
+    const newAccessRow: AccessRow = {
+      assignmentCode: selectedAccessAssignmentCode,
+      tool: selectedTool,
+      view: toolView,
+      create: toolCreate,
+      edit: toolEdit,
+      approve: toolApprove,
+    };
+
+    const updatedAccess = [...existingAccess, newAccessRow];
+    const updatedSetup: SetupData = {
+      ...saved,
+      access: updatedAccess,
+    };
+
+    const res = await saveBusinessSetupAction(updatedSetup);
+    setSaving(false);
+
+    if (res.success) {
+      onSaved(res.data);
+      setAccessModalOpen(false);
+      toast.success(`Access updated for ${selectedTool}`);
+    } else {
+      toast.error(res.errors.join(", "));
+    }
+  };
+
+  // Helpers to retrieve member assignments
+  const getMemberAssignments = (memberCode: string) => {
+    return memberEntityAssignments.filter((a) => a.memberCode === memberCode);
+  };
+
+  const getMemberAccessList = (memberCode: string) => {
+    const memberAssignments = saved.assignments.filter((a) => a.memberCode === memberCode);
+    const assignmentCodes = new Set(memberAssignments.map((a) => a.code));
+    return saved.access.filter((acc) => assignmentCodes.has(acc.assignmentCode));
+  };
+
+  const selectedMember = saved.members.find((m) => m.code === selectedMemberCode);
+
   return (
     <div className="space-y-6">
+      {/* TOP-LEVEL ADMIN POOL (COLLAPSIBLE HEADER BAR) */}
+      <Card className="border-border bg-gradient-to-r from-background via-muted/20 to-background">
+        <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between cursor-pointer select-none" onClick={() => setShowPool(!showPool)}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+              <Briefcase className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base font-bold">MAIN ADMIN ENTITY POOL</CardTitle>
+                <Badge variant="outline" className="text-xs bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300">
+                  Global Pool
+                </Badge>
+              </div>
+              <CardDescription className="text-xs">
+                Admin master directory: 50+ Buyers, Suppliers & Freelancers ready to be assigned to team members
+              </CardDescription>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+            {showPool ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </Button>
+        </CardHeader>
+
+        {showPool && (
+          <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 border-t border-border/60">
+            <div className="grid gap-3 pt-4 sm:grid-cols-3 text-xs">
+              {/* Buyers Pool */}
+              <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-3 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-sky-800 dark:text-sky-200">
+                  <span className="flex items-center gap-1.5"><UserSquare2 className="h-4 w-4" /> Buyers Pool</span>
+                  <Badge variant="secondary" className="font-bold">{assignedBusiness?.buyers.length ?? 0}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Available for admin to assign to sales & CRM team members</p>
+              </div>
+
+              {/* Suppliers Pool */}
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-emerald-800 dark:text-emerald-200">
+                  <span className="flex items-center gap-1.5"><Truck className="h-4 w-4" /> Suppliers Pool</span>
+                  <Badge variant="secondary" className="font-bold">{assignedBusiness?.suppliers.length ?? 0}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Available for admin to assign to sourcing & procurement managers</p>
+              </div>
+
+              {/* Freelancers Pool */}
+              <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-purple-800 dark:text-purple-200">
+                  <span className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Freelancers Pool</span>
+                  <Badge variant="secondary" className="font-bold">{assignedBusiness?.freelancers.length ?? 0}</Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Available for admin to assign to design & creative leads</p>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Visual Hierarchy Root Tree */}
       <div className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-xs">
         <div className="flex items-center gap-3 border-b border-border pb-4">
@@ -175,7 +329,7 @@ export function BusinessStructureTree({
           </div>
           <div>
             <h2 className="text-lg font-bold tracking-tight">BUSINESS STRUCTURE</h2>
-            <p className="text-xs text-muted-foreground">Complete organizational hierarchy, locations & assigned business</p>
+            <p className="text-xs text-muted-foreground">Organizational hierarchy, team management, locations & assigned entities</p>
           </div>
         </div>
 
@@ -185,7 +339,7 @@ export function BusinessStructureTree({
           <div className="relative pl-6 sm:pl-8 border-l-2 border-blue-500/30">
             <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-blue-500 ring-4 ring-background" />
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">1. TEAM MANAGEMENT</span>
@@ -198,44 +352,121 @@ export function BusinessStructureTree({
                 </Button>
               </div>
 
-              {/* Team Management Child Node: Hierarchy */}
+              {/* Team Members List Card */}
               <Card className="bg-muted/30">
                 <CardHeader className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                        <Users className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-sm font-semibold">Hierarchy</CardTitle>
-                        <CardDescription className="text-xs">
-                          Employee reporting structure, designations, and workspace roles
-                        </CardDescription>
-                      </div>
+                    <div>
+                      <CardTitle className="text-sm font-semibold">Team Members &amp; Assignments</CardTitle>
+                      <CardDescription className="text-xs">
+                        Configure team member roles, tool permissions (e.g. Content Management), and assigned Buyers/Suppliers/Freelancers
+                      </CardDescription>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => onOpenTab("hierarchy")} className="text-xs font-medium text-primary">
-                      Manage Hierarchy
+                    <Button variant="ghost" size="sm" onClick={() => onOpenTab("tables")} className="text-xs font-medium text-primary">
+                      Manage Setup Tables
                     </Button>
                   </div>
                 </CardHeader>
-                {saved.members.length > 0 && (
-                  <CardContent className="px-3 pb-3 sm:px-4 pt-0">
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {saved.members.slice(0, 6).map((m) => (
-                        <span key={m.code} className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs">
-                          <UserCheck className="h-3 w-3 text-blue-500" />
-                          <span className="font-medium">{m.name}</span>
-                          {m.email && <span className="text-[10px] text-muted-foreground">({m.email})</span>}
-                        </span>
-                      ))}
-                      {saved.members.length > 6 && (
-                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground font-medium">
-                          +{saved.members.length - 6} more
-                        </span>
-                      )}
-                    </div>
-                  </CardContent>
-                )}
+                <CardContent className="p-3 sm:p-4 pt-0 space-y-3">
+                  {saved.members.length === 0 && (
+                    <p className="text-xs text-muted-foreground italic">No team members added yet. Add members in Setup Tables.</p>
+                  )}
+
+                  {saved.members.map((m) => {
+                    const memberAssignments = saved.assignments.filter((a) => a.memberCode === m.code);
+                    const assignedEntities = getMemberAssignments(m.code);
+                    const memberAccess = getMemberAccessList(m.code);
+
+                    return (
+                      <div key={m.code} className="rounded-lg border border-border bg-background p-3.5 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 font-bold text-xs">
+                              {m.name[0]?.toUpperCase() ?? "M"}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm text-foreground">{m.name}</p>
+                              <p className="text-[11px] text-muted-foreground">{m.code} {m.email ? `· ${m.email}` : ""}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => {
+                                setSelectedMemberCode(m.code);
+                                setAssignModalOpen(true);
+                              }}
+                            >
+                              <UserPlus className="h-3 w-3" /> Assign Entities ({assignedEntities.length})
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Designation & Location info */}
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {memberAssignments.map((a) => {
+                            const b = saved.businesses.find((x) => x.code === a.businessCode);
+                            const l = saved.locations.find((x) => x.code === a.locationCode);
+                            return (
+                              <Badge key={a.code} variant="secondary" className="text-[10px]">
+                                {a.designation} {b ? `at ${b.name}` : ""} {l ? `(${l.name})` : ""}
+                              </Badge>
+                            );
+                          })}
+
+                          {/* Tool Access RBAC Summary */}
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <span className="text-[11px] font-medium text-muted-foreground">Tool Access:</span>
+                            {memberAccess.length === 0 ? (
+                              <span className="text-[11px] text-muted-foreground italic">None configured</span>
+                            ) : (
+                              memberAccess.map((acc) => (
+                                <Badge key={acc.tool} variant="outline" className="text-[10px] bg-blue-50/50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
+                                  {acc.tool} ({[acc.view && "V", acc.create && "C", acc.edit && "E", acc.approve && "A"].filter(Boolean).join("")})
+                                </Badge>
+                              ))
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] text-primary"
+                              onClick={() => {
+                                const assignment = memberAssignments[0];
+                                if (assignment) {
+                                  setSelectedAccessAssignmentCode(assignment.code);
+                                  setAccessModalOpen(true);
+                                } else {
+                                  toast.error("Member must have an assignment before setting tool access.");
+                                }
+                              }}
+                            >
+                              <Settings2 className="h-3 w-3 mr-0.5" /> Edit Access
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Assigned Buyers, Suppliers, Freelancers tags */}
+                        {assignedEntities.length > 0 && (
+                          <div className="rounded-md bg-muted/40 p-2 space-y-1 text-xs">
+                            <p className="text-[11px] font-semibold text-muted-foreground">Assigned Business Entities to {m.name}:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {assignedEntities.map((ae) => (
+                                <span key={`${ae.entityType}-${ae.entityId}`} className="inline-flex items-center gap-1 rounded bg-background border border-border px-1.5 py-0.5 text-[10px] font-medium">
+                                  {ae.entityType === "BUYER" && <UserSquare2 className="h-3 w-3 text-sky-500" />}
+                                  {ae.entityType === "SUPPLIER" && <Truck className="h-3 w-3 text-emerald-500" />}
+                                  {ae.entityType === "FREELANCER" && <Users className="h-3 w-3 text-purple-500" />}
+                                  <span>{ae.entityName}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
               </Card>
             </div>
           </div>
@@ -387,8 +618,8 @@ export function BusinessStructureTree({
                   <CardHeader className="p-3">
                     <div className="flex items-center gap-2">
                       <Briefcase className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                      <CardTitle className="text-sm font-semibold">Assigned Business</CardTitle>
-                      <Badge variant="outline" className="text-[10px]">Buyers, Suppliers & Freelancers</Badge>
+                      <CardTitle className="text-sm font-semibold">Assigned Business Summary</CardTitle>
+                      <Badge variant="outline" className="text-[10px]">Buyers, Suppliers &amp; Freelancers</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="p-3 pt-0">
@@ -398,17 +629,14 @@ export function BusinessStructureTree({
                       <div className="rounded-md border border-border bg-muted/20 p-2.5 space-y-1.5">
                         <div className="flex items-center justify-between font-semibold">
                           <span className="flex items-center gap-1 text-sky-700 dark:text-sky-300">
-                            <UserSquare2 className="h-3.5 w-3.5" /> Buyers
+                            <UserSquare2 className="h-3.5 w-3.5" /> Buyers ({assignedBusiness?.buyers.length ?? 0})
                           </span>
-                          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                            {assignedBusiness?.buyers.length ?? 0}
-                          </Badge>
                         </div>
                         <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                           {assignedBusiness?.buyers.length === 0 && (
                             <p className="text-[10px] text-muted-foreground italic">No buyers linked</p>
                           )}
-                          {assignedBusiness?.buyers.map((b) => (
+                          {assignedBusiness?.buyers.slice(0, 5).map((b) => (
                             <div key={b.id} className="text-[11px] font-medium text-foreground truncate">
                               • {b.name} {b.location ? <span className="text-[9px] text-muted-foreground">({b.location})</span> : ""}
                             </div>
@@ -420,17 +648,14 @@ export function BusinessStructureTree({
                       <div className="rounded-md border border-border bg-muted/20 p-2.5 space-y-1.5">
                         <div className="flex items-center justify-between font-semibold">
                           <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
-                            <Truck className="h-3.5 w-3.5" /> Suppliers
+                            <Truck className="h-3.5 w-3.5" /> Suppliers ({assignedBusiness?.suppliers.length ?? 0})
                           </span>
-                          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                            {assignedBusiness?.suppliers.length ?? 0}
-                          </Badge>
                         </div>
                         <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                           {assignedBusiness?.suppliers.length === 0 && (
                             <p className="text-[10px] text-muted-foreground italic">No suppliers linked</p>
                           )}
-                          {assignedBusiness?.suppliers.map((s) => (
+                          {assignedBusiness?.suppliers.slice(0, 5).map((s) => (
                             <div key={s.id} className="text-[11px] font-medium text-foreground truncate">
                               • {s.name} {s.location ? <span className="text-[9px] text-muted-foreground">({s.location})</span> : ""}
                             </div>
@@ -442,17 +667,14 @@ export function BusinessStructureTree({
                       <div className="rounded-md border border-border bg-muted/20 p-2.5 space-y-1.5">
                         <div className="flex items-center justify-between font-semibold">
                           <span className="flex items-center gap-1 text-purple-700 dark:text-purple-300">
-                            <Users className="h-3.5 w-3.5" /> Freelancers
+                            <Users className="h-3.5 w-3.5" /> Freelancers ({assignedBusiness?.freelancers.length ?? 0})
                           </span>
-                          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                            {assignedBusiness?.freelancers.length ?? 0}
-                          </Badge>
                         </div>
                         <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
                           {assignedBusiness?.freelancers.length === 0 && (
                             <p className="text-[10px] text-muted-foreground italic">No freelancers linked</p>
                           )}
-                          {assignedBusiness?.freelancers.map((f) => (
+                          {assignedBusiness?.freelancers.slice(0, 5).map((f) => (
                             <div key={f.id} className="text-[11px] font-medium text-foreground truncate">
                               • {f.name} {f.location ? <span className="text-[9px] text-muted-foreground">({f.location})</span> : ""}
                             </div>
@@ -555,6 +777,183 @@ export function BusinessStructureTree({
             <Button size="sm" onClick={handleEditLocation} disabled={saving}>
               {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Update Location
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Entities to Team Member Modal */}
+      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Assign Entities to {selectedMember?.name ?? "Team Member"}</DialogTitle>
+            <DialogDescription className="text-xs">
+              Select which Buyers, Suppliers, or Freelancers from the Admin Pool are assigned to this team member.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedMemberCode && (
+            <div className="space-y-4 py-2 text-xs max-h-96 overflow-y-auto pr-1">
+              {/* Assign Buyers */}
+              <div className="space-y-2">
+                <p className="font-semibold text-sky-700 dark:text-sky-300 flex items-center gap-1">
+                  <UserSquare2 className="h-3.5 w-3.5" /> Buyers
+                </p>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {assignedBusiness?.buyers.map((b) => {
+                    const isAssigned = memberEntityAssignments.some(
+                      (a) => a.memberCode === selectedMemberCode && a.entityType === "BUYER" && a.entityId === b.id
+                    );
+                    return (
+                      <div
+                        key={b.id}
+                        onClick={() => toggleMemberEntityAssignment(selectedMemberCode, "BUYER", b.id, b.name)}
+                        className={`flex items-center justify-between rounded-md border p-2 cursor-pointer transition-colors ${
+                          isAssigned ? "border-sky-500 bg-sky-50 dark:bg-sky-950/40" : "border-border hover:bg-muted/50"
+                        }`}
+                      >
+                        <span className="font-medium truncate">{b.name}</span>
+                        {isAssigned && <Check className="h-3.5 w-3.5 text-sky-600 shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Assign Suppliers */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                  <Truck className="h-3.5 w-3.5" /> Suppliers
+                </p>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {assignedBusiness?.suppliers.map((s) => {
+                    const isAssigned = memberEntityAssignments.some(
+                      (a) => a.memberCode === selectedMemberCode && a.entityType === "SUPPLIER" && a.entityId === s.id
+                    );
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => toggleMemberEntityAssignment(selectedMemberCode, "SUPPLIER", s.id, s.name)}
+                        className={`flex items-center justify-between rounded-md border p-2 cursor-pointer transition-colors ${
+                          isAssigned ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-border hover:bg-muted/50"
+                        }`}
+                      >
+                        <span className="font-medium truncate">{s.name}</span>
+                        {isAssigned && <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Assign Freelancers */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                  <Users className="h-3.5 w-3.5" /> Freelancers
+                </p>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {assignedBusiness?.freelancers.map((f) => {
+                    const isAssigned = memberEntityAssignments.some(
+                      (a) => a.memberCode === selectedMemberCode && a.entityType === "FREELANCER" && a.entityId === f.id
+                    );
+                    return (
+                      <div
+                        key={f.id}
+                        onClick={() => toggleMemberEntityAssignment(selectedMemberCode, "FREELANCER", f.id, f.name)}
+                        className={`flex items-center justify-between rounded-md border p-2 cursor-pointer transition-colors ${
+                          isAssigned ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40" : "border-border hover:bg-muted/50"
+                        }`}
+                      >
+                        <span className="font-medium truncate">{f.name}</span>
+                        {isAssigned && <Check className="h-3.5 w-3.5 text-purple-600 shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button size="sm" onClick={() => setAssignModalOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Member Tool Access Modal (RBAC, e.g. Content Management access) */}
+      <Dialog open={accessModalOpen} onOpenChange={setAccessModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Configure Tool Access Permissions</DialogTitle>
+            <DialogDescription className="text-xs">
+              Grant specific tool permissions to this team member (e.g., Content Management, Marketing, CRM).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-sm">
+            <div className="space-y-1.5">
+              <Label>Tool / Module</Label>
+              <select
+                value={selectedTool}
+                onChange={(e) => setSelectedTool(e.target.value)}
+                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+              >
+                {TOOLS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Label className="text-xs font-semibold">Permissions Level</Label>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label className="flex items-center gap-2 rounded-md border border-border p-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={toolView}
+                    onChange={(e) => setToolView(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>View</span>
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-border p-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={toolCreate}
+                    onChange={(e) => setToolCreate(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>Create</span>
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-border p-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={toolEdit}
+                    onChange={(e) => setToolEdit(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>Edit</span>
+                </label>
+                <label className="flex items-center gap-2 rounded-md border border-border p-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={toolApprove}
+                    onChange={(e) => setToolApprove(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  <span>Approve</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setAccessModalOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleSaveToolAccess} disabled={saving}>
+              {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Save Access
             </Button>
           </DialogFooter>
         </DialogContent>

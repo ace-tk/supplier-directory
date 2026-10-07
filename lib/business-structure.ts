@@ -88,6 +88,13 @@ export interface AccessRow {
   approve: boolean;
 }
 
+export interface MemberEntityAssignmentRow {
+  memberCode: string;
+  entityType: "BUYER" | "SUPPLIER" | "FREELANCER";
+  entityId: string;
+  entityName: string;
+}
+
 export interface SetupData {
   entities: EntityRow[];
   businesses: BusinessRow[];
@@ -95,9 +102,11 @@ export interface SetupData {
   members: MemberRow[];
   assignments: AssignmentRow[];
   access: AccessRow[];
+  memberEntityAssignments?: MemberEntityAssignmentRow[];
 }
 
-export const EMPTY_SETUP: SetupData = { entities: [], businesses: [], locations: [], members: [], assignments: [], access: [] };
+export const EMPTY_SETUP: SetupData = { entities: [], businesses: [], locations: [], members: [], assignments: [], access: [], memberEntityAssignments: [] };
+
 
 /** The ID prefix for each table, as in the prototype (E001, B001, L001, M001, A001). */
 export const ID_PREFIX = { entities: "E", businesses: "B", locations: "L", members: "M", assignments: "A" } as const;
