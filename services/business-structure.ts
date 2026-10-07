@@ -132,3 +132,54 @@ export async function saveBusinessSetupAction(input: SetupData): Promise<SetupRe
 
   return { success: true, data };
 }
+
+export interface AssignedBusinessData {
+  buyers: Array<{ id: string; name: string; companyName?: string; location?: string }>;
+  suppliers: Array<{ id: string; name: string; companyName?: string; location?: string }>;
+  freelancers: Array<{ id: string; name: string; location?: string; skills?: string[] }>;
+}
+
+export async function getAssignedBusinessAction(): Promise<AssignedBusinessData> {
+  const [buyers, supplierListings, suppliers, freelancers] = await Promise.all([
+    db.buyer.findMany({ take: 20, include: { user: { select: { name: true, email: true } } } }),
+    db.supplierListing.findMany({ take: 20 }),
+    db.supplier.findMany({ take: 20, include: { user: { select: { name: true, email: true } } } }),
+    db.freelancer.findMany({ take: 20, include: { user: { select: { name: true, email: true } } } }),
+  ]);
+
+  const mappedBuyers = buyers.map((b) => ({
+    id: b.id,
+    name: b.user.name || b.companyName || b.user.email,
+    companyName: b.companyName,
+    location: [b.city, b.country].filter(Boolean).join(", "),
+  }));
+
+  const mappedSuppliers = [
+    ...suppliers.map((s) => ({
+      id: s.id,
+      name: s.companyName || s.user.name || s.user.email,
+      companyName: s.companyName,
+      location: [s.city, s.country].filter(Boolean).join(", "),
+    })),
+    ...supplierListings.map((sl) => ({
+      id: sl.id,
+      name: sl.companyName,
+      companyName: sl.companyName,
+      location: [sl.city, sl.country].filter(Boolean).join(", "),
+    })),
+  ];
+
+  const mappedFreelancers = freelancers.map((f) => ({
+    id: f.id,
+    name: f.user.name || f.user.email,
+    location: f.location ?? "",
+    skills: f.skills,
+  }));
+
+  return {
+    buyers: mappedBuyers,
+    suppliers: mappedSuppliers,
+    freelancers: mappedFreelancers,
+  };
+}
+

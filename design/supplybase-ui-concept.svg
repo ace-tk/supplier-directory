@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1760" height="1080" viewBox="0 0 1760 1080" fill="none">
+  <defs>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1760" y2="1080" gradientUnits="userSpaceOnUse"><stop stop-color="#E9ECE7"/><stop offset="1" stop-color="#DDE3DD"/></linearGradient>
+    <linearGradient id="lime" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#C4F47D"/><stop offset="1" stop-color="#A9E85D"/></linearGradient>
+    <linearGradient id="dark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#202723"/><stop offset="1" stop-color="#141A17"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#253027" flood-opacity=".14"/></filter>
+    <filter id="smallShadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#253027" flood-opacity=".08"/></filter>
+    <style>
+      .ui{font-family:Inter,Arial,sans-serif;fill:#202722}.muted{fill:#7D8780}.tiny{font-size:10px}.small{font-size:12px}.body{font-size:14px}.label{font-size:11px;font-weight:600;letter-spacing:.2px}.title{font-size:25px;font-weight:650;letter-spacing:-.5px}.num{font-size:26px;font-weight:650;letter-spacing:-.5px}.bold{font-weight:650}.white{fill:#fff}.limeText{fill:#668E39}
+    </style>
+  </defs>
+  <rect width="1760" height="1080" rx="0" fill="url(#canvas)"/>
+  <text x="78" y="55" class="ui label" fill="#778078">SUPPLYBASE / WORKSPACE CONCEPT</text>
+  <text x="78" y="83" class="ui" font-size="17" font-weight="600">A calmer, more actionable home for your supply operations</text>
+  <text x="78" y="105" class="ui small muted">Desktop workspace with a mobile layout shown at right</text>
+
+  <!-- Desktop app frame -->
+  <g filter="url(#shadow)">
+    <rect x="64" y="135" width="1265" height="865" rx="23" fill="#F6F7F3"/>
+    <rect x="64" y="135" width="208" height="865" rx="23" fill="#202723"/>
+    <path d="M250 135H272V1000H250V135Z" fill="#202723"/>
+  </g>
+  <!-- Desktop sidebar -->
+  <rect x="84" y="157" width="34" height="34" rx="11" fill="url(#lime)"/>
+  <path d="M94 178L101 165L108 178M97 173H105" stroke="#263126" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="128" y="174" class="white" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="650">SupplyBase</text>
+  <text x="128" y="188" fill="#A8B1AA" font-family="Inter,Arial,sans-serif" font-size="9">OPERATIONS WORKSPACE</text>
+  <rect x="84" y="216" width="168" height="36" rx="10" fill="#303A33"/>
+  <circle cx="101" cy="234" r="6" fill="#C1EF7A"/><circle cx="101" cy="234" r="2" fill="#30402D"/>
+  <text x="116" y="238" class="white small" font-family="Inter,Arial,sans-serif" font-weight="600">Overview</text>
+  <text x="87" y="279" fill="#7F8981" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="700" letter-spacing="1.2">WORKSPACE</text>
+  <g font-family="Inter,Arial,sans-serif" font-size="12" fill="#B9C1BA">
+    <rect x="87" y="293" width="15" height="15" rx="4" fill="#414B43"/><path d="M91 301h7m-7-4h7m-7 8h5" stroke="#C8D0C8" stroke-width="1.2" stroke-linecap="round"/><text x="112" y="305">Supplier directory</text>
+    <rect x="87" y="329" width="15" height="15" rx="4" fill="#414B43"/><path d="M91 334h7v5h-7zM93 332v2m3-2v2" stroke="#C8D0C8" stroke-width="1"/><text x="112" y="341">Orders &amp; sourcing</text>
+    <rect x="87" y="365" width="15" height="15" rx="4" fill="#414B43"/><circle cx="94.5" cy="372.5" r="4" stroke="#C8D0C8" stroke-width="1.1"/><path d="M92 376l-2 3m7-3 2 3" stroke="#C8D0C8" stroke-width="1"/><text x="112" y="377">Buyer relationships</text>
+    <rect x="87" y="401" width="15" height="15" rx="4" fill="#414B43"/><path d="M90.5 405.5h8v7h-8zM92.5 403.5h4" stroke="#C8D0C8" stroke-width="1"/><text x="112" y="413">Product catalog</text>
+    <rect x="87" y="437" width="15" height="15" rx="4" fill="#414B43"/><path d="M90 441h9v7h-9zM92 439v2m5-2v2" stroke="#C8D0C8" stroke-width="1"/><text x="112" y="449">Inventory</text>
+  </g>
+  <text x="87" y="489" fill="#7F8981" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="700" letter-spacing="1.2">TOOLS</text>
+  <g font-family="Inter,Arial,sans-serif" font-size="12" fill="#B9C1BA">
+    <circle cx="94" cy="511" r="7" stroke="#AEB8AF" stroke-width="1.2"/><path d="M91 511h6m-3-3v6" stroke="#AEB8AF" stroke-width="1.1"/><text x="112" y="515">AI Design Studio</text>
+    <path d="M88 543h13v11H88zM91 540h7" stroke="#AEB8AF" stroke-width="1.1"/><text x="112" y="552">Content &amp; documents</text>
+    <circle cx="94.5" cy="582" r="6" stroke="#AEB8AF" stroke-width="1.1"/><path d="M94.5 578v5l3 2" stroke="#AEB8AF" stroke-width="1.1"/><text x="112" y="586">Reports</text>
+  </g>
+  <line x1="84" y1="928" x2="252" y2="928" stroke="#39423B"/>
+  <circle cx="101" cy="959" r="15" fill="#D8E4D6"/><text x="94" y="963" fill="#445548" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="700">AM</text>
+  <text x="124" y="957" class="white" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="600">Alex Morgan</text><text x="124" y="972" fill="#A4AEA6" font-family="Inter,Arial,sans-serif" font-size="9">Workspace admin</text>
+  <circle cx="235" cy="959" r="2" fill="#A4AEA6"/><circle cx="241" cy="959" r="2" fill="#A4AEA6"/><circle cx="247" cy="959" r="2" fill="#A4AEA6"/>
+
+  <!-- Desktop main header -->
+  <rect x="272" y="135" width="1057" height="62" fill="#FBFCF9"/>
+  <line x1="272" y1="197" x2="1329" y2="197" stroke="#E6EAE3"/>
+  <rect x="299" y="153" width="265" height="31" rx="9" fill="#F1F3EF"/>
+  <circle cx="316" cy="168.5" r="5" stroke="#7D8780" stroke-width="1.4"/><path d="M320 172l4 4" stroke="#7D8780" stroke-width="1.4" stroke-linecap="round"/>
+  <text x="331" y="172" class="ui small muted">Search suppliers, orders...</text>
+  <rect x="515" y="159" width="38" height="19" rx="5" fill="#fff" stroke="#DDE2DA"/><text x="526" y="172" class="ui tiny muted">⌘ K</text>
+  <circle cx="1211" cy="168" r="16" fill="#F0F2ED"/><path d="M1206 169h10m-8-3h6m-8 6h10" stroke="#657067" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="1252" cy="168" r="16" fill="#F0F2ED"/><path d="M1252 160v2m-6 8h12l-2-2v-4a4 4 0 0 0-8 0v4l-2 2Z" stroke="#657067" stroke-width="1.2" stroke-linejoin="round"/><circle cx="1263" cy="157" r="4" fill="#EE816A" stroke="#FBFCF9" stroke-width="1.5"/>
+  <circle cx="1292" cy="168" r="16" fill="#D7E2D5"/><text x="1285" y="172" fill="#465548" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="700">AM</text>
+  <!-- page title and date -->
+  <text x="301" y="240" class="ui tiny muted" font-weight="600">MONDAY, 6 OCTOBER 2026</text>
+  <text x="301" y="273" class="ui title">Good morning, Alex</text>
+  <text x="301" y="294" class="ui small muted">Here is what needs your attention across the workspace.</text>
+  <rect x="1164" y="230" width="137" height="36" rx="10" fill="#202723"/><text x="1183" y="252" class="white small" font-family="Inter,Arial,sans-serif" font-weight="600">+ New task</text><path d="M1175 242v8m-4-4h8" stroke="#C3F17E" stroke-width="1.4" stroke-linecap="round"/>
+  <!-- KPI cards -->
+  <g filter="url(#smallShadow)">
+    <rect x="301" y="316" width="234" height="116" rx="14" fill="#FFFFFF" stroke="#E5E9E2"/>
+    <rect x="547" y="316" width="234" height="116" rx="14" fill="#FFFFFF" stroke="#E5E9E2"/>
+    <rect x="793" y="316" width="234" height="116" rx="14" fill="#FFFFFF" stroke="#E5E9E2"/>
+    <rect x="1039" y="316" width="262" height="116" rx="14" fill="#FFFFFF" stroke="#E5E9E2"/>
+  </g>
+  <text x="320" y="343" class="ui label muted">ACTIVE SUPPLIERS</text><text x="320" y="382" class="ui num">128</text><rect x="443" y="360" width="70" height="24" rx="12" fill="#EEF6E5"/><path d="M454 376l5-5 4 3 6-8" stroke="#6B973B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><text x="471" y="376" class="limeText tiny" font-weight="700">+8.4%</text><text x="320" y="412" class="ui tiny muted">Compared with last month</text>
+  <text x="566" y="343" class="ui label muted">OPEN ORDERS</text><text x="566" y="382" class="ui num">34</text><rect x="651" y="360" width="68" height="24" rx="12" fill="#F0F2ED"/><text x="665" y="376" class="ui tiny" fill="#69756B" font-weight="700">12 due soon</text><text x="566" y="412" class="ui tiny muted">Across 9 suppliers</text>
+  <text x="812" y="343" class="ui label muted">PENDING APPROVAL</text><text x="812" y="382" class="ui num">7</text><rect x="874" y="360" width="74" height="24" rx="12" fill="#FFF0E7"/><circle cx="887" cy="372" r="3" fill="#E98A58"/><text x="895" y="376" fill="#AA653D" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="700">Needs review</text><text x="812" y="412" class="ui tiny muted">2 items require a decision</text>
+  <rect x="1058" y="334" width="31" height="31" rx="9" fill="#F0F6E8"/><path d="M1066 350l4-4 4 3 6-8" stroke="#779D4C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><text x="1100" y="343" class="ui label muted">WORKSPACE HEALTH</text><text x="1058" y="390" class="ui" font-size="19" font-weight="650">On track</text><text x="1058" y="412" class="ui tiny muted">Most milestones are progressing well</text>
+  <!-- left workspace: tasks -->
+  <text x="301" y="474" class="ui" font-size="16" font-weight="650">Your tasks</text><text x="380" y="474" class="ui tiny muted">4 open</text>
+  <text x="944" y="474" class="ui small" fill="#6C8E46" font-weight="600">View all</text><path d="M1004 470l4 4-4 4" stroke="#6C8E46" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="301" y="490" width="718" height="49" rx="10" fill="#FFFFFF" stroke="#E5E9E2"/>
+  <circle cx="323" cy="514" r="8" stroke="#C6CDC4" stroke-width="1.3"/><text x="343" y="511" class="ui small" font-weight="600">Review sample approval for Nila Textiles</text><text x="343" y="528" class="ui tiny muted">Purchase order #SB-2408 · Due today</text><rect x="856" y="503" width="68" height="22" rx="11" fill="#FFF1E8"/><text x="870" y="518" fill="#AE6A42" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="700">HIGH PRIORITY</text><circle cx="986" cy="514" r="12" fill="#F0F2ED"/><path d="M983 514h6m-3-3 3 3-3 3" stroke="#727D73" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="301" y="547" width="718" height="49" rx="10" fill="#FFFFFF" stroke="#E5E9E2"/>
+  <circle cx="323" cy="571" r="8" stroke="#C6CDC4" stroke-width="1.3"/><text x="343" y="568" class="ui small" font-weight="600">Send revised quote to Northstar Retail</text><text x="343" y="585" class="ui tiny muted">Buyer request · Due tomorrow</text><rect x="872" y="560" width="52" height="22" rx="11" fill="#F1F3EF"/><text x="885" y="575" class="ui tiny muted" font-weight="700">NORMAL</text><circle cx="986" cy="571" r="12" fill="#F0F2ED"/><path d="M983 571h6m-3-3 3 3-3 3" stroke="#727D73" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="301" y="604" width="718" height="49" rx="10" fill="#FFFFFF" stroke="#E5E9E2"/>
+  <circle cx="323" cy="628" r="8" stroke="#C6CDC4" stroke-width="1.3"/><text x="343" y="625" class="ui small" font-weight="600">Confirm shipment window with Meridian Works</text><text x="343" y="642" class="ui tiny muted">Order #SB-2391 · Due 9 Oct</text><rect x="872" y="617" width="52" height="22" rx="11" fill="#F1F3EF"/><text x="885" y="632" class="ui tiny muted" font-weight="700">NORMAL</text><circle cx="986" cy="628" r="12" fill="#F0F2ED"/><path d="M983 628h6m-3-3 3 3-3 3" stroke="#727D73" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- supplier activity -->
+  <text x="301" y="701" class="ui" font-size="16" font-weight="650">Supplier activity</text><text x="443" y="701" class="ui tiny muted">Recent updates</text>
+  <rect x="301" y="717" width="718" height="240" rx="14" fill="#FFFFFF" stroke="#E5E9E2"/>
+  <circle cx="330" cy="752" r="16" fill="#E4EBDD"/><text x="323" y="756" fill="#566B4B" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="700">NT</text><text x="359" y="748" class="ui small" font-weight="600">Nila Textiles shared a new sample update</text><text x="359" y="766" class="ui tiny muted">Cotton poplin, item #FAB-108 · 18 minutes ago</text><rect x="870" y="741" width="117" height="24" rx="8" fill="#F0F6E8"/><text x="884" y="757" class="limeText tiny" font-weight="700">Review sample</text><line x1="320" y1="782" x2="1000" y2="782" stroke="#EDF0EA"/>
+  <circle cx="330" cy="817" r="16" fill="#E8E9F0"/><text x="323" y="821" fill="#595F79" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="700">MW</text><text x="359" y="813" class="ui small" font-weight="600">Meridian Works confirmed dispatch readiness</text><text x="359" y="831" class="ui tiny muted">Order #SB-2391 · 1 hour ago</text><rect x="884" y="806" width="103" height="24" rx="8" fill="#F1F3EF"/><text x="899" y="822" class="ui tiny muted" font-weight="700">View order</text><line x1="320" y1="847" x2="1000" y2="847" stroke="#EDF0EA"/>
+  <circle cx="330" cy="882" r="16" fill="#F3E9DE"/><text x="323" y="886" fill="#88684B" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="700">NS</text><text x="359" y="878" class="ui small" font-weight="600">Northstar Retail requested a quote revision</text><text x="359" y="896" class="ui tiny muted">3 products · Today, 9:42 am</text><rect x="880" y="871" width="107" height="24" rx="8" fill="#F1F3EF"/><text x="895" y="887" class="ui tiny muted" font-weight="700">Open request</text>
+  <!-- AI contextual panel -->
+  <rect x="1041" y="457" width="260" height="500" rx="15" fill="url(#dark)"/>
+  <rect x="1060" y="477" width="30" height="30" rx="10" fill="#374438"/><path d="M1075 483l2.2 5.8 5.8 2.2-5.8 2.2-2.2 5.8-2.2-5.8-5.8-2.2 5.8-2.2 2.2-5.8Z" fill="#C1EE7A"/>
+  <text x="1100" y="490" class="white" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="650">SupplyBase AI</text><text x="1100" y="504" fill="#A6B0A7" font-family="Inter,Arial,sans-serif" font-size="9">WORKSPACE INSIGHTS</text>
+  <rect x="1253" y="481" width="28" height="21" rx="10" fill="#344137"/><circle cx="1262" cy="491.5" r="3" fill="#C1EE7A"/><text x="1269" y="495" fill="#CAD2C9" font-family="Inter,Arial,sans-serif" font-size="8">Live</text>
+  <text x="1060" y="542" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="600">TODAY'S BRIEF</text>
+  <text x="1060" y="569" class="white" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="650">A few things to act on</text>
+  <text x="1060" y="592" fill="#CAD1CA" font-family="Inter,Arial,sans-serif" font-size="11">Your supplier updates point to two</text><text x="1060" y="608" fill="#CAD1CA" font-family="Inter,Arial,sans-serif" font-size="11">useful next steps today.</text>
+  <rect x="1060" y="629" width="222" height="95" rx="11" fill="#2B342D" stroke="#3B463D"/>
+  <circle cx="1078" cy="649" r="9" fill="#4A503A"/><path d="M1074 649h8m-4-4v8" stroke="#C1EE7A" stroke-width="1.3" stroke-linecap="round"/><text x="1095" y="652" fill="#DBE2D9" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="650">Sample waiting for review</text><text x="1074" y="675" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">Nila Textiles uploaded a sample update.</text><text x="1074" y="690" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">Approve or request a change to keep the</text><text x="1074" y="705" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">order timeline moving.</text>
+  <rect x="1060" y="737" width="222" height="95" rx="11" fill="#2B342D" stroke="#3B463D"/>
+  <circle cx="1078" cy="757" r="9" fill="#4A503A"/><path d="M1075 757l2 2 4-5" stroke="#C1EE7A" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><text x="1095" y="760" fill="#DBE2D9" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="650">Quote response due tomorrow</text><text x="1074" y="783" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">Northstar is waiting for revised pricing</text><text x="1074" y="798" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">on 3 items. Draft a response from the</text><text x="1074" y="813" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">buyer request.</text>
+  <rect x="1060" y="849" width="222" height="42" rx="10" fill="url(#lime)"/><path d="M1078 870h11m-4-4 4 4-4 4" stroke="#293326" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><text x="1098" y="874" fill="#293326" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="700">Ask AI about my workspace</text>
+  <text x="1060" y="922" fill="#859188" font-family="Inter,Arial,sans-serif" font-size="9">AI suggestions are optional. Review before applying.</text>
+
+  <!-- Mobile concept label -->
+  <text x="1380" y="162" class="ui label" fill="#778078">MOBILE</text>
+  <text x="1380" y="184" class="ui small muted">Same priorities,</text><text x="1380" y="201" class="ui small muted">stacked for a narrow screen.</text>
+  <!-- Mobile frame -->
+  <g filter="url(#shadow)"><rect x="1380" y="228" width="316" height="700" rx="34" fill="#202723"/><rect x="1388" y="236" width="300" height="684" rx="28" fill="#F6F7F3"/></g>
+  <rect x="1474" y="242" width="128" height="18" rx="9" fill="#202723"/>
+  <text x="1407" y="281" class="ui tiny muted" font-weight="600">MON, OCT 6</text><circle cx="1654" cy="276" r="15" fill="#D7E2D5"/><text x="1648" y="280" fill="#465548" font-family="Inter,Arial,sans-serif" font-size="9" font-weight="700">AM</text>
+  <text x="1407" y="313" class="ui" font-size="21" font-weight="650">Good morning, Alex</text><text x="1407" y="332" class="ui tiny muted">Your workspace at a glance.</text>
+  <rect x="1407" y="348" width="262" height="32" rx="9" fill="#202723"/><path d="M1422 364v-8m-4 4h8" stroke="#C3F17E" stroke-width="1.4" stroke-linecap="round"/><text x="1437" y="368" class="white small" font-family="Inter,Arial,sans-serif" font-weight="600">Create new task</text>
+  <text x="1407" y="409" class="ui label muted">WORKSPACE SNAPSHOT</text>
+  <rect x="1407" y="423" width="125" height="74" rx="11" fill="#FFFFFF" stroke="#E5E9E2"/><text x="1420" y="444" class="ui tiny muted" font-weight="600">SUPPLIERS</text><text x="1420" y="477" class="ui" font-size="23" font-weight="650">128</text><text x="1480" y="477" class="limeText tiny" font-weight="700">+8%</text>
+  <rect x="1544" y="423" width="125" height="74" rx="11" fill="#FFFFFF" stroke="#E5E9E2"/><text x="1557" y="444" class="ui tiny muted" font-weight="600">OPEN ORDERS</text><text x="1557" y="477" class="ui" font-size="23" font-weight="650">34</text><text x="1597" y="477" class="ui tiny muted">12 due soon</text>
+  <text x="1407" y="532" class="ui" font-size="15" font-weight="650">Needs your attention</text><text x="1635" y="532" fill="#6C8E46" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="600">View all</text>
+  <rect x="1407" y="546" width="262" height="70" rx="11" fill="#FFFFFF" stroke="#E5E9E2"/><circle cx="1427" cy="568" r="8" stroke="#C6CDC4" stroke-width="1.2"/><text x="1444" y="565" class="ui tiny" font-weight="650">Review sample approval</text><text x="1444" y="581" class="ui tiny muted">Nila Textiles · Due today</text><rect x="1444" y="590" width="62" height="16" rx="8" fill="#FFF1E8"/><text x="1453" y="601" fill="#AE6A42" font-family="Inter,Arial,sans-serif" font-size="8" font-weight="700">HIGH PRIORITY</text>
+  <rect x="1407" y="624" width="262" height="70" rx="11" fill="#FFFFFF" stroke="#E5E9E2"/><circle cx="1427" cy="646" r="8" stroke="#C6CDC4" stroke-width="1.2"/><text x="1444" y="643" class="ui tiny" font-weight="650">Send revised quote</text><text x="1444" y="659" class="ui tiny muted">Northstar Retail · Due tomorrow</text><text x="1444" y="680" class="ui tiny muted">Buyer request</text>
+  <rect x="1407" y="710" width="262" height="151" rx="14" fill="url(#dark)"/>
+  <rect x="1422" y="725" width="26" height="26" rx="8" fill="#374438"/><path d="M1435 729l1.8 4.5 4.5 1.8-4.5 1.8-1.8 4.5-1.8-4.5-4.5-1.8 4.5-1.8 1.8-4.5Z" fill="#C1EE7A"/><text x="1457" y="736" class="white" font-family="Inter,Arial,sans-serif" font-size="11" font-weight="650">SupplyBase AI</text><text x="1457" y="748" fill="#A6B0A7" font-family="Inter,Arial,sans-serif" font-size="8">2 suggested next steps</text>
+  <text x="1422" y="773" fill="#E3E9E1" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="600">Sample waiting for review</text><text x="1422" y="789" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">Review Nila Textiles' update to keep the</text><text x="1422" y="802" fill="#AAB4AB" font-family="Inter,Arial,sans-serif" font-size="9">order moving.</text>
+  <rect x="1422" y="817" width="232" height="30" rx="8" fill="#C1EE7A"/><text x="1486" y="836" fill="#293326" font-family="Inter,Arial,sans-serif" font-size="10" font-weight="700">Ask AI about my workspace</text>
+  <!-- mobile bottom navigation -->
+  <rect x="1388" y="874" width="300" height="46" rx="0" fill="#FBFCF9"/><line x1="1388" y1="874" x2="1688" y2="874" stroke="#E5E9E2"/>
+  <g font-family="Inter,Arial,sans-serif" font-size="8" text-anchor="middle"><circle cx="1431" cy="890" r="6" fill="#BCEB73"/><text x="1431" y="909" fill="#526448" font-weight="700">Home</text><rect x="1484" y="884" width="12" height="12" rx="3" fill="#C8CEC7"/><text x="1490" y="909" fill="#7D8780">Suppliers</text><path d="M1544 885h13v11h-13z" stroke="#9AA39B" stroke-width="1.2"/><text x="1550" y="909" fill="#7D8780">Orders</text><circle cx="1610" cy="890" r="6" stroke="#9AA39B" stroke-width="1.2"/><path d="M1610 887v4l2 1" stroke="#9AA39B" stroke-width="1"/><text x="1610" y="909" fill="#7D8780">Tasks</text><circle cx="1653" cy="890" r="6" stroke="#9AA39B" stroke-width="1.2"/><path d="M1653 886l1.2 2.8 2.8 1.2-2.8 1.2-1.2 2.8-1.2-2.8-2.8-1.2 2.8-1.2 1.2-2.8Z" fill="#9AA39B"/><text x="1653" y="909" fill="#7D8780">AI</text></g>
+
+  <text x="78" y="1040" class="ui tiny muted">Concept only · Example data and labels · Final screens should follow actual permissions, workflows, and content</text>
+</svg>

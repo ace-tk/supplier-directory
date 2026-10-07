@@ -4,9 +4,11 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { type SetupData } from "@/lib/business-structure";
+import { type AssignedBusinessData } from "@/services/business-structure";
 import { PortalsSection, ModulesSection, FlowsSection, RoadmapSection } from "@/components/business-structure/StaticSections";
 import { SetupTables } from "@/components/business-structure/SetupTables";
 import { Hierarchy } from "@/components/business-structure/Hierarchy";
+import { BusinessStructureTree } from "@/components/business-structure/BusinessStructureTree";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -21,7 +23,13 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function BusinessStructureTabs({ initialSetup }: { initialSetup: SetupData }) {
+export function BusinessStructureTabs({
+  initialSetup,
+  assignedBusiness,
+}: {
+  initialSetup: SetupData;
+  assignedBusiness?: AssignedBusinessData;
+}) {
   const [tab, setTab] = useState<TabId>("overview");
   // The last saved setup. The overview and hierarchy show this, never unsaved edits.
   const [saved, setSaved] = useState<SetupData>(initialSetup);
@@ -54,7 +62,14 @@ export function BusinessStructureTabs({ initialSetup }: { initialSetup: SetupDat
 
       {tab !== "tables" && (
         <div role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label}>
-          {tab === "overview" && <OverviewSection saved={saved} onOpen={setTab} />}
+          {tab === "overview" && (
+            <OverviewSection
+              saved={saved}
+              assignedBusiness={assignedBusiness}
+              onSaved={setSaved}
+              onOpen={setTab}
+            />
+          )}
           {tab === "hierarchy" && <Hierarchy saved={saved} onEdit={() => setTab("tables")} />}
           {tab === "portals" && <PortalsSection />}
           {tab === "modules" && <ModulesSection />}
@@ -67,7 +82,17 @@ export function BusinessStructureTabs({ initialSetup }: { initialSetup: SetupDat
   );
 }
 
-function OverviewSection({ saved, onOpen }: { saved: SetupData; onOpen: (t: TabId) => void }) {
+function OverviewSection({
+  saved,
+  assignedBusiness,
+  onSaved,
+  onOpen,
+}: {
+  saved: SetupData;
+  assignedBusiness?: AssignedBusinessData;
+  onSaved: (saved: SetupData) => void;
+  onOpen: (t: TabId) => void;
+}) {
   const stats = [
     { label: "Businesses", value: saved.businesses.length },
     { label: "Locations", value: saved.locations.length },
@@ -79,6 +104,14 @@ function OverviewSection({ saved, onOpen }: { saved: SetupData; onOpen: (t: TabI
 
   return (
     <div className="space-y-6">
+      {/* Visual Business Structure Hierarchy Tree */}
+      <BusinessStructureTree
+        saved={saved}
+        assignedBusiness={assignedBusiness}
+        onSaved={onSaved}
+        onOpenTab={onOpen}
+      />
+
       <p className="text-sm text-muted-foreground">Business setup comes first. Fill the setup tables, validate and save, and the hierarchy is generated from them.</p>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -153,6 +186,7 @@ function OverviewSection({ saved, onOpen }: { saved: SetupData; onOpen: (t: TabI
     </div>
   );
 }
+
 
 function ComingNext({ title, body }: { title: string; body: string }) {
   return (

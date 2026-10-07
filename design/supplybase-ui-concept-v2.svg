@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1040" viewBox="0 0 1680 1040" fill="none">
+  <defs>
+    <linearGradient id="backdrop" x1="0" y1="0" x2="1680" y2="1040" gradientUnits="userSpaceOnUse"><stop stop-color="#E9EDE7"/><stop offset="1" stop-color="#DDE3DD"/></linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#C7F287"/><stop offset="1" stop-color="#AFE66D"/></linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="13" stdDeviation="16" flood-color="#273329" flood-opacity=".14"/></filter>
+    <style>.t{font-family:Arial,sans-serif;fill:#202722}.m{fill:#7B857C}.w{fill:#F8FAF6}.lime{fill:#6D913F}.xs{font-size:9px}.sm{font-size:11px}.md{font-size:13px}.h{font-size:23px;font-weight:700}.bold{font-weight:700}.caps{font-size:9px;font-weight:700;letter-spacing:1px}</style>
+  </defs>
+  <rect width="1680" height="1040" fill="url(#backdrop)"/>
+  <text x="60" y="48" class="t caps m">SUPPLYBASE · VISUAL CONCEPT</text>
+  <text x="60" y="75" class="t" font-size="16" font-weight="700">Same dashboard content, refreshed workspace styling</text>
+  <text x="60" y="94" class="t sm m">Data-dependent values are shown as placeholders. Existing labels and actions are retained.</text>
+
+  <!-- Desktop workspace -->
+  <g filter="url(#shadow)"><rect x="54" y="120" width="1198" height="855" rx="22" fill="#F5F7F2"/><path d="M76 120h185v855H76a22 22 0 0 1-22-22V142a22 22 0 0 1 22-22Z" fill="#202723"/></g>
+  <!-- Sidebar -->
+  <rect x="76" y="143" width="32" height="32" rx="10" fill="url(#accent)"/><path d="M86 164l6-12 6 12m-10-4h8" stroke="#263126" stroke-width="1.8" stroke-linecap="round"/>
+  <text x="117" y="159" class="w" font-size="14" font-weight="700">SupplyBase</text><text x="117" y="172" fill="#9FAAA0" font-family="Arial,sans-serif" font-size="8">ADMIN PORTAL</text>
+  <rect x="74" y="195" width="167" height="35" rx="9" fill="#344037"/><circle cx="93" cy="212" r="5" fill="#C4EE82"/><text x="108" y="216" class="w sm" font-weight="700">Dashboard</text>
+  <text x="81" y="257" fill="#818D83" font-family="Arial,sans-serif" class="caps">WORKSPACE</text>
+  <g font-family="Arial,sans-serif" font-size="11" fill="#BEC6BE">
+    <circle cx="91" cy="281" r="6" stroke="#AAB4AA"/><text x="107" y="285">Directory</text>
+    <rect x="85" y="300" width="12" height="12" rx="3" stroke="#AAB4AA"/><text x="107" y="310">CRM</text>
+    <rect x="85" y="327" width="12" height="12" rx="3" stroke="#AAB4AA"/><text x="107" y="337">Buyer Directory</text>
+    <rect x="85" y="354" width="12" height="12" rx="3" stroke="#AAB4AA"/><text x="107" y="364">Catalog</text>
+    <rect x="85" y="381" width="12" height="12" rx="3" stroke="#AAB4AA"/><text x="107" y="391">Product</text>
+    <rect x="85" y="408" width="12" height="12" rx="3" stroke="#AAB4AA"/><text x="107" y="418">Inventory</text>
+    <rect x="85" y="435" width="12" height="12" rx="3" stroke="#AAB4AA"/><text x="107" y="445">Invoices</text>
+    <rect x="85" y="462" width="12" height="12" rx="3" stroke="#AAB4AA"/><text x="107" y="472">Shop</text>
+  </g>
+  <text x="81" y="512" fill="#818D83" font-family="Arial,sans-serif" class="caps">TOOLS</text>
+  <g font-family="Arial,sans-serif" font-size="11" fill="#BEC6BE">
+    <path d="M85 534h12v12H85z" stroke="#AAB4AA"/><text x="107" y="544">AI Design Studio</text>
+    <path d="M85 561h12v12H85z" stroke="#AAB4AA"/><text x="107" y="571">Content Management</text>
+    <path d="M85 588h12v12H85z" stroke="#AAB4AA"/><text x="107" y="598">Project Management</text>
+    <path d="M85 615h12v12H85z" stroke="#AAB4AA"/><text x="107" y="625">Reports</text>
+  </g>
+  <line x1="76" y1="918" x2="241" y2="918" stroke="#3A453C"/><circle cx="96" cy="946" r="14" fill="#D8E3D5"/><text x="90" y="950" class="t xs bold">AM</text><rect x="119" y="938" width="77" height="6" rx="3" fill="#737E74"/><rect x="119" y="950" width="51" height="5" rx="2.5" fill="#566259"/>
+  <!-- Main top bar -->
+  <rect x="261" y="120" width="991" height="57" fill="#FBFCF9"/><line x1="261" y1="177" x2="1252" y2="177" stroke="#E4E9E1"/>
+  <rect x="286" y="135" width="273" height="29" rx="8" fill="#F0F3EE"/><circle cx="302" cy="148" r="5" stroke="#818B82" stroke-width="1.2"/><path d="M306 152l4 4" stroke="#818B82" stroke-width="1.2"/><text x="317" y="152" class="t sm m">Search suppliers, contacts, orders...</text>
+  <circle cx="1151" cy="148" r="14" fill="#EFF2ED"/><path d="M1147 149h8m-6-3h4m-6 6h8" stroke="#6B766D" stroke-width="1.2"/><circle cx="1191" cy="148" r="14" fill="#EFF2ED"/><path d="M1191 141v2m-5 7h10l-2-2v-3a3 3 0 0 0-6 0v3l-2 2Z" stroke="#6B766D" stroke-width="1.1"/><circle cx="1201" cy="138" r="3" fill="#E98769"/><circle cx="1230" cy="148" r="14" fill="#D9E4D7"/><text x="1225" y="152" class="t xs bold">AM</text>
+  <!-- Dashboard top -->
+  <text x="286" y="207" class="t h">Good morning, [first name]</text><text x="286" y="227" class="t sm m">Here's what's happening across your workspace today.</text>
+  <rect x="286" y="245" width="966" height="51" rx="11" fill="#FFFFFF" stroke="#E4E9E1"/>
+  <text x="302" y="265" class="t sm bold">Quick navigation</text>
+  <g font-family="Arial,sans-serif" font-size="9.5" fill="#4F5B51" text-anchor="middle">
+    <rect x="402" y="254" width="137" height="29" rx="8" fill="#F3F5F1"/><text x="470" y="272">Content Management</text>
+    <rect x="546" y="254" width="139" height="29" rx="8" fill="#F3F5F1"/><text x="615" y="272">Project Management</text>
+    <rect x="692" y="254" width="62" height="29" rx="8" fill="#F3F5F1"/><text x="723" y="272">Shop</text>
+    <rect x="761" y="254" width="89" height="29" rx="8" fill="#F3F5F1"/><text x="805" y="272">Campaigns</text>
+    <rect x="857" y="254" width="153" height="29" rx="8" fill="#F3F5F1"/><text x="933" y="272">Scheduled Campaigns</text>
+    <rect x="1017" y="254" width="101" height="29" rx="8" fill="#F3F5F1"/><text x="1067" y="272">Email Campaigns</text>
+    <rect x="1125" y="254" width="111" height="29" rx="8" fill="#F3F5F1"/><text x="1180" y="272">WhatsApp Campaigns</text>
+  </g>
+  <!-- Quick add -->
+  <text x="286" y="329" class="t md bold">Quick add</text>
+  <g>
+    <rect x="286" y="341" width="151" height="45" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="305" cy="363" r="11" fill="#EAF1E6"/><path d="M305 358v10m-5-5h10" stroke="#68854D" stroke-width="1.3"/><text x="323" y="367" class="t sm bold">Add Supplier</text>
+    <rect x="445" y="341" width="151" height="45" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="464" cy="363" r="11" fill="#EEF0F7"/><circle cx="464" cy="360" r="3" stroke="#71799A"/><path d="M459 368c1-4 9-4 10 0" stroke="#71799A"/><text x="482" y="367" class="t sm bold">New Contact</text>
+    <rect x="604" y="341" width="151" height="45" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="623" cy="363" r="11" fill="#EAF2E9"/><path d="M619 358h8v10h-8z" stroke="#61835A"/><text x="641" y="367" class="t sm bold">Create Invoice</text>
+    <rect x="763" y="341" width="151" height="45" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="782" cy="363" r="11" fill="#EEF0F7"/><path d="M778 359h8v8h-8z" stroke="#737BA0"/><text x="800" y="367" class="t sm bold">Add Product</text>
+    <rect x="922" y="341" width="151" height="45" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="941" cy="363" r="11" fill="#F5EEE6"/><path d="M941 357v12m-4-8h8" stroke="#9C7954"/><text x="959" y="367" class="t sm bold">Add Expense</text>
+    <rect x="1081" y="341" width="171" height="45" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1100" cy="363" r="11" fill="#F3EAF0"/><path d="M1096 358h8v10h-8z" stroke="#936A83"/><text x="1118" y="367" class="t sm bold">Create Content</text>
+  </g>
+  <!-- Role and email tags; dynamic values represented as bars -->
+  <rect x="286" y="400" width="122" height="22" rx="11" fill="#EEF4E8"/><circle cx="300" cy="411" r="3" fill="#76964D"/><text x="309" y="415" class="t xs bold">[role] account</text><rect x="415" y="400" width="106" height="22" rx="11" fill="#EFF1ED"/><rect x="426" y="408" width="82" height="5" rx="2.5" fill="#9AA39A"/>
+  <!-- Stats -->
+  <g>
+    <rect x="286" y="438" width="229" height="94" rx="13" fill="#FFFFFF" stroke="#E3E8E0"/><text x="303" y="461" class="t sm m">Active Suppliers</text><text x="303" y="502" class="t" font-size="27" font-weight="700">—</text><circle cx="485" cy="462" r="13" fill="#EAF1E6"/><path d="M479 465h12m-9-6h6m-7 12h8" stroke="#68854D" stroke-width="1.2"/>
+    <rect x="527" y="438" width="229" height="94" rx="13" fill="#FFFFFF" stroke="#E3E8E0"/><text x="544" y="461" class="t sm m">CRM Contacts</text><text x="544" y="502" class="t" font-size="27" font-weight="700">—</text><circle cx="726" cy="462" r="13" fill="#EEF0F7"/><circle cx="726" cy="459" r="3" stroke="#71799A"/><path d="M720 467c1-4 11-4 12 0" stroke="#71799A"/>
+    <rect x="768" y="438" width="229" height="94" rx="13" fill="#FFFFFF" stroke="#E3E8E0"/><text x="785" y="461" class="t sm m">Pending Invoices</text><text x="785" y="502" class="t" font-size="27" font-weight="700">—</text><circle cx="967" cy="462" r="13" fill="#EAF2E9"/><path d="M963 455h8v13h-8zM965 459h4m-4 3h4" stroke="#61835A" stroke-width="1"/>
+    <rect x="1009" y="438" width="243" height="94" rx="13" fill="#FFFFFF" stroke="#E3E8E0"/><text x="1026" y="461" class="t sm m">Revenue MTD</text><text x="1026" y="502" class="t" font-size="24" font-weight="700">—</text><circle cx="1222" cy="462" r="13" fill="#F5EEE6"/><path d="M1217 467l4-4 3 2 4-7" stroke="#9C7954" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- Action rows -->
+  <text x="286" y="565" class="t md bold">Quick Actions</text>
+  <g font-family="Arial,sans-serif" font-size="10" fill="#303A32">
+    <rect x="286" y="578" width="229" height="47" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="305" cy="601" r="11" fill="#EAF1E6"/><text x="324" y="599" font-weight="700">Add Supplier</text><text x="324" y="613" fill="#818B82" font-size="9">Onboard a new supplier</text>
+    <rect x="527" y="578" width="229" height="47" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="546" cy="601" r="11" fill="#EEF0F7"/><text x="565" y="599" font-weight="700">New Contact</text><text x="565" y="613" fill="#818B82" font-size="9">Add a CRM contact</text>
+    <rect x="768" y="578" width="229" height="47" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="787" cy="601" r="11" fill="#EAF2E9"/><text x="806" y="599" font-weight="700">Create Order</text><text x="806" y="613" fill="#818B82" font-size="9">Place a bulk order</text>
+    <rect x="1009" y="578" width="243" height="47" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1028" cy="601" r="11" fill="#F5EEE6"/><text x="1047" y="599" font-weight="700">View Reports</text><text x="1047" y="613" fill="#818B82" font-size="9">Check analytics and insights</text>
+  </g>
+  <!-- Lower dashboard: recent activity and tasks/checklist -->
+  <text x="286" y="660" class="t md bold">Recent Activity</text><text x="286" y="677" class="t xs m">Latest events across your workspace</text>
+  <rect x="286" y="690" width="461" height="236" rx="13" fill="#FFFFFF" stroke="#E3E8E0"/>
+  <g>
+    <circle cx="307" cy="718" r="12" fill="#EAF1E6"/><path d="M302 715h10v7h-10z" stroke="#68854D"/><rect x="328" y="711" width="225" height="6" rx="3" fill="#C9D0C8"/><rect x="328" y="723" width="156" height="5" rx="2.5" fill="#E1E5DF"/><rect x="698" y="714" width="29" height="5" rx="2.5" fill="#E1E5DF"/>
+    <line x1="301" y1="742" x2="732" y2="742" stroke="#EDF0EB"/><circle cx="307" cy="765" r="12" fill="#EEF0F7"/><circle cx="307" cy="762" r="3" stroke="#71799A"/><path d="M301 771c1-4 11-4 12 0" stroke="#71799A"/><rect x="328" y="758" width="239" height="6" rx="3" fill="#C9D0C8"/><rect x="328" y="770" width="176" height="5" rx="2.5" fill="#E1E5DF"/><rect x="698" y="761" width="29" height="5" rx="2.5" fill="#E1E5DF"/>
+    <line x1="301" y1="789" x2="732" y2="789" stroke="#EDF0EB"/><circle cx="307" cy="812" r="12" fill="#F5EEE6"/><path d="M302 807h10v10h-10z" stroke="#9C7954"/><rect x="328" y="805" width="219" height="6" rx="3" fill="#C9D0C8"/><rect x="328" y="817" width="169" height="5" rx="2.5" fill="#E1E5DF"/><rect x="698" y="808" width="29" height="5" rx="2.5" fill="#E1E5DF"/>
+    <line x1="301" y1="836" x2="732" y2="836" stroke="#EDF0EB"/><circle cx="307" cy="859" r="12" fill="#F3EAF0"/><path d="M302 856h10m-10 4h7" stroke="#936A83"/><rect x="328" y="852" width="192" height="6" rx="3" fill="#C9D0C8"/><rect x="328" y="864" width="147" height="5" rx="2.5" fill="#E1E5DF"/>
+  </g>
+  <text x="772" y="660" class="t md bold">Tasks</text><text x="772" y="677" class="t xs m">— of — complete</text>
+  <rect x="772" y="690" width="480" height="112" rx="13" fill="#FFFFFF" stroke="#E3E8E0"/>
+  <g stroke="#CBD2CA"><circle cx="795" cy="718" r="7"/><circle cx="795" cy="745" r="7"/><circle cx="795" cy="772" r="7"/></g><g fill="#CAD1C9"><rect x="814" y="714" width="252" height="7" rx="3.5"/><rect x="814" y="741" width="296" height="7" rx="3.5"/><rect x="814" y="768" width="208" height="7" rx="3.5"/></g><rect x="1174" y="786" width="58" height="5" rx="2.5" fill="#E2E6E0"/>
+  <text x="772" y="832" class="t md bold">Getting Started</text><rect x="1203" y="817" width="49" height="21" rx="10.5" fill="#EDF2E9"/><text x="1218" y="831" class="t xs bold">— of 5</text>
+  <rect x="772" y="844" width="480" height="82" rx="13" fill="#FFFFFF" stroke="#E3E8E0"/>
+  <g font-family="Arial,sans-serif" font-size="10" fill="#39443B"><circle cx="794" cy="864" r="6" stroke="#BAC4B9"/><text x="808" y="868">Add your first supplier</text><circle cx="794" cy="885" r="6" stroke="#BAC4B9"/><text x="808" y="889">Add your first buyer</text><circle cx="994" cy="864" r="6" stroke="#BAC4B9"/><text x="1008" y="868">Add your first product</text><circle cx="994" cy="885" r="6" stroke="#BAC4B9"/><text x="1008" y="889">Create your first invoice</text></g>
+
+  <!-- Mobile preview -->
+  <text x="1301" y="151" class="t caps m">MOBILE LAYOUT</text>
+  <g filter="url(#shadow)"><rect x="1302" y="175" width="318" height="755" rx="35" fill="#202723"/><rect x="1310" y="183" width="302" height="739" rx="28" fill="#F5F7F2"/></g>
+  <rect x="1404" y="190" width="114" height="17" rx="8.5" fill="#202723"/>
+  <text x="1330" y="237" class="t xs m bold">DASHBOARD</text><circle cx="1580" cy="232" r="14" fill="#D9E4D7"/><text x="1575" y="236" class="t xs bold">AM</text>
+  <text x="1330" y="270" class="t" font-size="19" font-weight="700">Good morning,</text><text x="1330" y="292" class="t" font-size="19" font-weight="700">[first name]</text><text x="1330" y="310" class="t xs m">Here's what's happening across your workspace today.</text>
+  <text x="1330" y="344" class="t sm bold">Quick add</text>
+  <g font-family="Arial,sans-serif" font-size="9.5" fill="#39443B"><rect x="1330" y="354" width="126" height="36" rx="9" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1346" cy="372" r="8" fill="#EAF1E6"/><text x="1360" y="375" font-weight="700">Add Supplier</text><rect x="1464" y="354" width="126" height="36" rx="9" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1480" cy="372" r="8" fill="#EEF0F7"/><text x="1494" y="375" font-weight="700">New Contact</text>
+  <rect x="1330" y="396" width="126" height="36" rx="9" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1346" cy="414" r="8" fill="#EAF2E9"/><text x="1360" y="417" font-weight="700">Create Invoice</text><rect x="1464" y="396" width="126" height="36" rx="9" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1480" cy="414" r="8" fill="#EEF0F7"/><text x="1494" y="417" font-weight="700">Add Product</text></g>
+  <text x="1330" y="458" class="t sm bold">Overview</text>
+  <rect x="1330" y="469" width="126" height="63" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><text x="1342" y="488" class="t xs m">Active Suppliers</text><text x="1342" y="518" class="t" font-size="21" font-weight="700">—</text>
+  <rect x="1464" y="469" width="126" height="63" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><text x="1476" y="488" class="t xs m">CRM Contacts</text><text x="1476" y="518" class="t" font-size="21" font-weight="700">—</text>
+  <rect x="1330" y="540" width="126" height="63" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><text x="1342" y="559" class="t xs m">Pending Invoices</text><text x="1342" y="589" class="t" font-size="21" font-weight="700">—</text>
+  <rect x="1464" y="540" width="126" height="63" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><text x="1476" y="559" class="t xs m">Revenue MTD</text><text x="1476" y="589" class="t" font-size="21" font-weight="700">—</text>
+  <text x="1330" y="631" class="t sm bold">Quick Actions</text>
+  <rect x="1330" y="641" width="260" height="47" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1349" cy="664" r="10" fill="#EAF1E6"/><text x="1367" y="662" class="t sm bold">Add Supplier</text><text x="1367" y="676" class="t xs m">Onboard a new supplier</text>
+  <rect x="1330" y="696" width="260" height="47" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1349" cy="719" r="10" fill="#EEF0F7"/><text x="1367" y="717" class="t sm bold">New Contact</text><text x="1367" y="731" class="t xs m">Add a CRM contact</text>
+  <text x="1330" y="779" class="t sm bold">Tasks</text><text x="1330" y="795" class="t xs m">— of — complete</text>
+  <rect x="1330" y="805" width="260" height="58" rx="10" fill="#FFFFFF" stroke="#E3E8E0"/><circle cx="1348" cy="825" r="6" stroke="#BAC4B9"/><rect x="1363" y="822" width="172" height="6" rx="3" fill="#CAD1C9"/><circle cx="1348" cy="845" r="6" stroke="#BAC4B9"/><rect x="1363" y="842" width="143" height="6" rx="3" fill="#CAD1C9"/>
+  <rect x="1310" y="873" width="302" height="49" fill="#FBFCF9"/><line x1="1310" y1="873" x2="1612" y2="873" stroke="#E3E8E0"/><g font-family="Arial,sans-serif" font-size="8" text-anchor="middle"><circle cx="1350" cy="889" r="6" fill="#BCEB73"/><text x="1350" y="909" fill="#586A4D" font-weight="700">Dashboard</text><rect x="1408" y="883" width="12" height="12" rx="3" fill="#AAB4AA"/><text x="1414" y="909" fill="#7B857C">Directory</text><rect x="1474" y="883" width="12" height="12" rx="3" fill="#AAB4AA"/><text x="1480" y="909" fill="#7B857C">CRM</text><rect x="1540" y="883" width="12" height="12" rx="3" fill="#AAB4AA"/><text x="1546" y="909" fill="#7B857C">More</text></g>
+  <text x="60" y="1012" class="t xs m">Concept redraw uses existing dashboard copy and actions; personal names, account details, and database-backed values remain live in the product.</text>
+</svg>
