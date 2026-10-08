@@ -3,6 +3,8 @@ import { Inter, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MotionProvider } from "@/components/shared/motion-provider";
+import { Suspense } from "react";
+import { TopProgressBar } from "@/components/shared/top-progress-bar";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -59,6 +61,9 @@ export default function RootLayout({
         >
           <MotionProvider>
             <TooltipProvider delay={200}>
+              <Suspense fallback={null}>
+                <TopProgressBar />
+              </Suspense>
               {children}
               <Toaster position="bottom-right" richColors closeButton />
             </TooltipProvider>

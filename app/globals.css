@@ -342,11 +342,17 @@ html.theme-transition *::after {
     box-shadow: 0 0 20px color-mix(in srgb, var(--pri) 35%, transparent);
   }
 
-  /* Skeleton shimmer (background sweep; off for reduced motion) */
-  .shimmer {
-    background: linear-gradient(90deg, var(--soft) 25%, color-mix(in srgb, var(--soft) 55%, var(--surface)) 50%, var(--soft) 75%);
+  /* Skeleton shimmer: --soft sweep over --bg (spec: 1.3s linear). Off for reduced motion. */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, var(--soft) 25%, var(--bg) 50%, var(--soft) 75%);
     background-size: 200% 100%;
-    animation: shimmer 1.4s ease-in-out infinite;
+    animation: shimmer 1.3s linear infinite;
+  }
+
+  /* Skeleton wrapper: invisible for the first 150ms so fast loads never flash a skeleton */
+  .skeleton-delay {
+    opacity: 0;
+    animation: skeleton-in 0.01s linear 150ms forwards;
   }
 
   /* Focus ring at 25% of the primary colour */
@@ -445,13 +451,37 @@ html.theme-transition *::after {
   height: 0;
 }
 
+@keyframes skeleton-in {
+  to { opacity: 1; }
+}
+
+/* Thread & needle loader (Studio only) */
+@keyframes draw {
+  0% { width: 0; opacity: 1; }
+  85% { width: 240px; opacity: 1; }
+  100% { width: 240px; opacity: 0; }
+}
+@keyframes nmove {
+  0% { left: 0; }
+  85% { left: 215px; }
+  100% { left: 215px; opacity: 0; }
+}
+@keyframes bob {
+  from { transform: translateY(-8px) rotate(-8deg); }
+  to { transform: translateY(8px) rotate(8deg); }
+}
+
 @keyframes shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shimmer { animation: none; }
+  .skeleton-shimmer { animation: none; }
+  .skeleton-delay { animation-duration: 0.01ms; }
+  .stitch-line { animation: none !important; width: 240px !important; opacity: 1 !important; }
+  .stitch-needle { animation: none !important; left: 215px !important; }
+  .stitch-bob { animation: none !important; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
