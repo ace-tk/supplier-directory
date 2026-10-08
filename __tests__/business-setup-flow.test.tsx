@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BusinessSetup, type BusinessSetupActions } from "@/components/business-structure/BusinessSetup";
-import { EMPTY_SETUP, registerBusiness, saveTeamMember, type SetupData } from "@/lib/business-structure";
+import { EMPTY_SETUP, assignMembers, registerBusiness, saveLocation, saveTeamMember, type SetupData } from "@/lib/business-structure";
 import { ROLE_PRESETS } from "@/lib/team-permissions";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -225,5 +225,130 @@ describe("Business Setup — logins (Team Management)", () => {
     expect(await screen.findByRole("article", { name: "Kiran" })).toBeTruthy();
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Member saved, but the login could not be created: Seat limit reached (10)."));
     expect(screen.queryByText("Login created for Kiran")).toBeNull();
+  });
+});
+
+
+describe("Business Setup — verticals & locations", () => {
+  const openStep2 = () => fireEvent.click(screen.getByRole("tab", { name: /02 · Verticals & locations/ }));
+
+  it("shows the three verticals with the GST, and a way to add each kind of location", () => {
+    render(<Harness initial={withTeam()} />);
+    openStep2();
+    expect(screen.getByText("Three verticals. One GST.")).toBeTruthy();
+    for (const name of ["Warehouses", "Retail Stores", "Back Offices"]) expect(screen.getByRole("region", { name })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add Warehouse/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add Retail Store/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add Back Office/ })).toBeTruthy();
+  });
+
+  it("adds a warehouse with a suggested name and an address; it shows under Warehouses with the business GST", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: /Add Warehouse/ }));
+    expect((screen.getByLabelText("Location name") as HTMLInputElement).value).toBe("Warehouse 1");
+    type("Address", "Plot 4, Bhiwandi");
+    fireEvent.click(screen.getByRole("button", { name: "Add Warehouse" }));
+    const card = await screen.findByRole("article", { name: "Warehouse 1" });
+    expect(within(card).getByText("Plot 4, Bhiwandi")).toBeTruthy();
+    expect(within(card).getByText(GST)).toBeTruthy();
+    expect(within(card).getByText("No members assigned")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Warehouses" })).getByRole("article", { name: "Warehouse 1" })).toBeTruthy();
+    const sent = actions.save.mock.calls[0][0] as SetupData;
+    expect(sent.locations).toEqual([{ code: "L001", businessCode: "B001", type: "WAREHOUSE", name: "Warehouse 1", address: "Plot 4, Bhiwandi", mapPin: "" }]);
+    // the live panel counts it, with the new Back Office name
+    expect(within(screen.getByLabelText("Live structure")).getByText("Back Office")).toBeTruthy();
+  });
+
+  it("a second warehouse is suggested as Warehouse 2; a duplicate name is refused", async () => {
+    let s = withTeam();
+    const c = saveLocation(s, "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "" });
+    if (!c.ok) throw new Error(c.error);
+    s = c.setup;
+    render(<Harness initial={s} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: /Add Warehouse/ }));
+    expect((screen.getByLabelText("Location name") as HTMLInputElement).value).toBe("Warehouse 2");
+    type("Location name", "warehouse 1");
+    fireEvent.click(screen.getByRole("button", { name: "Add Warehouse" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("A location with this name already exists.");
+    expect(actions.save).not.toHaveBeenCalled();
+  });
+
+  it("assigns team members to a location: the card lists them and the member card shows the location", async () => {
+    const c = saveLocation(withTeam(), "B001", { type: "RETAIL_STORE", name: "Store 1", address: "" });
+    if (!c.ok) throw new Error(c.error);
+    render(<Harness initial={c.setup} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: "Assign members" }));
+    fireEvent.click(screen.getByLabelText(/Ravi/));
+    fireEvent.click(screen.getByRole("button", { name: "Save assignments" }));
+    await waitFor(() => expect(within(screen.getByRole("article", { name: "Store 1" })).getByText("Ravi")).toBeTruthy());
+    const sent = actions.save.mock.calls[0][0] as SetupData;
+    expect(sent.assignments.find((a) => a.memberCode === "M002")?.locationCode).toBe("L001");
+    // step 01 now shows the store on Ravi's card
+    fireEvent.click(screen.getByRole("tab", { name: /01 · Team members/ }));
+    expect(within(screen.getByRole("article", { name: "Ravi" })).getByText("Store 1")).toBeTruthy();
+    expect(within(screen.getByLabelText("Live structure")).getByText("1 assigned to locations")).toBeTruthy();
+  });
+
+  it("the assign dialog starts with the people already there, and unticking removes them", async () => {
+    const s = saveLocation(withTeam(), "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "" });
+    if (!s.ok) throw new Error(s.error);
+    const a = assignMembers(s.setup, "B001", "L001", ["M001", "M002"]);
+    if (!a.ok) throw new Error(a.error);
+    render(<Harness initial={a.setup} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: "Assign members" }));
+    expect((screen.getByLabelText(/Asha/) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(/Ravi/) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText(/Ravi/));
+    fireEvent.click(screen.getByRole("button", { name: "Save assignments" }));
+    await waitFor(() => expect(within(screen.getByRole("article", { name: "Warehouse 1" })).queryByText("Ravi")).toBeNull());
+    expect(within(screen.getByRole("article", { name: "Warehouse 1" })).getByText("Asha")).toBeTruthy();
+  });
+
+  it("without a team it says so and points to step 01", () => {
+    render(<Harness initial={withBusiness()} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: "Add team members first" }));
+    expect(screen.getByText("Start with your people")).toBeTruthy();
+  });
+
+  it("edits a location (its type stays) and deletes it after confirming; the people stay on the team", async () => {
+    const s = saveLocation(withTeam(), "B001", { type: "OFFICE", name: "Head office", address: "" });
+    if (!s.ok) throw new Error(s.error);
+    const a = assignMembers(s.setup, "B001", "L001", ["M001"]);
+    if (!a.ok) throw new Error(a.error);
+    render(<Harness initial={a.setup} />);
+    openStep2();
+    fireEvent.click(within(screen.getByRole("article", { name: "Head office" })).getByRole("button", { name: "Edit" }));
+    type("Location name", "Registered office");
+    type("Address", "Mumbai");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    const card = await screen.findByRole("article", { name: "Registered office" });
+    expect(within(screen.getByRole("region", { name: "Back Offices" })).getByRole("article", { name: "Registered office" })).toBeTruthy();
+    expect(within(card).getByText("Mumbai")).toBeTruthy();
+
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete location" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Registered office" })).toBeNull());
+    expect(confirm).toHaveBeenCalled();
+    confirm.mockRestore();
+    fireEvent.click(screen.getByRole("tab", { name: /01 · Team members/ }));
+    expect(within(screen.getByRole("article", { name: "Asha" })).getByText("Unassigned")).toBeTruthy();
+  });
+
+  it("only the selected business's locations are shown", () => {
+    const c = saveLocation(withTeam(), "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "" });
+    if (!c.ok) throw new Error(c.error);
+    const b2 = registerBusiness(c.setup, { businessName: "Business 2", legalName: "", gstin: "29BBBBB0002B1Z2" });
+    if (!b2.ok) throw new Error(b2.error);
+    render(<Harness initial={b2.setup} />);
+    openStep2();
+    expect(screen.getByRole("article", { name: "Warehouse 1" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Business 2/ }));
+    expect(screen.queryByRole("article", { name: "Warehouse 1" })).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Building2, Copy, KeyRound, Loader2, MapPin, Plus, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Building, Building2, Copy, KeyRound, Loader2, MapPin, Plus, Search, ShieldCheck, Store, UserPlus, Users, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,15 +10,19 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   DESIGNATIONS,
-  LOCATION_TYPES,
+  VERTICALS,
   LOCATION_TYPE_LABEL,
+  assignMembers,
   entityOf,
   registerBusiness,
+  removeLocation,
   removeTeamMember,
+  saveLocation,
   saveTeamMember,
   teamOf,
   updateBusiness,
   type Change,
+  type LocationType,
   type SetupData,
   type TeamMember,
 } from "@/lib/business-structure";
@@ -41,7 +45,10 @@ const LOGIN_ROLES = (Object.entries(ROLE_PRESETS) as [TeamRoleKey, (typeof ROLE_
 const fieldCls = "h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
-type Dialogs = null | { kind: "register" } | { kind: "business" } | { kind: "member"; memberCode?: string };
+type Dialogs = null | { kind: "register" } | { kind: "business" } | { kind: "member"; memberCode?: string } | { kind: "location"; type: LocationType; locationCode?: string } | { kind: "assign"; locationCode: string };
+
+const VERTICAL_ICON = { WAREHOUSE: Warehouse, RETAIL_STORE: Store, OFFICE: Building } as const;
+const PLURAL: Record<LocationType, string> = { WAREHOUSE: "Warehouses", RETAIL_STORE: "Retail Stores", OFFICE: "Back Offices" };
 
 export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { saved: SetupData; onSaved: (setup: SetupData) => void; actions?: BusinessSetupActions }) {
   const [selected, setSelected] = useState("");
@@ -180,6 +187,18 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                     <p className="py-10 text-center text-sm text-muted-foreground">{team.length ? "No matching members." : "No team members yet. Add the first person to start."}</p>
                   )}
                 </div>
+              ) : step === 1 ? (
+                <VerticalsStep
+                  setup={saved}
+                  businessCode={business.code}
+                  gstin={entity?.gstin ?? ""}
+                  businessName={business.name}
+                  team={team}
+                  onAdd={(type) => setDialog({ kind: "location", type })}
+                  onEdit={(type, locationCode) => setDialog({ kind: "location", type, locationCode })}
+                  onAssign={(locationCode) => setDialog({ kind: "assign", locationCode })}
+                  onGoToTeam={() => setStep(0)}
+                />
               ) : (
                 <div className="py-10 text-center">
                   <h3 className="text-lg font-semibold">{STEPS[step].replace(/^\d+ · /, "")}</h3>
@@ -200,7 +219,7 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                 </div>
                 <div className="border-l-2 border-border pl-3">
                   <h4 className="text-sm font-semibold">02 / Verticals</h4>
-                  {LOCATION_TYPES.map((t) => (
+                  {VERTICALS.map((t) => (
                     <p key={t} className="mt-1">
                       {LOCATION_TYPE_LABEL[t]} <b>{saved.locations.filter((l) => l.businessCode === business.code && l.type === t).length}</b>
                     </p>
@@ -263,6 +282,41 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
           onRemove={async (code) => {
             const error = await commit(removeTeamMember(saved, business.code, code));
             if (!error) toast.success("Removed from this business");
+            return error;
+          }}
+        />
+      )}
+      {dialog?.kind === "location" && business && (
+        <LocationDialog
+          key={dialog.locationCode ?? `new-${dialog.type}`}
+          type={dialog.type}
+          location={dialog.locationCode ? saved.locations.find((l) => l.code === dialog.locationCode) : undefined}
+          suggested={`${LOCATION_TYPE_LABEL[dialog.type]} ${saved.locations.filter((l) => l.businessCode === business.code && l.type === dialog.type).length + 1}`}
+          businessName={business.name}
+          gstin={entity?.gstin ?? ""}
+          onClose={() => setDialog(null)}
+          onSave={async (v) => {
+            const error = await commit(saveLocation(saved, business.code, { locationCode: dialog.locationCode, type: dialog.type, ...v }));
+            if (!error) toast.success(dialog.locationCode ? "Location updated" : `${LOCATION_TYPE_LABEL[dialog.type]} added`);
+            return error;
+          }}
+          onDelete={async (code) => {
+            const error = await commit(removeLocation(saved, code));
+            if (!error) toast.success("Location deleted");
+            return error;
+          }}
+        />
+      )}
+      {dialog?.kind === "assign" && business && (
+        <AssignDialog
+          key={dialog.locationCode}
+          location={saved.locations.find((l) => l.code === dialog.locationCode)}
+          team={team}
+          businessName={business.name}
+          onClose={() => setDialog(null)}
+          onSave={async (codes) => {
+            const error = await commit(assignMembers(saved, business.code, dialog.locationCode, codes));
+            if (!error) toast.success("Assignments updated");
             return error;
           }}
         />
@@ -565,6 +619,183 @@ function MemberDialog({
           </>
         )}
       </div>
+      <ErrorLine message={error} />
+    </Modal>
+  );
+}
+
+function VerticalsStep({
+  setup,
+  businessCode,
+  businessName,
+  gstin,
+  team,
+  onAdd,
+  onEdit,
+  onAssign,
+  onGoToTeam,
+}: {
+  setup: SetupData;
+  businessCode: string;
+  businessName: string;
+  gstin: string;
+  team: TeamMember[];
+  onAdd: (type: LocationType) => void;
+  onEdit: (type: LocationType, locationCode: string) => void;
+  onAssign: (locationCode: string) => void;
+  onGoToTeam: () => void;
+}) {
+  return (
+    <div>
+      <h3 className="text-lg font-semibold">Three verticals. One GST.</h3>
+      <p className="text-sm text-muted-foreground">Add as many locations as you need, then assign people from {businessName}&apos;s team.</p>
+      {!team.length && (
+        <p className="mt-3 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+          There is nobody on the team yet.{" "}
+          <button type="button" className="font-medium text-primary hover:underline" onClick={onGoToTeam}>
+            Add team members first
+          </button>{" "}
+          to assign them to locations.
+        </p>
+      )}
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        {VERTICALS.map((type) => {
+          const Icon = VERTICAL_ICON[type];
+          const locations = setup.locations.filter((l) => l.businessCode === businessCode && l.type === type);
+          return (
+            <section key={type} aria-label={PLURAL[type]} className="rounded-xl border border-border bg-muted/20 p-3">
+              <h4 className="flex items-center gap-2 px-1 pb-3 pt-1 text-sm font-semibold">
+                <Icon className="h-4 w-4 text-primary" aria-hidden /> {PLURAL[type]}
+                <span className="ml-auto text-xs font-normal text-muted-foreground">{locations.length}</span>
+              </h4>
+              <div className="space-y-3">
+                {locations.map((l) => {
+                  const people = team.filter((m) => m.locationCodes.includes(l.code));
+                  return (
+                    <article key={l.code} aria-label={l.name} className="rounded-xl border border-border bg-card p-3">
+                      <h5 className="text-sm font-semibold">{l.name}</h5>
+                      <p className="mt-1 text-xs text-muted-foreground">{l.address || "Address not added"}</p>
+                      <small className="text-[11px] text-muted-foreground">{gstin || "GST not added"}</small>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {people.length ? people.map((m) => <span key={m.memberCode} className="rounded-md bg-muted px-2 py-0.5 text-[11px]">{m.name}</span>) : <small className="text-xs text-muted-foreground">No members assigned</small>}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => onAssign(l.code)}>
+                          Assign members
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => onEdit(type, l.code)}>
+                          Edit
+                        </Button>
+                      </div>
+                    </article>
+                  );
+                })}
+                <Button variant="outline" className="w-full" onClick={() => onAdd(type)}>
+                  <Plus className="h-4 w-4" /> Add {LOCATION_TYPE_LABEL[type]}
+                </Button>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LocationDialog({
+  type,
+  location,
+  suggested,
+  businessName,
+  gstin,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  type: LocationType;
+  location?: { code: string; name: string; address: string };
+  suggested: string;
+  businessName: string;
+  gstin: string;
+  onClose: () => void;
+  onSave: (v: { name: string; address: string }) => Promise<string | null>;
+  onDelete: (code: string) => Promise<string | null>;
+}) {
+  const [v, setV] = useState({ name: location?.name ?? suggested, address: location?.address ?? "" });
+  const [error, setError] = useState<string | null>(null);
+  const label = LOCATION_TYPE_LABEL[type];
+  return (
+    <Modal
+      title={location ? `Edit ${label}` : `Add ${label}`}
+      onClose={onClose}
+      submitLabel={location ? "Save changes" : `Add ${label}`}
+      extraFooter={
+        location ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-red-600 hover:text-red-700"
+            onClick={async () => {
+              if (!window.confirm(`Delete ${location.name}? The people assigned to it stay on the team, unassigned.`)) return;
+              const e = await onDelete(location.code);
+              if (e) setError(e);
+              else onClose();
+            }}
+          >
+            Delete location
+          </Button>
+        ) : null
+      }
+      onSubmit={async () => {
+        const e = await onSave(v);
+        if (e) setError(e);
+        else onClose();
+      }}
+    >
+      <Field id="loc-name" label="Location name">
+        <Input id="loc-name" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} autoFocus />
+      </Field>
+      <Field id="loc-address" label="Address">
+        <Input id="loc-address" value={v.address} onChange={(e) => setV({ ...v, address: e.target.value })} />
+      </Field>
+      <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+        {businessName} · GST {gstin || "not added"}
+        <br />
+        Inherited automatically from this business.
+      </p>
+      <ErrorLine message={error} />
+    </Modal>
+  );
+}
+
+function AssignDialog({ location, team, businessName, onClose, onSave }: { location?: { code: string; name: string }; team: TeamMember[]; businessName: string; onClose: () => void; onSave: (memberCodes: string[]) => Promise<string | null> }) {
+  const [picked, setPicked] = useState<string[]>(() => (location ? team.filter((m) => m.locationCodes.includes(location.code)).map((m) => m.memberCode) : []));
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Modal
+      title={`Assign members · ${location?.name ?? ""}`}
+      description={`Select from ${businessName}'s team. Members can also be assigned to other locations.`}
+      onClose={onClose}
+      submitLabel="Save assignments"
+      onSubmit={async () => {
+        const e = await onSave(picked);
+        if (e) setError(e);
+        else onClose();
+      }}
+    >
+      {team.length ? (
+        <div className="space-y-2">
+          {team.map((m) => (
+            <label key={m.memberCode} className="flex items-center gap-3 rounded-lg border border-border p-3 text-sm">
+              <input type="checkbox" checked={picked.includes(m.memberCode)} onChange={(e) => setPicked((cur) => (e.target.checked ? [...cur, m.memberCode] : cur.filter((c) => c !== m.memberCode)))} />
+              {m.name}
+              <small className="ml-auto text-xs text-muted-foreground">{m.designation}</small>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">There is nobody on the team yet. Add team members in step 01 first.</p>
+      )}
       <ErrorLine message={error} />
     </Modal>
   );

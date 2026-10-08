@@ -42,7 +42,7 @@ export const TOOLS = [
 
 export const LOCATION_TYPES = ["RETAIL_STORE", "WAREHOUSE", "OFFICE"] as const;
 export type LocationType = (typeof LOCATION_TYPES)[number];
-export const LOCATION_TYPE_LABEL: Record<LocationType, string> = { RETAIL_STORE: "Retail Store", WAREHOUSE: "Warehouse", OFFICE: "Office" };
+export const LOCATION_TYPE_LABEL: Record<LocationType, string> = { RETAIL_STORE: "Retail Store", WAREHOUSE: "Warehouse", OFFICE: "Back Office" };
 
 export interface EntityRow {
   code: string;
@@ -449,4 +449,85 @@ export function removeTeamMember(setup: SetupData, businessCode: string, memberC
   const members = stillThere ? setup.members : setup.members.filter((m) => m.code !== memberCode);
   const access = setup.access.filter((t) => !goneCodes.has(t.assignmentCode));
   return { ok: true, setup: { ...setup, members, assignments, access }, code: memberCode };
+}
+
+
+// ---------------------------------------------------------------- Business Setup: verticals & locations
+/** Warehouse, Retail Store and Back Office, in the order the screen shows them. */
+export const VERTICALS: LocationType[] = ["WAREHOUSE", "RETAIL_STORE", "OFFICE"];
+
+export interface LocationInput {
+  /** Set when editing; the type of an existing location does not change. */
+  locationCode?: string;
+  type: LocationType;
+  name: string;
+  address: string;
+}
+
+/** Adds a location to a business (it shares the business's GST), or edits one. Names are unique within a business. */
+export function saveLocation(setup: SetupData, businessCode: string, input: LocationInput): Change {
+  if (!setup.businesses.some((b) => b.code === businessCode)) return fail("Business not found.");
+  const name = input.name.trim();
+  if (!name) return fail("Enter the location name.");
+  const existing = input.locationCode ? setup.locations.find((l) => l.code === input.locationCode && l.businessCode === businessCode) : undefined;
+  if (input.locationCode && !existing) return fail("Location not found.");
+  const type = existing?.type || input.type;
+  if (!(LOCATION_TYPES as readonly string[]).includes(type)) return fail("Choose Warehouse, Retail Store or Back Office.");
+  if (setup.locations.some((l) => l.businessCode === businessCode && l.code !== existing?.code && l.name.trim().toLowerCase() === name.toLowerCase())) return fail("A location with this name already exists.");
+  if (existing) {
+    return { ok: true, setup: { ...setup, locations: setup.locations.map((l) => (l.code === existing.code ? { ...l, name, address: input.address.trim() } : l)) }, code: existing.code };
+  }
+  const location: LocationRow = { code: nextCode(ID_PREFIX.locations, setup.locations), businessCode, type, name, address: input.address.trim(), mapPin: "" };
+  return { ok: true, setup: { ...setup, locations: [...setup.locations, location] }, code: location.code };
+}
+
+/** What a member's tool access looks like across their assignments in a business: the same on every one. */
+function accessCopies(setup: SetupData, fromAssignment: string, toAssignment: string): AccessRow[] {
+  return setup.access.filter((t) => t.assignmentCode === fromAssignment).map((t) => ({ ...t, assignmentCode: toAssignment }));
+}
+
+/**
+ * Sets who works at a location. Ticked people from the business's team are assigned (a person with no location
+ * yet gets this one; a person who already works elsewhere gets an extra assignment with the same designation,
+ * reporting line and tool access); unticked people are taken off it, and someone left with no location stays on
+ * the team as "unassigned".
+ */
+export function assignMembers(setup: SetupData, businessCode: string, locationCode: string, memberCodes: string[]): Change {
+  const location = setup.locations.find((l) => l.code === locationCode && l.businessCode === businessCode);
+  if (!location) return fail("Location not found.");
+  const team = new Map(teamOf(setup, businessCode).map((t) => [t.memberCode, t]));
+  for (const code of memberCodes) if (!team.has(code)) return fail("Only people on this business's team can be assigned.");
+  const wanted = new Set(memberCodes);
+
+  let assignments = setup.assignments;
+  let access = setup.access;
+  for (const [memberCode] of team) {
+    const mine = assignments.filter((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+    const here = mine.find((a) => a.locationCode === locationCode);
+    if (wanted.has(memberCode) && !here) {
+      const unplaced = mine.find((a) => !a.locationCode);
+      if (unplaced) assignments = assignments.map((a) => (a === unplaced ? { ...a, locationCode } : a));
+      else {
+        const base = mine[0];
+        const code = nextCode(ID_PREFIX.assignments, assignments);
+        assignments = [...assignments, { code, memberCode, businessCode, locationCode, designation: base.designation, reportsToCode: base.reportsToCode }];
+        access = [...access, ...accessCopies({ ...setup, access }, base.code, code)];
+      }
+    } else if (!wanted.has(memberCode) && here) {
+      if (mine.length > 1) {
+        assignments = assignments.filter((a) => a !== here);
+        access = access.filter((t) => t.assignmentCode !== here.code);
+      } else assignments = assignments.map((a) => (a === here ? { ...a, locationCode: "" } : a));
+    }
+  }
+  return { ok: true, setup: { ...setup, assignments, access }, code: locationCode };
+}
+
+/** Deletes a location. People who worked only there stay on the team as unassigned. */
+export function removeLocation(setup: SetupData, locationCode: string): Change {
+  const location = setup.locations.find((l) => l.code === locationCode);
+  if (!location) return fail("Location not found.");
+  const kept = assignMembers(setup, location.businessCode, locationCode, []);
+  if (!kept.ok) return kept;
+  return { ok: true, setup: { ...kept.setup, locations: kept.setup.locations.filter((l) => l.code !== locationCode) }, code: locationCode };
 }

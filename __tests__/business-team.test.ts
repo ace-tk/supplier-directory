@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_SETUP, checkSetup, isValidGstin, registerBusiness, removeTeamMember, saveTeamMember, teamOf, updateBusiness, type Change, type SetupData } from "@/lib/business-structure";
+import { EMPTY_SETUP, LOCATION_TYPE_LABEL, VERTICALS, assignMembers, checkSetup, isValidGstin, registerBusiness, removeLocation, removeTeamMember, saveLocation, saveTeamMember, teamOf, updateBusiness, type Change, type SetupData } from "@/lib/business-structure";
 
 const GST1 = "27AAAAA0001A1Z1";
 const GST2 = "29BBBBB0002B1Z2";
@@ -149,5 +149,96 @@ describe("team members", () => {
     // a location that is given must still exist and belong to the business
     const bad = { ...s, assignments: [{ ...s.assignments[0], locationCode: "L099" }] };
     expect(checkSetup(bad).errors[0]).toMatch(/Location ID L099 is not in Locations/);
+  });
+});
+
+// ---------------------------------------------------------------- verticals & locations
+
+function team3(): SetupData {
+  let s = done(saveTeamMember(oneBusiness(), "B001", person("Asha", { designation: "Director" })));
+  s = done(saveTeamMember(s, "B001", person("Ravi", { designation: "Warehouse Manager", reportsToCode: "M001" })));
+  s = done(saveTeamMember(s, "B001", person("Sana", { designation: "Store Manager", reportsToCode: "M001" })));
+  return s;
+}
+const loc = (type: "WAREHOUSE" | "RETAIL_STORE" | "OFFICE", name: string, address = "") => ({ type, name, address });
+
+describe("verticals and locations", () => {
+  it("the three verticals are Warehouse, Retail Store and Back Office", () => {
+    expect(VERTICALS.map((t) => LOCATION_TYPE_LABEL[t])).toEqual(["Warehouse", "Retail Store", "Back Office"]);
+  });
+  it("adds many locations of each type, with the next codes; names are unique within a business", () => {
+    let s = oneBusiness();
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 1")));
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 2", "Plot 4, Bhiwandi")));
+    s = done(saveLocation(s, "B001", loc("RETAIL_STORE", "Store 1")));
+    s = done(saveLocation(s, "B001", loc("OFFICE", "Head office")));
+    expect(s.locations.map((l) => [l.code, l.type, l.name])).toEqual([["L001", "WAREHOUSE", "Warehouse 1"], ["L002", "WAREHOUSE", "Warehouse 2"], ["L003", "RETAIL_STORE", "Store 1"], ["L004", "OFFICE", "Head office"]]);
+    expect(s.locations[1].address).toBe("Plot 4, Bhiwandi");
+    expect(err(saveLocation(s, "B001", loc("RETAIL_STORE", " warehouse 1 ")))).toBe("A location with this name already exists.");
+    expect(err(saveLocation(s, "B001", loc("RETAIL_STORE", " ")))).toBe("Enter the location name.");
+    expect(checkSetup(s).errors).toEqual([]);
+  });
+  it("the same name may be used by another business", () => {
+    let s = done(saveLocation(oneBusiness(), "B001", loc("WAREHOUSE", "Main")));
+    s = done(registerBusiness(s, { businessName: "Business 2", legalName: "", gstin: GST2 }));
+    s = done(saveLocation(s, "B002", loc("WAREHOUSE", "Main")));
+    expect(s.locations.map((l) => l.businessCode)).toEqual(["B001", "B002"]);
+  });
+  it("editing changes the name and address but never the type", () => {
+    let s = done(saveLocation(oneBusiness(), "B001", loc("WAREHOUSE", "Warehouse 1")));
+    s = done(saveLocation(s, "B001", { locationCode: "L001", ...loc("OFFICE", "Main warehouse", "Pune") }));
+    expect(s.locations[0]).toMatchObject({ code: "L001", type: "WAREHOUSE", name: "Main warehouse", address: "Pune" });
+    expect(err(saveLocation(s, "B001", { locationCode: "L099", ...loc("WAREHOUSE", "X") }))).toBe("Location not found.");
+  });
+  it("assigning: a person with no location gets it, a person elsewhere gets an extra assignment with the same designation, reporting line and tool access", () => {
+    let s = team3();
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 1")));
+    s = done(saveLocation(s, "B001", loc("RETAIL_STORE", "Store 1")));
+    s = { ...s, access: [{ assignmentCode: "A002", tool: "Inventory", view: true, create: true, edit: false, approve: false }] };
+    s = done(assignMembers(s, "B001", "L001", ["M001", "M002"]));
+    expect(s.assignments.map((a) => [a.code, a.memberCode, a.locationCode])).toEqual([["A001", "M001", "L001"], ["A002", "M002", "L001"], ["A003", "M003", ""]]);
+    // Ravi also works at the store
+    s = done(assignMembers(s, "B001", "L002", ["M002", "M003"]));
+    expect(s.assignments.map((a) => [a.code, a.memberCode, a.locationCode, a.designation, a.reportsToCode])).toEqual([
+      ["A001", "M001", "L001", "Director", ""],
+      ["A002", "M002", "L001", "Warehouse Manager", "M001"],
+      ["A003", "M003", "L002", "Store Manager", "M001"],
+      ["A004", "M002", "L002", "Warehouse Manager", "M001"],
+    ]);
+    expect(s.access.map((t) => [t.assignmentCode, t.tool, t.create])).toEqual([["A002", "Inventory", true], ["A004", "Inventory", true]]);
+    expect(teamOf(s, "B001").find((t) => t.memberCode === "M002")?.locationCodes).toEqual(["L001", "L002"]);
+    expect(checkSetup(s).errors).toEqual([]);
+  });
+  it("unticking takes a person off a location; their last location leaves them on the team, unassigned, with their tool access", () => {
+    let s = team3();
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 1")));
+    s = done(saveLocation(s, "B001", loc("RETAIL_STORE", "Store 1")));
+    s = done(assignMembers(s, "B001", "L001", ["M002"]));
+    s = { ...s, access: [{ assignmentCode: "A002", tool: "Inventory", view: true, create: false, edit: false, approve: false }] };
+    s = done(assignMembers(s, "B001", "L002", ["M002"])); // second location → A004 with copied access
+    s = done(assignMembers(s, "B001", "L001", []));
+    expect(s.assignments.filter((a) => a.memberCode === "M002").map((a) => [a.code, a.locationCode])).toEqual([["A004", "L002"]]);
+    expect(s.access.map((t) => t.assignmentCode)).toEqual(["A004"]);
+    s = done(assignMembers(s, "B001", "L002", []));
+    expect(teamOf(s, "B001").find((t) => t.memberCode === "M002")).toMatchObject({ locationCodes: [], designation: "Warehouse Manager" });
+    expect(s.access.map((t) => t.assignmentCode)).toEqual(["A004"]);
+  });
+  it("only people on this business's team can be assigned, and only to its own locations", () => {
+    let s = team3();
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 1")));
+    expect(err(assignMembers(s, "B001", "L001", ["M099"]))).toBe("Only people on this business's team can be assigned.");
+    expect(err(assignMembers(s, "B001", "L099", ["M001"]))).toBe("Location not found.");
+    s = done(registerBusiness(s, { businessName: "Business 2", legalName: "", gstin: GST2 }));
+    expect(err(assignMembers(s, "B002", "L001", []))).toBe("Location not found.");
+  });
+  it("deleting a location leaves its people on the team, unassigned", () => {
+    let s = team3();
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 1")));
+    s = done(assignMembers(s, "B001", "L001", ["M001", "M002"]));
+    s = done(removeLocation(s, "L001"));
+    expect(s.locations).toEqual([]);
+    expect(teamOf(s, "B001").map((t) => t.locationCodes)).toEqual([[], [], []]);
+    expect(checkSetup(s).errors).toEqual([]);
+    expect(err(removeLocation(s, "L001"))).toBe("Location not found.");
   });
 });
