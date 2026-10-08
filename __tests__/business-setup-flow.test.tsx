@@ -352,3 +352,85 @@ describe("Business Setup — verticals & locations", () => {
     expect(screen.queryByRole("article", { name: "Warehouse 1" })).toBeNull();
   });
 });
+
+describe("Business Setup — tool access", () => {
+  const openStep3 = () => fireEvent.click(screen.getByRole("tab", { name: /03 · Tool access/ }));
+  const lastSaved = () => actions.save.mock.calls.at(-1)![0] as SetupData;
+
+  it("without a team it says so and points to step 01", () => {
+    render(<Harness initial={withBusiness()} />);
+    openStep3();
+    expect(screen.getByText("Add your team before assigning tools.", { exact: false })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Go to team members" }));
+    expect(screen.getByText("Start with your people")).toBeTruthy();
+  });
+
+  it("shows the selected member, their locations and every tool switched off", () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    expect((screen.getByLabelText("Select team member") as HTMLSelectElement).value).toBe("M001");
+    expect(screen.getByText("Locations: Not assigned yet")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("0 of 22 tools on");
+    expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false);
+    // Create / Edit / Approve are behind "Advanced"
+    expect(screen.queryByLabelText("Inventory create")).toBeNull();
+  });
+
+  it("a switch saves at once, for the selected member only; Live structure counts them", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    fireEvent.change(screen.getByLabelText("Select team member"), { target: { value: "M002" } });
+    fireEvent.click(screen.getByLabelText("Inventory"));
+    await waitFor(() => expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(true));
+    expect(lastSaved().access).toEqual([{ assignmentCode: "A002", tool: "Inventory", view: true, create: false, edit: false, approve: false }]);
+    expect(screen.getByRole("status").textContent).toBe("1 of 22 tools on");
+    expect(within(screen.getByLabelText("Live structure")).getByText("1 member with tool access")).toBeTruthy();
+    // another person is unaffected
+    fireEvent.change(screen.getByLabelText("Select team member"), { target: { value: "M001" } });
+    expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false);
+    // and it can be switched off again
+    fireEvent.change(screen.getByLabelText("Select team member"), { target: { value: "M002" } });
+    fireEvent.click(screen.getByLabelText("Inventory"));
+    await waitFor(() => expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false));
+    expect(lastSaved().access).toEqual([]);
+  });
+
+  it("Advanced shows Create, Edit and Approve; ticking one turns View on", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    fireEvent.click(screen.getByLabelText("Advanced: Create, Edit, Approve"));
+    fireEvent.click(screen.getByLabelText("Catalog approve"));
+    await waitFor(() => expect((screen.getByLabelText("Catalog") as HTMLInputElement).checked).toBe(true));
+    expect((screen.getByLabelText("Catalog approve") as HTMLInputElement).checked).toBe(true);
+    expect(lastSaved().access).toEqual([{ assignmentCode: "A001", tool: "Catalog", view: true, create: false, edit: false, approve: true }]);
+    // switching View off clears the rest
+    fireEvent.click(screen.getByLabelText("Catalog"));
+    await waitFor(() => expect((screen.getByLabelText("Catalog approve") as HTMLInputElement).checked).toBe(false));
+  });
+
+  it("marks the tools that have no module yet", () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    expect(screen.getAllByText("Not built yet")).toHaveLength(3);
+    for (const t of ["Retail POS", "Purchases", "Banking"]) expect(screen.getByLabelText(t)).toBeTruthy();
+  });
+
+  it("if the save is refused the switch does not move and the reason is shown", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    actions.save.mockResolvedValueOnce({ success: false, errors: ["Not allowed right now."] });
+    fireEvent.click(screen.getByLabelText("Inventory"));
+    expect((await screen.findByRole("alert")).textContent).toBe("Not allowed right now.");
+    expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("tools survive a trip to the locations step and back", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    fireEvent.click(screen.getByLabelText("Banking"));
+    await waitFor(() => expect((screen.getByLabelText("Banking") as HTMLInputElement).checked).toBe(true));
+    fireEvent.click(screen.getByRole("tab", { name: /01 · Team members/ }));
+    openStep3();
+    expect((screen.getByLabelText("Banking") as HTMLInputElement).checked).toBe(true);
+  });
+});

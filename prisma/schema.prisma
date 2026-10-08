@@ -2874,7 +2874,7 @@ model BusinessToolAccess {
   assignmentId String
   assignment   BusinessAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
-  // One of the 19 tools in lib/business-structure.ts.
+  // One of the tools in lib/business-structure.ts (TOOLS).
   tool       String
   canView    Boolean @default(false)
   canCreate  Boolean @default(false)

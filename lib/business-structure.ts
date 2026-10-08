@@ -31,6 +31,9 @@ export const TOOLS = [
   "CRM",
   "Invoices",
   "Expenses",
+  "Retail POS",
+  "Purchases",
+  "Banking",
   "Inventory",
   "Shop",
   "Deals",
@@ -530,4 +533,50 @@ export function removeLocation(setup: SetupData, locationCode: string): Change {
   const kept = assignMembers(setup, location.businessCode, locationCode, []);
   if (!kept.ok) return kept;
   return { ok: true, setup: { ...kept.setup, locations: kept.setup.locations.filter((l) => l.code !== locationCode) }, code: locationCode };
+}
+
+
+// ---------------------------------------------------------------- Business Setup: tool access
+/** Tools whose SupplyBase module does not exist yet: switching them on records the plan only. */
+export const PLANNED_TOOLS: readonly string[] = ["Retail POS", "Purchases", "Banking"];
+
+export interface ToolLevels {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  approve: boolean;
+}
+export const NO_ACCESS: ToolLevels = { view: false, create: false, edit: false, approve: false };
+
+/** Ticking Create, Edit or Approve turns View on; turning View off clears the rest. */
+export function normalizeLevels(l: ToolLevels): ToolLevels {
+  const view = l.view || l.create || l.edit || l.approve;
+  return view ? { ...l, view: true } : NO_ACCESS;
+}
+export const hasAnyAccess = (l: ToolLevels | undefined) => !!l && (l.view || l.create || l.edit || l.approve);
+
+/** A member's tool access in a business. It is the same on all their locations, so the first assignment tells it. */
+export function toolAccessOf(setup: SetupData, businessCode: string, memberCode: string): Map<string, ToolLevels> {
+  const first = setup.assignments.find((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+  const out = new Map<string, ToolLevels>();
+  if (!first) return out;
+  for (const t of setup.access) if (t.assignmentCode === first.code) out.set(t.tool, normalizeLevels({ view: t.view, create: t.create, edit: t.edit, approve: t.approve }));
+  return out;
+}
+
+/** Sets one tool for one member of a business team, on all of their locations. No levels ticked removes the tool. */
+export function setToolAccess(setup: SetupData, businessCode: string, memberCode: string, tool: string, levels: ToolLevels): Change {
+  if (!(TOOLS as readonly string[]).includes(tool)) return fail("Choose a tool from the list.");
+  const mine = setup.assignments.filter((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+  if (!mine.length) return fail("This person is not on the team.");
+  const codes = new Set(mine.map((a) => a.code));
+  const next = normalizeLevels(levels);
+  const kept = setup.access.filter((t) => !(codes.has(t.assignmentCode) && t.tool === tool));
+  const added: AccessRow[] = hasAnyAccess(next) ? mine.map((a) => ({ assignmentCode: a.code, tool, ...next })) : [];
+  return { ok: true, setup: { ...setup, access: [...kept, ...added] }, code: memberCode };
+}
+
+/** How many people on a business's team have at least one tool. */
+export function membersWithTools(setup: SetupData, businessCode: string): number {
+  return teamOf(setup, businessCode).filter((m) => [...toolAccessOf(setup, businessCode, m.memberCode).values()].some(hasAnyAccess)).length;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_SETUP, LOCATION_TYPE_LABEL, VERTICALS, assignMembers, checkSetup, isValidGstin, registerBusiness, removeLocation, removeTeamMember, saveLocation, saveTeamMember, teamOf, updateBusiness, type Change, type SetupData } from "@/lib/business-structure";
+import { EMPTY_SETUP, LOCATION_TYPE_LABEL, NO_ACCESS, PLANNED_TOOLS, TOOLS, VERTICALS, membersWithTools, setToolAccess, toolAccessOf, assignMembers, checkSetup, isValidGstin, registerBusiness, removeLocation, removeTeamMember, saveLocation, saveTeamMember, teamOf, updateBusiness, type Change, type SetupData } from "@/lib/business-structure";
 
 const GST1 = "27AAAAA0001A1Z1";
 const GST2 = "29BBBBB0002B1Z2";
@@ -240,5 +240,59 @@ describe("verticals and locations", () => {
     expect(teamOf(s, "B001").map((t) => t.locationCodes)).toEqual([[], [], []]);
     expect(checkSetup(s).errors).toEqual([]);
     expect(err(removeLocation(s, "L001"))).toBe("Location not found.");
+  });
+});
+
+// ---------------------------------------------------------------- tool access
+
+describe("tool access", () => {
+  const view = { ...NO_ACCESS, view: true };
+  it("the tool list now has Retail POS, Purchases and Banking, marked as not built yet", () => {
+    for (const t of PLANNED_TOOLS) expect(TOOLS as readonly string[]).toContain(t);
+    expect(PLANNED_TOOLS).toEqual(["Retail POS", "Purchases", "Banking"]);
+    expect(new Set(TOOLS).size).toBe(TOOLS.length);
+  });
+  it("switching a tool on gives View; it is stored on every location the person works at", () => {
+    let s = team3();
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 1")));
+    s = done(saveLocation(s, "B001", loc("RETAIL_STORE", "Store 1")));
+    s = done(assignMembers(s, "B001", "L001", ["M002"]));
+    s = done(assignMembers(s, "B001", "L002", ["M002"]));
+    s = done(setToolAccess(s, "B001", "M002", "Inventory", view));
+    expect(s.access.map((t) => [t.assignmentCode, t.tool, t.view]).sort()).toEqual([["A002", "Inventory", true], ["A004", "Inventory", true]]);
+    expect(toolAccessOf(s, "B001", "M002").get("Inventory")).toEqual(view);
+    expect(checkSetup(s).errors).toEqual([]);
+  });
+  it("Create, Edit or Approve turn View on; View off clears the rest; no level removes the tool", () => {
+    let s = team3();
+    s = done(setToolAccess(s, "B001", "M002", "Catalog", { ...NO_ACCESS, edit: true }));
+    expect(toolAccessOf(s, "B001", "M002").get("Catalog")).toEqual({ view: true, create: false, edit: true, approve: false });
+    s = done(setToolAccess(s, "B001", "M002", "Catalog", { view: false, create: true, edit: true, approve: true }));
+    expect(toolAccessOf(s, "B001", "M002").get("Catalog")).toEqual({ view: true, create: true, edit: true, approve: true });
+    s = done(setToolAccess(s, "B001", "M002", "Catalog", NO_ACCESS));
+    expect(toolAccessOf(s, "B001", "M002").size).toBe(0);
+    expect(s.access).toEqual([]);
+  });
+  it("tools are per person: one person's switches never touch another's", () => {
+    let s = team3();
+    s = done(setToolAccess(s, "B001", "M002", "Inventory", view));
+    s = done(setToolAccess(s, "B001", "M003", "Banking", view));
+    expect([...toolAccessOf(s, "B001", "M002").keys()]).toEqual(["Inventory"]);
+    expect([...toolAccessOf(s, "B001", "M003").keys()]).toEqual(["Banking"]);
+    expect(membersWithTools(s, "B001")).toBe(2);
+    s = done(setToolAccess(s, "B001", "M003", "Banking", NO_ACCESS));
+    expect(membersWithTools(s, "B001")).toBe(1);
+  });
+  it("refuses a tool that is not in the list and a person who is not on the team", () => {
+    const s = team3();
+    expect(err(setToolAccess(s, "B001", "M002", "Time travel", view))).toBe("Choose a tool from the list.");
+    expect(err(setToolAccess(s, "B001", "M099", "Inventory", view))).toBe("This person is not on the team.");
+  });
+  it("a person with no location can have tools; they stay when a location is added", () => {
+    let s = team3();
+    s = done(saveLocation(s, "B001", loc("WAREHOUSE", "Warehouse 1")));
+    s = done(setToolAccess(s, "B001", "M002", "Inventory", view));
+    s = done(assignMembers(s, "B001", "L001", ["M002"]));
+    expect(toolAccessOf(s, "B001", "M002").get("Inventory")).toEqual(view);
   });
 });

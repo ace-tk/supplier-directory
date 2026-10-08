@@ -10,19 +10,27 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   DESIGNATIONS,
+  NO_ACCESS,
+  PLANNED_TOOLS,
+  TOOLS,
   VERTICALS,
   LOCATION_TYPE_LABEL,
   assignMembers,
   entityOf,
+  hasAnyAccess,
+  membersWithTools,
   registerBusiness,
   removeLocation,
   removeTeamMember,
   saveLocation,
   saveTeamMember,
+  setToolAccess,
   teamOf,
+  toolAccessOf,
   updateBusiness,
   type Change,
   type LocationType,
+  type ToolLevels,
   type SetupData,
   type TeamMember,
 } from "@/lib/business-structure";
@@ -199,6 +207,15 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                   onAssign={(locationCode) => setDialog({ kind: "assign", locationCode })}
                   onGoToTeam={() => setStep(0)}
                 />
+              ) : step === 2 ? (
+                <ToolAccessStep
+                  setup={saved}
+                  businessCode={business.code}
+                  businessName={business.name}
+                  team={team}
+                  onChange={async (memberCode, tool, levels) => commit(setToolAccess(saved, business.code, memberCode, tool, levels))}
+                  onGoToTeam={() => setStep(0)}
+                />
               ) : (
                 <div className="py-10 text-center">
                   <h3 className="text-lg font-semibold">{STEPS[step].replace(/^\d+ · /, "")}</h3>
@@ -227,7 +244,7 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                 </div>
                 <div className="border-l-2 border-border pl-3">
                   <h4 className="text-sm font-semibold">03 / Tools</h4>
-                  <p className="mt-1">{new Set(saved.access.filter((t) => team.some((m) => m.assignmentCodes.includes(t.assignmentCode))).map((t) => t.assignmentCode)).size} members with tool access</p>
+                  <p className="mt-1">{membersWithTools(saved, business.code)} {membersWithTools(saved, business.code) === 1 ? "member" : "members"} with tool access</p>
                 </div>
               </div>
               <p className="mt-4 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">A member can belong to several locations. Their identity stays in this business&apos;s team.</p>
@@ -798,5 +815,121 @@ function AssignDialog({ location, team, businessName, onClose, onSave }: { locat
       )}
       <ErrorLine message={error} />
     </Modal>
+  );
+}
+
+function ToolAccessStep({
+  setup,
+  businessCode,
+  businessName,
+  team,
+  onChange,
+  onGoToTeam,
+}: {
+  setup: SetupData;
+  businessCode: string;
+  businessName: string;
+  team: TeamMember[];
+  onChange: (memberCode: string, tool: string, levels: ToolLevels) => Promise<string | null>;
+  onGoToTeam: () => void;
+}) {
+  const [picked, setPicked] = useState("");
+  const [advanced, setAdvanced] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!team.length) {
+    return (
+      <div className="py-10 text-center">
+        <h3 className="text-lg font-semibold">Assign tools to team members</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Add your team before assigning tools.{" "}
+          <button type="button" className="font-medium text-primary hover:underline" onClick={onGoToTeam}>
+            Go to team members
+          </button>
+        </p>
+      </div>
+    );
+  }
+
+  const member = team.find((m) => m.memberCode === picked) ?? team[0];
+  const access = toolAccessOf(setup, businessCode, member.memberCode);
+  const on = [...access.values()].filter(hasAnyAccess).length;
+  const places = member.locationCodes.map((c) => setup.locations.find((l) => l.code === c)?.name).filter(Boolean);
+
+  /** One change at a time: each one is saved before the next is made, so none is lost. */
+  async function change(tool: string, levels: ToolLevels) {
+    setBusy(true);
+    setError(await onChange(member.memberCode, tool, levels));
+    setBusy(false);
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">Assign tools to team members</h3>
+          <p className="text-xs text-muted-foreground">Tool access belongs to the selected member within {businessName}.</p>
+        </div>
+        <span className="rounded-md bg-muted px-2 py-1 text-xs">{businessName}</span>
+      </div>
+
+      <div className="mt-4 space-y-1.5">
+        <Label htmlFor="tool-member">Select team member</Label>
+        <select id="tool-member" className={fieldCls} value={member.memberCode} onChange={(e) => setPicked(e.target.value)}>
+          {team.map((m) => (
+            <option key={m.memberCode} value={m.memberCode}>
+              {m.name} — {m.designation}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-3 rounded-lg bg-muted/50 p-3 text-sm">
+        <b>{member.name}</b> · {member.designation}
+        <br />
+        <span className="text-xs text-muted-foreground">Locations: {places.length ? places.join(" · ") : "Not assigned yet"}</span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground" role="status">
+          {on} of {TOOLS.length} tools on
+        </p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
+          Advanced: Create, Edit, Approve
+        </label>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2" role="group" aria-label={`Tools for ${member.name}`}>
+        {TOOLS.map((tool) => {
+          const levels = access.get(tool) ?? NO_ACCESS;
+          return (
+            <div key={tool} className={cn("rounded-lg border p-3 text-sm", levels.view ? "border-primary/40 bg-primary/5" : "border-border")}>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" aria-label={tool} checked={levels.view} disabled={busy} onChange={(e) => void change(tool, e.target.checked ? { ...NO_ACCESS, view: true } : NO_ACCESS)} />
+                <span className="font-medium">{tool}</span>
+                {PLANNED_TOOLS.includes(tool) && <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">Not built yet</span>}
+              </label>
+              {advanced && (
+                <div className="mt-2 flex gap-4 pl-6 text-xs">
+                  {(["create", "edit", "approve"] as const).map((level) => (
+                    <label key={level} className="flex items-center gap-1.5">
+                      <input type="checkbox" aria-label={`${tool} ${level}`} checked={levels[level]} disabled={busy} onChange={(e) => void change(tool, { ...levels, [level]: e.target.checked })} />
+                      {level[0].toUpperCase() + level.slice(1)}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <ErrorLine message={error} />
+      <p className="mt-4 text-xs text-muted-foreground">
+        Switches save immediately. A designation does not turn tools on by itself. The admin always has full access. This records what each person should be able to open; their login is set by the role in Team Management.
+        Tools marked &quot;Not built yet&quot; have no module in SupplyBase yet.
+      </p>
+    </div>
   );
 }
