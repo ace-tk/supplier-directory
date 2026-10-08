@@ -69,7 +69,7 @@ const ASSIGNMENT_COLS: Column[] = [
   { field: "code", label: "ID", kind: "text" },
   { field: "memberCode", label: "Member ID", required: true, kind: "select" },
   { field: "businessCode", label: "Business ID", required: true, kind: "select" },
-  { field: "locationCode", label: "Location ID", required: true, kind: "select" },
+  { field: "locationCode", label: "Location ID", kind: "select" },
   { field: "designation", label: "Designation", required: true, kind: "select", options: DESIGNATIONS },
   { field: "reportsToCode", label: "Reports-to ID", kind: "select" },
 ];

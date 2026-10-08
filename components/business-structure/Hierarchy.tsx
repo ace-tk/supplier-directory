@@ -129,7 +129,7 @@ function ReportingChart({ saved, businessCode, onSelect }: { saved: SetupData; b
         <button type="button" onClick={() => onSelect(a.memberCode)} className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-muted/50">
           <span className="font-medium">{member?.name ?? a.memberCode}</span>
           <span className="text-xs text-muted-foreground">{a.designation}</span>
-          <span className="ml-auto text-xs text-muted-foreground">{location?.name ?? a.locationCode}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{location?.name ?? (a.locationCode || "No location yet")}</span>
         </button>
         {children.length > 0 && <ul className="ml-4 space-y-1 border-l border-border pl-3">{children.map((c) => render(c, nextSeen))}</ul>}
       </li>
@@ -187,7 +187,7 @@ function MemberProfile({ saved, memberCode, onEdit }: { saved: SetupData; member
                   {a.designation} · {business?.name ?? a.businessCode}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {location?.name ?? a.locationCode} · reports to {a.reportsToCode ? nameOf(a.reportsToCode) : "nobody (top)"}
+                  {location?.name ?? (a.locationCode || "No location yet")} · reports to {a.reportsToCode ? nameOf(a.reportsToCode) : "nobody (top)"}
                 </p>
                 <ul className="mt-2 space-y-0.5 text-xs">
                   {saved.access

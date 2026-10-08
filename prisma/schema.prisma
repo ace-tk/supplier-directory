@@ -2846,8 +2846,9 @@ model BusinessAssignment {
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  locationId String
-  location   BusinessLocation @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  // Empty = on the business's team, not assigned to a location yet.
+  locationId String?
+  location   BusinessLocation? @relation(fields: [locationId], references: [id], onDelete: Restrict)
 
   // One of the 12 designations in lib/business-structure.ts.
   designation String

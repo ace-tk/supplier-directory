@@ -32,10 +32,10 @@ describe("Business Structure content (from the prototype)", () => {
 });
 
 describe("BusinessStructureTabs", () => {
-  it("shows all eight tabs, with Overview first", () => {
+  it("shows all nine tabs, with Overview first and the guided Business Setup next", () => {
     render(<BusinessStructureTabs initialSetup={EMPTY_SETUP} />);
     const labels = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(labels).toEqual(["Overview", "Setup Tables", "Hierarchy", "Portals", "Modules", "Connected Flows", "Deals", "App Roadmap"]);
+    expect(labels).toEqual(["Overview", "Business Setup", "Setup Tables", "Hierarchy", "Portals", "Modules", "Connected Flows", "Deals", "App Roadmap"]);
     expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
   });
 

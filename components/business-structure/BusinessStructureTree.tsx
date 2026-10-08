@@ -34,7 +34,7 @@ interface BusinessStructureTreeProps {
   saved: SetupData;
   assignedBusiness?: AssignedBusinessData;
   onSaved: (updated: SetupData) => void;
-  onOpenTab: (tabId: "overview" | "tables" | "hierarchy" | "portals" | "modules" | "flows" | "deals" | "roadmap") => void;
+  onOpenTab: (tabId: "overview" | "setup" | "tables" | "hierarchy" | "portals" | "modules" | "flows" | "deals" | "roadmap") => void;
 }
 
 export function BusinessStructureTree({

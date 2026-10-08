@@ -1,0 +1,153 @@
+import { describe, expect, it } from "vitest";
+import { EMPTY_SETUP, checkSetup, isValidGstin, registerBusiness, removeTeamMember, saveTeamMember, teamOf, updateBusiness, type Change, type SetupData } from "@/lib/business-structure";
+
+const GST1 = "27AAAAA0001A1Z1";
+const GST2 = "29BBBBB0002B1Z2";
+
+/** Unwraps a successful change. */
+function done(change: Change): SetupData {
+  if (!change.ok) throw new Error(change.error);
+  return change.setup;
+}
+const err = (change: Change) => (change.ok ? "" : change.error);
+
+function oneBusiness(): SetupData {
+  return done(registerBusiness(EMPTY_SETUP, { businessName: "Business 1", legalName: "", gstin: GST1 }));
+}
+const person = (name: string, extra: Partial<Parameters<typeof saveTeamMember>[2]> = {}) => ({ name, designation: "Operations", reportsToCode: "", email: "", mobile: "", ...extra });
+
+describe("GSTIN", () => {
+  it("accepts the 15-character GST format, in any case, and rejects anything else", () => {
+    expect(isValidGstin(GST1)).toBe(true);
+    expect(isValidGstin(" 27aaaaa0001a1z1 ")).toBe(true);
+    expect(isValidGstin("27AAAAA0001A1Z")).toBe(false);
+    expect(isValidGstin("27AAAAA0001A1X1")).toBe(false);
+    expect(isValidGstin("")).toBe(false);
+  });
+  it("saving the tables refuses a wrong GSTIN but allows a blank one", () => {
+    const s = oneBusiness();
+    expect(checkSetup(s).errors).toEqual([]);
+    expect(checkSetup({ ...s, entities: [{ ...s.entities[0], gstin: "" }] }).errors).toEqual([]);
+    expect(checkSetup({ ...s, entities: [{ ...s.entities[0], gstin: "12345" }] }).errors[0]).toMatch(/GSTIN must be 15 characters/);
+  });
+});
+
+describe("register and edit a business", () => {
+  it("makes the company and the business, with the next codes", () => {
+    const s = oneBusiness();
+    expect(s.entities).toEqual([{ code: "E001", legalName: "Business 1", gstin: GST1, registeredAddress: "" }]);
+    expect(s.businesses).toEqual([{ code: "B001", entityCode: "E001", name: "Business 1", operationalAddress: "" }]);
+  });
+  it("two businesses with the same GST share one company; a different GST makes another", () => {
+    let s = oneBusiness();
+    s = done(registerBusiness(s, { businessName: "Business 2", legalName: "", gstin: GST1.toLowerCase() }));
+    expect(s.entities).toHaveLength(1);
+    expect(s.businesses.map((b) => b.entityCode)).toEqual(["E001", "E001"]);
+    s = done(registerBusiness(s, { businessName: "Business 3", legalName: "Three Ltd", gstin: GST2 }));
+    expect(s.entities.map((e) => [e.code, e.legalName])).toEqual([["E001", "Business 1"], ["E002", "Three Ltd"]]);
+  });
+  it("refuses a missing name, a duplicate name and a wrong GSTIN, and saves nothing", () => {
+    const s = oneBusiness();
+    expect(err(registerBusiness(s, { businessName: " ", legalName: "", gstin: "" }))).toBe("Enter the business name.");
+    expect(err(registerBusiness(s, { businessName: "business 1", legalName: "", gstin: "" }))).toBe("A business with this name already exists.");
+    expect(err(registerBusiness(s, { businessName: "X", legalName: "", gstin: "123" }))).toMatch(/15-character GSTIN/);
+    expect(s.businesses).toHaveLength(1);
+  });
+  it("a business may be registered without a GST yet", () => {
+    const s = done(registerBusiness(EMPTY_SETUP, { businessName: "Soon", legalName: "", gstin: "" }));
+    expect(s.entities[0].gstin).toBe("");
+  });
+  it("changing the GST of the only business changes its company; a shared company is split; an existing GST is joined", () => {
+    let s = oneBusiness();
+    s = done(updateBusiness(s, "B001", { name: "Business One", gstin: GST2 }));
+    expect(s.entities).toEqual([{ code: "E001", legalName: "Business 1", gstin: GST2, registeredAddress: "" }]);
+    expect(s.businesses[0].name).toBe("Business One");
+
+    // two businesses on one company: moving one to a new GST makes a new company for it
+    s = done(registerBusiness(s, { businessName: "Business 2", legalName: "", gstin: GST2 }));
+    s = done(updateBusiness(s, "B002", { name: "Business 2", gstin: GST1 }));
+    expect(s.businesses.map((b) => b.entityCode)).toEqual(["E001", "E002"]);
+    expect(s.entities.map((e) => e.gstin)).toEqual([GST2, GST1]);
+
+    // moving it to the GST the other company already has joins that company; the empty one is dropped
+    s = done(updateBusiness(s, "B002", { name: "Business 2", gstin: GST2 }));
+    expect(s.businesses.map((b) => b.entityCode)).toEqual(["E001", "E001"]);
+    expect(s.entities.map((e) => e.code)).toEqual(["E001"]);
+  });
+});
+
+describe("team members", () => {
+  it("a new person joins the team with no location and the next codes", () => {
+    const s = done(saveTeamMember(oneBusiness(), "B001", person("Asha", { designation: "Director", email: "Asha@Example.com" })));
+    expect(s.members).toEqual([{ code: "M001", name: "Asha", mobile: "", email: "asha@example.com", photoUrl: "" }]);
+    expect(s.assignments).toEqual([{ code: "A001", memberCode: "M001", businessCode: "B001", locationCode: "", designation: "Director", reportsToCode: "" }]);
+    expect(teamOf(s, "B001")).toEqual([{ memberCode: "M001", name: "Asha", email: "asha@example.com", mobile: "", designation: "Director", reportsToCode: "", locationCodes: [], assignmentCodes: ["A001"] }]);
+    expect(checkSetup(s).errors).toEqual([]);
+  });
+  it("needs a name and a designation from the list", () => {
+    const s = oneBusiness();
+    expect(err(saveTeamMember(s, "B001", person(" ")))).toBe("Enter the member's name.");
+    expect(err(saveTeamMember(s, "B001", person("A", { designation: "" })))).toBe("Choose a designation.");
+    expect(err(saveTeamMember(s, "B001", person("A", { designation: "Wizard" })))).toBe("Choose a designation.");
+    expect(err(saveTeamMember(s, "B001", person("A", { email: "nope" })))).toBe("Enter a valid email address.");
+  });
+  it("reporting: only to someone on the same team, never to oneself, never in a circle", () => {
+    let s = done(saveTeamMember(oneBusiness(), "B001", person("Boss", { designation: "Director" })));
+    s = done(saveTeamMember(s, "B001", person("Ravi", { reportsToCode: "M001" })));
+    s = done(saveTeamMember(s, "B001", person("Sana", { reportsToCode: "M002" })));
+    expect(teamOf(s, "B001").map((t) => [t.name, t.reportsToCode])).toEqual([["Boss", ""], ["Ravi", "M001"], ["Sana", "M002"]]);
+
+    expect(err(saveTeamMember(s, "B001", { ...person("Boss", { designation: "Director" }), memberCode: "M001", reportsToCode: "M001" }))).toBe("A member cannot report to themselves.");
+    // Boss reporting to Sana (who reports to Ravi, who reports to Boss) would be a loop
+    expect(err(saveTeamMember(s, "B001", { ...person("Boss", { designation: "Director" }), memberCode: "M001", reportsToCode: "M003" }))).toBe("Reporting cannot create a circular hierarchy.");
+    expect(err(saveTeamMember(s, "B001", person("New", { reportsToCode: "M099" })))).toBe("A person can only report to someone on this business's team.");
+    expect(checkSetup(s).errors).toEqual([]);
+  });
+  it("editing changes the designation and reporting line on all of the person's locations in the business", () => {
+    let s = done(saveTeamMember(oneBusiness(), "B001", person("Boss", { designation: "Director" })));
+    s = done(saveTeamMember(s, "B001", person("Ravi")));
+    // Ravi works at two locations (assigned in the next step)
+    s = { ...s, locations: [{ code: "L001", businessCode: "B001", type: "WAREHOUSE", name: "W1", address: "", mapPin: "" }, { code: "L002", businessCode: "B001", type: "RETAIL_STORE", name: "S1", address: "", mapPin: "" }], assignments: s.assignments.filter((a) => a.memberCode !== "M002").concat([{ code: "A010", memberCode: "M002", businessCode: "B001", locationCode: "L001", designation: "Operations", reportsToCode: "" }, { code: "A011", memberCode: "M002", businessCode: "B001", locationCode: "L002", designation: "Operations", reportsToCode: "" }]) };
+    s = done(saveTeamMember(s, "B001", { ...person("Ravi K", { designation: "Store Manager", reportsToCode: "M001" }), memberCode: "M002" }));
+    expect(s.assignments.filter((a) => a.memberCode === "M002").map((a) => [a.designation, a.reportsToCode])).toEqual([["Store Manager", "M001"], ["Store Manager", "M001"]]);
+    expect(s.members.find((m) => m.code === "M002")?.name).toBe("Ravi K");
+    expect(teamOf(s, "B001").find((t) => t.memberCode === "M002")?.locationCodes).toEqual(["L001", "L002"]);
+  });
+  it("the same person (same email) is one member, and can be on the teams of two businesses", () => {
+    let s = done(saveTeamMember(oneBusiness(), "B001", person("Asha", { email: "asha@example.com" })));
+    expect(err(saveTeamMember(s, "B001", person("Asha again", { email: "ASHA@example.com" })))).toBe("Asha is already on this team.");
+    s = done(registerBusiness(s, { businessName: "Business 2", legalName: "", gstin: GST2 }));
+    s = done(saveTeamMember(s, "B002", person("Asha again", { email: "asha@example.com", designation: "Accounts" })));
+    expect(s.members).toHaveLength(1);
+    expect(teamOf(s, "B001")).toHaveLength(1);
+    expect(teamOf(s, "B002")).toHaveLength(1);
+    expect(s.assignments.map((a) => [a.businessCode, a.designation])).toEqual([["B001", "Operations"], ["B002", "Accounts"]]);
+  });
+  it("removing someone moves their reports to the top, takes their tool access, and drops them if they are on no other team", () => {
+    let s = done(saveTeamMember(oneBusiness(), "B001", person("Boss", { designation: "Director" })));
+    s = done(saveTeamMember(s, "B001", person("Ravi", { reportsToCode: "M001" })));
+    s = { ...s, access: [{ assignmentCode: "A001", tool: "Inventory", view: true, create: false, edit: false, approve: false }, { assignmentCode: "A002", tool: "Inventory", view: true, create: false, edit: false, approve: false }] };
+    const after = done(removeTeamMember(s, "B001", "M001"));
+    expect(after.members.map((m) => m.code)).toEqual(["M002"]);
+    expect(after.assignments).toEqual([{ code: "A002", memberCode: "M002", businessCode: "B001", locationCode: "", designation: "Operations", reportsToCode: "" }]);
+    expect(after.access.map((a) => a.assignmentCode)).toEqual(["A002"]);
+    expect(checkSetup(after).errors).toEqual([]);
+    expect(err(removeTeamMember(after, "B001", "M001"))).toBe("This person is not on the team.");
+  });
+  it("a person on two teams stays in Members when removed from one", () => {
+    let s = done(saveTeamMember(oneBusiness(), "B001", person("Asha", { email: "asha@example.com" })));
+    s = done(registerBusiness(s, { businessName: "Business 2", legalName: "", gstin: GST2 }));
+    s = done(saveTeamMember(s, "B002", person("Asha", { email: "asha@example.com" })));
+    const after = done(removeTeamMember(s, "B001", "M001"));
+    expect(after.members).toHaveLength(1);
+    expect(teamOf(after, "B002")).toHaveLength(1);
+    expect(teamOf(after, "B001")).toHaveLength(0);
+  });
+  it("a team member with no location passes the same checks as the setup tables", () => {
+    const s = done(saveTeamMember(oneBusiness(), "B001", person("Asha")));
+    expect(checkSetup(s).errors).toEqual([]);
+    // a location that is given must still exist and belong to the business
+    const bad = { ...s, assignments: [{ ...s.assignments[0], locationCode: "L099" }] };
+    expect(checkSetup(bad).errors[0]).toMatch(/Location ID L099 is not in Locations/);
+  });
+});
