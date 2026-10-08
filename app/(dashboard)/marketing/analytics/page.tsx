@@ -15,8 +15,8 @@ export default function CampaignAnalyticsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatWidget icon={Megaphone} label="Total Campaigns" value={analytics.totalCampaigns} />
         <StatWidget icon={Users2} label="Total Recipients" value={analytics.totalRecipients.toLocaleString("en-IN")} />
-        <StatWidget icon={Mail} label="Avg Open Rate" value={`${analytics.avgOpenRate}%`} accentClassName="text-emerald-500" />
-        <StatWidget icon={MousePointerClick} label="Avg Click Rate" value={`${analytics.avgClickRate}%`} accentClassName="text-blue-500" />
+        <StatWidget icon={Mail} label="Avg Open Rate" value={`${analytics.avgOpenRate}%`} accentClassName="text-mint-ink" />
+        <StatWidget icon={MousePointerClick} label="Avg Click Rate" value={`${analytics.avgClickRate}%`} accentClassName="text-sky-ink" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

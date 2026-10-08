@@ -54,7 +54,7 @@ export function SupplierMatchList({ category, basePath }: { category: string; ba
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-foreground truncate">{s.companyName}</p>
-              {s.verified && <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+              {s.verified && <ShieldCheck className="h-3.5 w-3.5 text-mint-ink shrink-0" />}
             </div>
             <p className="text-xs text-muted-foreground">
               {s.industry} · {s.supplierType}

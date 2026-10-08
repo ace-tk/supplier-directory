@@ -43,7 +43,7 @@ export function DualSeriesLineChart({
     <div>
       <div className="flex items-center gap-4 mb-2 text-xs">
         <Legend color="var(--color-primary)" label={seriesALabel} />
-        <Legend color="#f59e0b" label={seriesBLabel} />
+        <Legend color="var(--peach-ink)" label={seriesBLabel} />
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" role="img" aria-label={`${seriesALabel} vs ${seriesBLabel} over time`}>
         <defs>
@@ -55,11 +55,11 @@ export function DualSeriesLineChart({
         <line x1={padding.left} y1={padding.top + innerH} x2={width - padding.right} y2={padding.top + innerH} stroke="currentColor" className="text-border" strokeWidth={1} />
         <path d={`${pathFor("a")} L${x(points.length - 1)},${padding.top + innerH} L${x(0)},${padding.top + innerH} Z`} fill={`url(#${gradientId})`} stroke="none" />
         <path d={pathFor("a")} fill="none" stroke="var(--color-primary)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        <path d={pathFor("b")} fill="none" stroke="#f59e0b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <path d={pathFor("b")} fill="none" stroke="var(--peach-ink)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p, i) => (
           <g key={i}>
             <circle cx={x(i)} cy={y(p.a)} r={2.5} fill="var(--color-primary)" />
-            <circle cx={x(i)} cy={y(p.b)} r={2.5} fill="#f59e0b" />
+            <circle cx={x(i)} cy={y(p.b)} r={2.5} fill="var(--peach-ink)" />
           </g>
         ))}
         {points.map((p, i) => {

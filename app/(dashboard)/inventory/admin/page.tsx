@@ -81,7 +81,7 @@ export default function AdminInventoryPage() {
           <Button variant="ghost" size="icon-sm" onClick={() => toast.info("Edit form coming soon")}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-sm" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(i.id)}>
+          <Button variant="ghost" size="icon-sm" className="text-rose-ink hover:text-rose-ink" onClick={() => handleDelete(i.id)}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -96,7 +96,7 @@ export default function AdminInventoryPage() {
       key: "change",
       label: "Quantity Change",
       render: (h) => (
-        <span className={h.quantityChange >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}>
+        <span className={h.quantityChange >= 0 ? "text-mint-ink " : "text-rose-ink"}>
           {h.quantityChange >= 0 ? "+" : ""}
           {h.quantityChange}
         </span>
@@ -132,8 +132,8 @@ export default function AdminInventoryPage() {
           label="Stock Value"
           value={`₹${(analytics.totalStockValue / 100000).toFixed(1)}L`}
         />
-        <StatWidget icon={AlertTriangle} label="Low Stock" value={analytics.lowStockCount} accentClassName="text-amber-500" />
-        <StatWidget icon={PackageX} label="Out of Stock" value={analytics.outOfStockCount} accentClassName="text-red-500" />
+        <StatWidget icon={AlertTriangle} label="Low Stock" value={analytics.lowStockCount} accentClassName="text-butter-ink" />
+        <StatWidget icon={PackageX} label="Out of Stock" value={analytics.outOfStockCount} accentClassName="text-rose-ink" />
       </div>
 
       <LowStockBanner lowStockCount={analytics.lowStockCount} outOfStockCount={analytics.outOfStockCount} />

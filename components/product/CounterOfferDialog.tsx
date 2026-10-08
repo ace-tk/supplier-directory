@@ -90,7 +90,7 @@ export function CounterOfferDialog({
 
         {done ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+            <CheckCircle2 className="h-10 w-10 text-mint-ink" />
             <p className="text-sm font-medium text-foreground">Offer submitted</p>
             <p className="text-xs text-muted-foreground">The supplier will review your terms and respond.</p>
             <Button size="sm" onClick={() => handleClose(false)}>

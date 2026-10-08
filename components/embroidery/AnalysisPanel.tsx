@@ -3,10 +3,10 @@ import type { EmbroideryAnalysis } from "@/lib/embroidery-production";
 import { Badge } from "@/components/ui/badge";
 
 const SUITABILITY_STYLE: Record<EmbroideryAnalysis["suitability"], string> = {
-  Poor: "bg-red-500/10 text-red-600 dark:text-red-400",
-  Fair: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  Good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  Excellent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  Poor: "bg-rose text-rose-ink ",
+  Fair: "bg-butter text-butter-ink ",
+  Good: "bg-mint text-mint-ink ",
+  Excellent: "bg-mint text-mint-ink ",
 };
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {

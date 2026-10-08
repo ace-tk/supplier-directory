@@ -117,8 +117,8 @@ export function AddFreelancerForm() {
       <div>
         <PageHeader title="Freelancer created" description="Share the activation link so they can set their own password." />
         <div className="max-w-lg rounded-2xl border border-border bg-card p-6 space-y-4">
-          <div className="flex items-start gap-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4">
-            <Check className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 rounded-xl bg-mint border border-mint-ink/20 p-4">
+            <Check className="h-5 w-5 text-mint-ink shrink-0 mt-0.5" />
             <div className="text-sm">
               <p className="font-medium text-foreground">{activation.name} was created</p>
               <p className="text-muted-foreground mt-0.5">
@@ -130,9 +130,9 @@ export function AddFreelancerForm() {
             </div>
           </div>
 
-          <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3">
-            <TriangleAlert className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800 dark:text-amber-300">
+          <div className="flex items-start gap-2 rounded-xl bg-butter border border-butter-ink/20 p-3">
+            <TriangleAlert className="h-4 w-4 text-butter-ink shrink-0 mt-0.5" />
+            <p className="text-xs text-butter-ink">
               This link is shown once and expires in 24 hours. It won&apos;t be retrievable again after you
               leave this page.
             </p>
@@ -141,7 +141,7 @@ export function AddFreelancerForm() {
           <div className="flex items-center gap-2">
             <Input readOnly value={activation.link} className="font-mono text-xs" />
             <Button type="button" variant="outline" size="icon" onClick={handleCopyLink} aria-label="Copy activation link">
-              {linkCopied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+              {linkCopied ? <Check className="h-4 w-4 text-mint-ink" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>
 

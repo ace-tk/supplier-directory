@@ -75,7 +75,7 @@ export function SettingsClient({ user, canManageSettings, workspace, team, notif
       <PageHeader title="Settings" description="Manage your workspace, team access, notifications and security." />
 
       {!canManageSettings && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+        <div className="rounded-xl border border-butter-ink/30 bg-butter px-4 py-3 text-sm text-butter-ink">
           You have view-only access to Settings. Ask a workspace Owner to grant Manage workspace settings permission to make changes.
         </div>
       )}

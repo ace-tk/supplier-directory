@@ -141,7 +141,7 @@ export function LeadDetailDialog({ lead, suppliers, open, onOpenChange, onUpdate
 
           {lead.verificationNote && (
             <Field label="Verification Note">
-              <p className="text-amber-600 dark:text-amber-400">{lead.verificationNote}</p>
+              <p className="text-butter-ink">{lead.verificationNote}</p>
             </Field>
           )}
 
@@ -165,7 +165,7 @@ export function LeadDetailDialog({ lead, suppliers, open, onOpenChange, onUpdate
               <Button size="sm" onClick={handleVerify} disabled={busy} className="gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Verify Buyer
               </Button>
-              <Button size="sm" variant="outline" onClick={handleReject} disabled={busy} className="gap-1.5 text-red-500 hover:text-red-600">
+              <Button size="sm" variant="outline" onClick={handleReject} disabled={busy} className="gap-1.5 text-rose-ink hover:text-rose-ink">
                 <XCircle className="h-3.5 w-3.5" /> Reject Buyer
               </Button>
               <Button size="sm" variant="outline" onClick={() => setShowInfoForm((v) => !v)} disabled={busy} className="gap-1.5">

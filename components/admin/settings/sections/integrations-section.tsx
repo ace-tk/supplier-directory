@@ -62,7 +62,7 @@ export function IntegrationsSection({ integrations }: IntegrationsProps) {
                 </div>
               </div>
               {row.connected ? (
-                <Badge className="gap-1 shrink-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-0">
+                <Badge className="gap-1 shrink-0 bg-mint text-mint-ink border-0">
                   <CheckCircle2 className="h-3 w-3" /> Connected
                 </Badge>
               ) : (

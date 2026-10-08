@@ -19,7 +19,7 @@ import { initials } from "@/utils/format";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL = { UPCOMING: "Upcoming", ACTIVE: "Active", COMPLETED: "Completed" } as const;
-const STATUS_STYLE = { UPCOMING: "bg-sky-500/10 text-sky-700", ACTIVE: "bg-emerald-500/10 text-emerald-700", COMPLETED: "bg-slate-500/10 text-slate-700" } as const;
+const STATUS_STYLE = { UPCOMING: "bg-sky text-sky-ink", ACTIVE: "bg-mint text-mint-ink", COMPLETED: "bg-soft/10 text-foreground" } as const;
 
 export function ProjectManagementDashboard({ initialData }: { initialData: ProjectManagementOverview }) {
   const router = useRouter();
@@ -62,10 +62,10 @@ export function ProjectManagementDashboard({ initialData }: { initialData: Proje
   }
 
   const stats = [
-    { label: "Active Projects", value: initialData.stats.activeProjects, icon: FolderKanban, color: "text-blue-600 bg-blue-500/10" },
-    { label: "Tasks Due", value: initialData.stats.tasksDue, icon: CalendarClock, color: "text-amber-600 bg-amber-500/10" },
-    { label: "Completed Tasks", value: initialData.stats.completedTasks, icon: CheckCircle2, color: "text-emerald-600 bg-emerald-500/10" },
-    { label: "Team Members", value: initialData.stats.teamMembers, icon: Users, color: "text-violet-600 bg-violet-500/10" },
+    { label: "Active Projects", value: initialData.stats.activeProjects, icon: FolderKanban, color: "text-sky-ink bg-sky" },
+    { label: "Tasks Due", value: initialData.stats.tasksDue, icon: CalendarClock, color: "text-butter-ink bg-butter" },
+    { label: "Completed Tasks", value: initialData.stats.completedTasks, icon: CheckCircle2, color: "text-mint-ink bg-mint" },
+    { label: "Team Members", value: initialData.stats.teamMembers, icon: Users, color: "text-lav-ink bg-lav" },
   ];
 
   return (
