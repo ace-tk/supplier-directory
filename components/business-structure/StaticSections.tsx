@@ -112,7 +112,7 @@ export function FlowsSection() {
                   <span
                     className={cn(
                       "rounded-md border px-2 py-1",
-                      f.notBuilt.includes(i) ? "border-orange-400 bg-orange-50 text-orange-800 dark:bg-orange-950/40 dark:text-orange-200" : "border-border bg-muted/40"
+                      f.notBuilt.includes(i) ? "border-peach-ink/30 bg-peach text-peach-ink  " : "border-border bg-muted/40"
                     )}
                   >
                     {s}

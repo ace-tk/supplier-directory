@@ -208,13 +208,13 @@ export function SetupTables({ initial, onSaved }: { initial: SetupData; onSaved:
       </div>
 
       {dirty && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        <p className="rounded-md border border-butter-ink/30 bg-butter px-3 py-2 text-sm text-butter-ink">
           <b>Unsaved changes.</b> The hierarchy still shows the last saved version.
         </p>
       )}
 
       {errors.length > 0 && (
-        <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:bg-red-950/40 dark:text-red-200">
+        <div role="alert" className="rounded-md border border-rose-ink/30 bg-rose p-3 text-sm text-rose-ink">
           <p className="font-semibold">
             {errors.length} thing{errors.length > 1 ? "s" : ""} to fix before saving
           </p>
@@ -241,7 +241,7 @@ export function SetupTables({ initial, onSaved }: { initial: SetupData; onSaved:
                   {cols.map((c) => (
                     <th key={c.field} className="py-2 pr-2 font-medium">
                       {c.label}
-                      {c.required && <span aria-hidden className="text-red-600"> *</span>}
+                      {c.required && <span aria-hidden className="text-rose-ink"> *</span>}
                     </th>
                   ))}
                   <th className="py-2 font-medium" />
@@ -264,7 +264,7 @@ export function SetupTables({ initial, onSaved }: { initial: SetupData; onSaved:
                       </td>
                     ))}
                     <td className="py-2">
-                      <button type="button" onClick={() => deleteRow(active, i)} aria-label={`Delete ${TABLES.find((t) => t.key === active)?.label} row ${i + 1}`} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-600">
+                      <button type="button" onClick={() => deleteRow(active, i)} aria-label={`Delete ${TABLES.find((t) => t.key === active)?.label} row ${i + 1}`} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-rose-ink">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>

@@ -168,13 +168,13 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
         </div>
       ) : (
         <>
-          <section aria-label="Selected business" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-800 px-6 py-5 text-white">
+          <section aria-label="Selected business" className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-hero px-6 py-5 ring-1 ring-border">
             <div className="min-w-0">
-              <small className="text-[10px] uppercase tracking-widest text-slate-300">Selected business / {business.code}</small>
+              <small className="text-[10px] uppercase tracking-widest text-muted-foreground">Selected business / {business.code}</small>
               <h3 className="truncate text-xl font-semibold">{business.name}</h3>
-              <small className="text-xs text-slate-300">GST {entity?.gstin || "not added"} · Inherited by every warehouse, store and back office</small>
+              <small className="text-xs text-muted-foreground">GST {entity?.gstin || "not added"} · Inherited by every warehouse, store and back office</small>
             </div>
-            <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setDialog({ kind: "business" })}>
+            <Button variant="outline" onClick={() => setDialog({ kind: "business" })}>
               Edit business
             </Button>
           </section>
@@ -480,7 +480,7 @@ function Modal({ title, description, onClose, onSubmit, submitLabel, children, e
 
 function ErrorLine({ message }: { message: string | null }) {
   return message ? (
-    <p role="alert" className="text-sm text-red-600">
+    <p role="alert" className="text-sm text-rose-ink">
       {message}
     </p>
   ) : null;
@@ -575,7 +575,7 @@ function MemberDialog({
           <Button
             type="button"
             variant="ghost"
-            className="text-red-600 hover:text-red-700"
+            className="text-rose-ink hover:text-rose-ink"
             onClick={async () => {
               const e = await onRemove(member.memberCode);
               if (e) setError(e);
@@ -790,7 +790,7 @@ function LocationDialog({
           <Button
             type="button"
             variant="ghost"
-            className="text-red-600 hover:text-red-700"
+            className="text-rose-ink hover:text-rose-ink"
             onClick={async () => {
               if (!window.confirm(`Delete ${location.name}? The people assigned to it stay on the team, unassigned.`)) return;
               const e = await onDelete(location.code);
