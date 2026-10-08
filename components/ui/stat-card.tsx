@@ -8,7 +8,7 @@ import { IconTile, type Tone } from "@/components/ui/icon-tile"
 import { Sparkline } from "@/components/ui/sparkline"
 
 /** Counts up from 0 once on mount (instant under prefers-reduced-motion). */
-function CountUp({ value }: { value: number }) {
+export function CountUp({ value }: { value: number }) {
   const reduce = useReducedMotion()
   const [shown, setShown] = useState(0)
   const done = useRef(false)
