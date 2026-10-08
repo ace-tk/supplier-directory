@@ -16,17 +16,17 @@ const NAV_LINKS = [
 ];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold tracking-[0.25em] uppercase text-neutral-500">{children}</p>;
+  return <p className="text-xs font-semibold tracking-[0.25em] uppercase text-muted-foreground">{children}</p>;
 }
 
 function Avatar({ src, name, className }: { src: string | null; name: string; className?: string }) {
   return (
-    <div className={cn("overflow-hidden bg-neutral-100 flex items-center justify-center shrink-0", className)}>
+    <div className={cn("overflow-hidden bg-soft flex items-center justify-center shrink-0", className)}>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={name} className="w-full h-full object-cover" loading="lazy" />
       ) : (
-        <span className="font-semibold text-neutral-400">{initials(name)}</span>
+        <span className="font-semibold text-muted-foreground">{initials(name)}</span>
       )}
     </div>
   );
@@ -46,21 +46,21 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
   ].filter((s) => s.url);
 
   return (
-    <div className="bg-white text-neutral-900 min-h-screen [&_*]:border-neutral-200">
+    <div className="bg-card text-foreground min-h-screen [&_*]:border-border">
       {/* Nav */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b">
+      <header className="sticky top-0 z-40 bg-card/90 backdrop-blur border-b">
         <div className="max-w-6xl mx-auto px-6 md:px-10 h-16 flex items-center justify-between">
           <a href="#top" className="text-sm font-bold tracking-tight">
             {hero.name || "Portfolio"}
           </a>
           <nav className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="text-xs font-medium uppercase tracking-wider text-neutral-500 hover:text-neutral-900 transition-colors">
+              <a key={l.href} href={l.href} className="text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
                 {l.label}
               </a>
             ))}
           </nav>
-          <a href="#contact" className="text-xs font-semibold uppercase tracking-wider border border-neutral-900 px-4 py-2 hover:bg-neutral-900 hover:text-white transition-colors">
+          <a href="#contact" className="text-xs font-semibold uppercase tracking-wider border border-border px-4 py-2 hover:bg-neutral-900 hover:text-white transition-colors">
             Contact
           </a>
         </div>
@@ -74,20 +74,20 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
             <h1 className="mt-4 text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-[0.95]">
               {hero.headline || hero.name}
             </h1>
-            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-neutral-600">
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
               {hero.role && <span>{hero.role}</span>}
               {hero.location && (
                 <span className="flex items-center gap-1">
-                  {hero.role && <span className="text-neutral-300">/</span>}
+                  {hero.role && <span className="text-muted-foreground">/</span>}
                   {hero.location}
                 </span>
               )}
               <span className="flex items-center gap-1.5">
-                <span className={cn("w-1.5 h-1.5 rounded-full", hero.isAvailable ? "bg-emerald-500" : "bg-neutral-400")} />
+                <span className={cn("w-1.5 h-1.5 rounded-full", hero.isAvailable ? "bg-emerald-500" : "bg-soft")} />
                 {hero.availabilityLabel}
               </span>
             </div>
-            {about.short && <p className="mt-8 max-w-lg text-base text-neutral-600 leading-relaxed">{about.short}</p>}
+            {about.short && <p className="mt-8 max-w-lg text-base text-muted-foreground leading-relaxed">{about.short}</p>}
           </div>
           <Avatar src={hero.avatar} name={hero.name} className="w-40 h-52 md:w-56 md:h-72 rounded-sm" />
         </div>
@@ -109,7 +109,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                   onClick={() => setActiveProject(project)}
                   className="text-left group"
                 >
-                  <div className="aspect-[4/3] bg-neutral-100 overflow-hidden">
+                  <div className="aspect-[4/3] bg-soft overflow-hidden">
                     {project.coverImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -119,17 +119,17 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                         className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-neutral-300 text-sm">No image</div>
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">No image</div>
                     )}
                   </div>
                   <div className="mt-4 flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold">{project.title}</p>
-                      <p className="text-sm text-neutral-500">
+                      <p className="text-sm text-muted-foreground">
                         {[project.category, project.year].filter(Boolean).join(" · ")}
                       </p>
                     </div>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 mt-1 text-neutral-400 group-hover:text-neutral-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                    <ArrowUpRight className="h-4 w-4 shrink-0 mt-1 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                   </div>
                 </button>
               ))}
@@ -151,7 +151,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                 <SectionLabel>Expertise</SectionLabel>
                 <div className="mt-4 flex flex-wrap gap-x-3 gap-y-2">
                   {skills.map((s) => (
-                    <span key={s} className="text-sm border px-3 py-1.5 rounded-full text-neutral-700">
+                    <span key={s} className="text-sm border px-3 py-1.5 rounded-full text-foreground">
                       {s}
                     </span>
                   ))}
@@ -171,10 +171,10 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
               {services.map((service, i) => (
                 <div key={service} className="flex items-center justify-between py-5 md:py-6 group">
                   <div className="flex items-center gap-6">
-                    <span className="text-sm text-neutral-400 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="text-sm text-muted-foreground tabular-nums">{String(i + 1).padStart(2, "0")}</span>
                     <span className="text-xl md:text-2xl font-medium tracking-tight">{service}</span>
                   </div>
-                  <ArrowUpRight className="h-5 w-5 text-neutral-300 group-hover:text-neutral-900 transition-colors" />
+                  <ArrowUpRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
               ))}
             </div>
@@ -184,7 +184,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
 
       {/* Process */}
       {process.length > 0 && (
-        <section className="border-t bg-neutral-50">
+        <section className="border-t bg-soft">
           <div className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-24">
             <SectionLabel>My Process</SectionLabel>
             <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -192,9 +192,9 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                 .sort((a, b) => a.order - b.order)
                 .map((step) => (
                   <div key={step.order}>
-                    <p className="text-3xl font-bold text-neutral-300 tabular-nums">{String(step.order).padStart(2, "0")}</p>
+                    <p className="text-3xl font-bold text-muted-foreground tabular-nums">{String(step.order).padStart(2, "0")}</p>
                     <p className="mt-3 font-semibold">{step.title}</p>
-                    <p className="mt-1.5 text-sm text-neutral-600 leading-relaxed">{step.description}</p>
+                    <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{step.description}</p>
                   </div>
                 ))}
             </div>
@@ -209,19 +209,19 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
             {stats.experienceYears != null && (
               <div>
                 <p className="text-4xl md:text-5xl font-bold tabular-nums">{stats.experienceYears}+</p>
-                <p className="mt-1 text-sm text-neutral-500">Years Experience</p>
+                <p className="mt-1 text-sm text-muted-foreground">Years Experience</p>
               </div>
             )}
             {stats.projectsCompleted > 0 && (
               <div>
                 <p className="text-4xl md:text-5xl font-bold tabular-nums">{stats.projectsCompleted}</p>
-                <p className="mt-1 text-sm text-neutral-500">Projects</p>
+                <p className="mt-1 text-sm text-muted-foreground">Projects</p>
               </div>
             )}
             {stats.clients != null && (
               <div>
                 <p className="text-4xl md:text-5xl font-bold tabular-nums">{stats.clients}</p>
-                <p className="mt-1 text-sm text-neutral-500">Clients</p>
+                <p className="mt-1 text-sm text-muted-foreground">Clients</p>
               </div>
             )}
           </div>
@@ -230,18 +230,18 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
 
       {/* Testimonials */}
       {testimonials.length > 0 && (
-        <section className="border-t bg-neutral-50">
+        <section className="border-t bg-soft">
           <div className="max-w-6xl mx-auto px-6 md:px-10 py-16 md:py-24">
             <SectionLabel>What People Say</SectionLabel>
             <div className="mt-8 grid md:grid-cols-2 gap-8">
               {testimonials.map((t, i) => (
-                <div key={i} className="bg-white border p-6 md:p-8">
+                <div key={i} className="bg-card border p-6 md:p-8">
                   <p className="text-lg md:text-xl leading-relaxed font-medium">&ldquo;{t.quote}&rdquo;</p>
                   <div className="mt-5 flex items-center gap-3">
                     <Avatar src={t.avatar ?? null} name={t.name} className="w-10 h-10 rounded-full text-xs" />
                     <div>
                       <p className="text-sm font-semibold">{t.name}</p>
-                      {t.company && <p className="text-xs text-neutral-500">{t.company}</p>}
+                      {t.company && <p className="text-xs text-muted-foreground">{t.company}</p>}
                     </div>
                   </div>
                 </div>
@@ -262,7 +262,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={i} src={c.logo} alt={c.name} className="h-8 object-contain grayscale opacity-70" />
                 ) : (
-                  <span key={i} className="text-sm font-medium text-neutral-500">
+                  <span key={i} className="text-sm font-medium text-muted-foreground">
                     {c.name}
                   </span>
                 )
@@ -288,7 +288,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                   target="_blank"
                   className="group block"
                 >
-                  <div className="aspect-square bg-neutral-100 overflow-hidden">
+                  <div className="aspect-square bg-soft overflow-hidden">
                     {board.coverImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -298,11 +298,11 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                         className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-neutral-300 text-sm">No pins yet</div>
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">No pins yet</div>
                     )}
                   </div>
                   <p className="mt-3 font-semibold">{board.title}</p>
-                  <p className="text-sm text-neutral-500">{board.pins.length} pin{board.pins.length === 1 ? "" : "s"}</p>
+                  <p className="text-sm text-muted-foreground">{board.pins.length} pin{board.pins.length === 1 ? "" : "s"}</p>
                 </Link>
               ))}
             </div>
@@ -314,22 +314,22 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
       <section id="contact" className="border-t bg-neutral-900 text-white">
         <div className="max-w-6xl mx-auto px-6 md:px-10 py-20 md:py-28">
           <SectionLabel>
-            <span className="text-neutral-400">Get In Touch</span>
+            <span className="text-muted-foreground">Get In Touch</span>
           </SectionLabel>
           <h2 className="mt-4 text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.05] max-w-2xl">
             Let&rsquo;s work together.
           </h2>
           <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4">
-            <a href={`mailto:${socials.email}`} className="flex items-center gap-2 text-sm md:text-base hover:text-neutral-300 transition-colors">
+            <a href={`mailto:${socials.email}`} className="flex items-center gap-2 text-sm md:text-base hover:text-muted-foreground transition-colors">
               <Mail className="h-4 w-4" /> {socials.email}
             </a>
             {socials.phone && (
-              <a href={`tel:${socials.phone}`} className="flex items-center gap-2 text-sm md:text-base hover:text-neutral-300 transition-colors">
+              <a href={`tel:${socials.phone}`} className="flex items-center gap-2 text-sm md:text-base hover:text-muted-foreground transition-colors">
                 <Phone className="h-4 w-4" /> {socials.phone}
               </a>
             )}
             {socials.website && (
-              <a href={socials.website} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm md:text-base hover:text-neutral-300 transition-colors">
+              <a href={socials.website} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm md:text-base hover:text-muted-foreground transition-colors">
                 <Globe className="h-4 w-4" /> Website
               </a>
             )}
@@ -343,7 +343,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={s.label}
-                  className="w-9 h-9 rounded-full border border-neutral-700 flex items-center justify-center hover:border-white transition-colors"
+                  className="w-9 h-9 rounded-full border border-border flex items-center justify-center hover:border-white transition-colors"
                 >
                   <s.icon className="h-4 w-4" />
                 </a>
@@ -354,7 +354,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
       </section>
 
       {/* Footer */}
-      <footer className="bg-neutral-900 text-neutral-500 border-t border-neutral-800">
+      <footer className="bg-neutral-900 text-muted-foreground border-t border-border">
         <div className="max-w-6xl mx-auto px-6 md:px-10 py-6 flex flex-wrap items-center justify-between gap-3 text-xs">
           <span>{hero.name}</span>
           <span>&copy; {new Date().getFullYear()}</span>
@@ -368,7 +368,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
           onClick={() => setActiveProject(null)}
         >
           <div
-            className="bg-white max-w-3xl w-full max-h-full overflow-y-auto"
+            className="bg-card max-w-3xl w-full max-h-full overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {activeProject.coverImage && (
@@ -379,21 +379,21 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="text-2xl font-bold tracking-tight">{activeProject.title}</h3>
-                  <p className="text-sm text-neutral-500 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     {[activeProject.category, activeProject.clientName, activeProject.year].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <button type="button" onClick={() => setActiveProject(null)} aria-label="Close" className="shrink-0">
-                  <X className="h-5 w-5 text-neutral-400 hover:text-neutral-900" />
+                  <X className="h-5 w-5 text-muted-foreground hover:text-foreground" />
                 </button>
               </div>
               {activeProject.description && (
-                <p className="mt-5 text-neutral-700 leading-relaxed">{activeProject.description}</p>
+                <p className="mt-5 text-foreground leading-relaxed">{activeProject.description}</p>
               )}
               {activeProject.tools.length > 0 && (
                 <div className="mt-5 flex flex-wrap gap-2">
                   {activeProject.tools.map((t) => (
-                    <span key={t} className="text-xs border px-2.5 py-1 rounded-full text-neutral-600">
+                    <span key={t} className="text-xs border px-2.5 py-1 rounded-full text-muted-foreground">
                       {t}
                     </span>
                   ))}
@@ -412,7 +412,7 @@ export function Editorial01Template({ data }: { data: PortfolioViewModel }) {
                   href={activeProject.projectUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold border-b border-neutral-900 pb-0.5"
+                  className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold border-b border-border pb-0.5"
                 >
                   Visit project <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>

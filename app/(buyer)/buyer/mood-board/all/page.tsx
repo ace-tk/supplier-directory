@@ -33,7 +33,7 @@ export default async function AllMoodBoardsPage() {
 
       {boards.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
-          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-rose-500/10 text-rose-500">
+          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-rose text-rose-ink">
             <Sparkles className="h-6 w-6" />
           </div>
           <p className="text-sm font-medium text-foreground">No boards yet</p>

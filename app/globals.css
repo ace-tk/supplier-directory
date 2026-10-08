@@ -92,18 +92,20 @@
   --soft: #e7eeff;
   --border-raw: #e1e8f7;
   --ink: #14213d;
-  --muted-ink: #6b7a99;
+  --muted-ink: #5d6a86; /* spec #6b7a99 darkened for AA (4.5:1) on bg/soft */
   --pri: #3d6fe0;
+  --pri-solid: #3d6fe0; /* fill behind white text on buttons */
   --pri-ink: #ffffff;
-  --pri-text: #3d6fe0;
+  --pri-text: #2b62dd; /* spec primary, nudged for AA as text on soft/bg */
 
-  --sky: #dff0ff;   --sky-ink: #2a6fb0;
-  --mint: #dcf5ea;  --mint-ink: #1f8a62;
-  --peach: #ffe9dc; --peach-ink: #c4622d;
+  /* Pastel pairs: backgrounds exactly per spec; inks nudged darker (same hue) so chip text passes AA */
+  --sky: #dff0ff;   --sky-ink: #296cac;
+  --mint: #dcf5ea;  --mint-ink: #1b7956;
+  --peach: #ffe9dc; --peach-ink: #a55226;
   --lav: #ece6ff;   --lav-ink: #6a52c9;
-  --rose: #ffe3ea;  --rose-ink: #c2415f;
-  --butter: #fff3c9; --butter-ink: #9a7410;
-  --sage: #e3f1dc;  --sage-ink: #4d7f3a;
+  --rose: #ffe3ea;  --rose-ink: #b73b57;
+  --butter: #fff3c9; --butter-ink: #8a680e;
+  --sage: #e3f1dc;  --sage-ink: #477435;
 
   --shadow-soft: 0 8px 24px rgba(61, 111, 224, 0.1);
   --hero-gradient: linear-gradient(135deg, #dfe9ff, #ece6ff, #ffe3ea);
@@ -115,7 +117,7 @@
   --card-foreground: var(--ink);
   --popover: var(--surface);
   --popover-foreground: var(--ink);
-  --primary: var(--pri);
+  --primary: var(--pri-solid);
   --primary-foreground: var(--pri-ink);
   --secondary: var(--soft);
   --secondary-foreground: var(--ink);
@@ -165,17 +167,18 @@
   --soft: #ffeedd;
   --border-raw: #f1e1d0;
   --ink: #3b2a20;
-  --muted-ink: #8a7565;
+  --muted-ink: #7b695a; /* spec #8a7565 darkened for AA */
   --pri: #e2703a;
+  --pri-solid: #c4531d; /* white-on-orange buttons need a deeper fill for AA */
   --pri-ink: #ffffff;
-  --pri-text: #b8501f;
+  --pri-text: #b54c1b;
 
-  --butter: #fff3c9; --butter-ink: #9a7410;
-  --peach: #ffe3d1;  --peach-ink: #c4622d;
-  --sage: #e3f1dc;   --sage-ink: #4d7f3a;
-  --rose: #ffe1e4;   --rose-ink: #c2415f;
-  --sky: #e1effa;    --sky-ink: #3a6f9a;
-  --mint: #dcf3e6;   --mint-ink: #2a7d58;
+  --butter: #fff3c9; --butter-ink: #8a680e;
+  --peach: #ffe3d1;  --peach-ink: #a15025;
+  --sage: #e3f1dc;   --sage-ink: #477435;
+  --rose: #ffe1e4;   --rose-ink: #b53a57;
+  --sky: #e1effa;    --sky-ink: #396e98;
+  --mint: #dcf3e6;   --mint-ink: #287754;
   --lav: #efe6f7;    --lav-ink: #7a4fb0;
 
   --shadow-soft: 0 8px 24px rgba(226, 112, 58, 0.12);
@@ -193,6 +196,7 @@
   --ink: #e8edff;
   --muted-ink: #9aa6c7;
   --pri: #6f97ff;
+  --pri-solid: #6f97ff;
   --pri-ink: #0e1424;
   --pri-text: #6f97ff;
 

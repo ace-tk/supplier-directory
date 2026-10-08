@@ -41,9 +41,9 @@ function StarRating({ rating }: { rating: number }) {
           className={cn(
             "h-3 w-3",
             star <= Math.floor(rating)
-              ? "fill-amber-400 text-amber-400"
+              ? "fill-amber-400 text-butter-ink"
               : star - 0.5 <= rating
-              ? "fill-amber-400/50 text-amber-400"
+              ? "fill-amber-400/50 text-butter-ink"
               : "fill-muted text-muted-foreground/30"
           )}
         />
@@ -173,7 +173,7 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
                 <Tooltip>
                   <TooltipTrigger
                     render={
-                      <span className="shrink-0 p-1.5 rounded-full text-emerald-600 dark:text-emerald-400" />
+                      <span className="shrink-0 p-1.5 rounded-full text-mint-ink" />
                     }
                   >
                     <BadgeCheck className="h-3.5 w-3.5" />
@@ -294,7 +294,7 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
               className="flex-1 h-7 flex items-center justify-center gap-1 text-[11px] rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground transition-colors font-medium"
               title={`WhatsApp ${supplier.whatsapp}`}
             >
-              <MessageCircle className="h-3 w-3 text-emerald-500" />
+              <MessageCircle className="h-3 w-3 text-mint-ink" />
               <span>Chat</span>
             </Link>
             <Button
@@ -303,7 +303,7 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
               className="h-7 px-0 gap-1 text-[11px]"
               title={supplier.email ?? undefined}
             >
-              <Mail className="h-3 w-3 text-blue-500" />
+              <Mail className="h-3 w-3 text-sky-ink" />
               <span>Email</span>
             </Button>
             <Button
@@ -312,7 +312,7 @@ export function SupplierCard({ supplier, delay = 0, onClick }: SupplierCardProps
               className="h-7 px-0 gap-1 text-[11px]"
               title={supplier.phone ?? undefined}
             >
-              <Phone className="h-3 w-3 text-violet-500" />
+              <Phone className="h-3 w-3 text-lav-ink" />
               <span>Call</span>
             </Button>
           </div>

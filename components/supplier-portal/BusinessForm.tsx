@@ -207,8 +207,8 @@ export function BusinessForm({ state, onChange, onValidChange }: BusinessFormPro
       {/* Location section */}
       <motion.div custom={1} variants={sectionVariants} initial="hidden" animate="visible">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-            <MapPin className="h-3.5 w-3.5 text-blue-500" />
+          <div className="w-7 h-7 rounded-lg bg-sky flex items-center justify-center">
+            <MapPin className="h-3.5 w-3.5 text-sky-ink" />
           </div>
           <h3 className="text-sm font-semibold text-foreground">Location</h3>
         </div>
@@ -228,8 +228,8 @@ export function BusinessForm({ state, onChange, onValidChange }: BusinessFormPro
       {/* Online presence */}
       <motion.div custom={2} variants={sectionVariants} initial="hidden" animate="visible">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
-            <Globe className="h-3.5 w-3.5 text-violet-500" />
+          <div className="w-7 h-7 rounded-lg bg-lav flex items-center justify-center">
+            <Globe className="h-3.5 w-3.5 text-lav-ink" />
           </div>
           <h3 className="text-sm font-semibold text-foreground">Online Presence</h3>
         </div>
@@ -258,8 +258,8 @@ export function BusinessForm({ state, onChange, onValidChange }: BusinessFormPro
       {/* Contact */}
       <motion.div custom={3} variants={sectionVariants} initial="hidden" animate="visible">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-            <User className="h-3.5 w-3.5 text-emerald-500" />
+          <div className="w-7 h-7 rounded-lg bg-mint flex items-center justify-center">
+            <User className="h-3.5 w-3.5 text-mint-ink" />
           </div>
           <h3 className="text-sm font-semibold text-foreground">Primary Contact</h3>
         </div>

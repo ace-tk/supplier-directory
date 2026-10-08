@@ -86,9 +86,9 @@ function CrmInner() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-white overflow-hidden rounded-t-2xl border border-slate-200 mt-2 mx-2 sm:mx-6 shadow-sm relative">
+    <div className="flex h-[calc(100vh-4rem)] bg-card overflow-hidden rounded-t-2xl border border-border mt-2 mx-2 sm:mx-6 shadow-sm relative">
       {/* Left Sidebar */}
-      <div className={`absolute inset-y-0 left-0 z-20 w-80 bg-white border-r border-slate-200 transition-transform duration-300 lg:relative lg:translate-x-0 ${showLeftSidebar ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className={`absolute inset-y-0 left-0 z-20 w-80 bg-card border-r border-border transition-transform duration-300 lg:relative lg:translate-x-0 ${showLeftSidebar ? "translate-x-0" : "-translate-x-full"}`}>
         <ConversationList
           conversations={conversations}
           activeId={activeConversation?.id}
@@ -109,7 +109,7 @@ function CrmInner() {
       </div>
 
       {/* Right Sidebar */}
-      <div className={`absolute inset-y-0 right-0 z-20 w-80 bg-white border-l border-slate-200 transition-transform duration-300 xl:relative xl:translate-x-0 flex flex-col ${showRightSidebar ? "translate-x-0" : "translate-x-full"}`}>
+      <div className={`absolute inset-y-0 right-0 z-20 w-80 bg-card border-l border-border transition-transform duration-300 xl:relative xl:translate-x-0 flex flex-col ${showRightSidebar ? "translate-x-0" : "translate-x-full"}`}>
         <RightSidebar
           conversation={activeConversation}
           onClose={() => setShowRightSidebar(false)}
@@ -125,7 +125,7 @@ function CrmInner() {
 
 export default function CrmPage() {
   return (
-    <Suspense fallback={<div className="h-[calc(100vh-4rem)] flex items-center justify-center text-slate-500">Loading CRM...</div>}>
+    <Suspense fallback={<div className="h-[calc(100vh-4rem)] flex items-center justify-center text-muted-foreground">Loading CRM...</div>}>
       <CrmInner />
     </Suspense>
   );

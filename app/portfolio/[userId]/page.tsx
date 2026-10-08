@@ -11,11 +11,11 @@ export default async function PublicPortfolioPage({ params }: { params: Promise<
 
   if (!portfolio) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white text-neutral-900 px-6">
+      <div className="min-h-screen flex items-center justify-center bg-card text-foreground px-6">
         <div className="text-center max-w-sm">
-          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-neutral-400">Portfolio</p>
+          <p className="text-xs font-semibold tracking-[0.25em] uppercase text-muted-foreground">Portfolio</p>
           <h1 className="mt-3 text-2xl font-bold tracking-tight">Portfolio not published yet</h1>
-          <p className="mt-2 text-sm text-neutral-500">This freelancer hasn&apos;t published their portfolio.</p>
+          <p className="mt-2 text-sm text-muted-foreground">This freelancer hasn&apos;t published their portfolio.</p>
         </div>
       </div>
     );
