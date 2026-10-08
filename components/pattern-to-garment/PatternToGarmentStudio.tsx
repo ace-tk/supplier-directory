@@ -1,5 +1,6 @@
 "use client";
 
+import { StitchLoader } from "@/components/studio/StitchLoader";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Download, ImagePlus, Loader2, RefreshCw, Sparkles, X } from "lucide-react";
@@ -402,10 +403,7 @@ export function PatternToGarmentStudio() {
             <TabsContent key={v.key} value={v.key} className="mt-4">
               <div className="mx-auto flex aspect-[2/3] max-h-[640px] items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
                 {stage === v.key ? (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <p className="text-xs">{STAGE_LABEL[v.key]}</p>
-                  </div>
+                  <StitchLoader label={STAGE_LABEL[v.key]} />
                 ) : views[v.key] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={views[v.key]!} alt={`${v.label} view`} className="max-h-full max-w-full object-contain" />

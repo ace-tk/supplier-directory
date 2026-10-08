@@ -6,6 +6,7 @@ import { ChevronRight, Download, ImagePlus, Loader2, RefreshCw, Search, Sparkles
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { validateImage, SUPPORTED_IMAGE_LABEL, MAX_IMAGE_BYTES } from "@/lib/file-validation";
+import { StitchLoader, useMinDuration } from "@/components/studio/StitchLoader";
 import { HIT_DEFAULT_GRID, HIT_MAX_GRID, HIT_MAX_IMAGES, HIT_MIN_GRID, HIT_OUTPUT_FORMATS, HIT_STYLE_CATEGORIES, HIT_UPLOAD_MAX_PX, type HitOutputFormat, type HitStyleCategory } from "@/lib/hit-collection";
 import {
   analyzeBestsellerAction,
@@ -108,6 +109,7 @@ export function HitCollectionStudio({ openId, actions = REAL_ACTIONS }: { openId
   const [dragOver, setDragOver] = useState(false);
 
   const busy = stage !== "idle";
+  const busyShown = useMinDuration(busy);
   const current = versions[shown] ?? null;
 
   const open = useCallback(
@@ -467,11 +469,8 @@ export function HitCollectionStudio({ openId, actions = REAL_ACTIONS }: { openId
                 After · {current ? `${current.gridCount} variation${current.gridCount === 1 ? "" : "s"} · ${HIT_OUTPUT_FORMATS.find((f) => f.id === current.outputFormat)?.label}` : "Variations"}
               </p>
               <div className="flex min-h-72 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
-                {busy ? (
-                  <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground" role="status">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <p className="text-sm">{stage === "analyzing" ? "Reading the bestseller's design language…" : `Designing ${grid} variation${grid === 1 ? "" : "s"}… this takes about a minute.`}</p>
-                  </div>
+                {busyShown ? (
+                  <StitchLoader className="py-16" label={stage === "analyzing" ? "Reading the bestseller's design language…" : `Designing ${grid} variation${grid === 1 ? "" : "s"}… this takes about a minute.`} />
                 ) : current ? (
                   // eslint-disable-next-line @next/next/no-img-element -- the generated result (a data URL)
                   <img src={current.image} alt={`${current.gridCount} style variations of the bestseller`} className="max-h-[70vh] max-w-full object-contain" data-result />

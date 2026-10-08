@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { StitchLoader } from "@/components/studio/StitchLoader";
 import { Loader2, Plus, Trash2, Search, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -210,9 +211,7 @@ export function AiRemixDialog({
         )}
 
         {target && loading && (
-          <div className="flex items-center justify-center py-8 text-muted-foreground gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /> Generating preview...
-          </div>
+          <StitchLoader className="py-8" label="Generating preview..." />
         )}
 
         {target && proposal && !loading && (

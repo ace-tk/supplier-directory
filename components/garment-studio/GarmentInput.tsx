@@ -1,5 +1,6 @@
 "use client";
 
+import { StitchLoader, useMinDuration } from "@/components/studio/StitchLoader";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { UploadCloud, X, Sparkles, Loader2 } from "lucide-react";
@@ -118,6 +119,7 @@ export function GarmentInput({ onGenerated }: { onGenerated: (id: string) => voi
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const generatingShown = useMinDuration(generating);
 
   async function handleSourceFiles(files: FileList) {
     // Captured synchronously, before any await: the caller (UploadBox's
@@ -224,6 +226,7 @@ export function GarmentInput({ onGenerated }: { onGenerated: (id: string) => voi
         {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
         {generating ? "Generating…" : "Generate"}
       </Button>
+      {generatingShown && <StitchLoader className="mt-4 shrink-0" label="Generating your design..." />}
     </div>
   );
 }
