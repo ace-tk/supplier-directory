@@ -25,13 +25,20 @@ import {
   CalendarClock,
   Mail,
   MessageCircle,
+  ArrowUpRight,
+  Sparkles,
+  ListChecks,
+  FilePlus2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { StatCard } from "@/components/cards/stat-card";
-import { AnimatedCard } from "@/components/cards/animated-card";
-import { PageHeader } from "@/components/layout/page-header";
-import { SectionHeader } from "@/components/layout/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { IconTile, TONE_CLASS, type Tone } from "@/components/ui/icon-tile";
+import { ProgressRing } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { OrdersChart } from "@/components/dashboard/OrdersChart";
+import { NetworkDonut } from "@/components/dashboard/NetworkDonut";
+import type { NetworkCounts, OrdersPoint } from "@/lib/dashboard-chart-queries";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,24 +51,24 @@ import { formatMoney } from "@/lib/invoicing/ui";
 import type { SessionUser } from "@/types/auth";
 import type { AdminDashboardStats, AdminGettingStartedState, AdminTasksState, AdminActivityItem } from "@/lib/dashboard-queries";
 
-const QUICK_ACTIONS = [
-  { label: "Add Supplier", description: "Onboard a new supplier", icon: Building2, color: "text-blue-500", bg: "bg-blue-500/10", href: "/directory" },
-  { label: "New Contact", description: "Add a CRM contact", icon: Users, color: "text-violet-500", bg: "bg-violet-500/10", href: "/crm" },
-  { label: "Create Order", description: "Place a bulk order", icon: Wallet, color: "text-emerald-500", bg: "bg-emerald-500/10", href: "/invoices/new" },
-  { label: "View Reports", description: "Check analytics and insights", icon: BarChart3, color: "text-orange-500", bg: "bg-orange-500/10", href: "/invoices/reports" },
-  { label: "Add Buyer", description: "Invite and add a new buyer", icon: UserPlus, color: "text-sky-500", bg: "bg-sky-500/10", href: "/buyer-directory" },
-  { label: "Create Campaign", description: "Launch a new marketing campaign", icon: Megaphone, color: "text-pink-500", bg: "bg-pink-500/10", href: "/marketing/email-campaigns" },
-  { label: "Upload Catalog", description: "Upload your product catalog", icon: Upload, color: "text-indigo-500", bg: "bg-indigo-500/10", href: "/catalog" },
-  { label: "Manage Inventory", description: "Track and manage your inventory", icon: Warehouse, color: "text-teal-500", bg: "bg-teal-500/10", href: "/inventory/admin" },
+const QUICK_ACTIONS: Array<{ label: string; description: string; icon: typeof Building2; tone: Tone; href: string }> = [
+  { label: "Add Supplier", description: "Onboard a new supplier", icon: Building2, tone: "sky", href: "/directory" },
+  { label: "New Contact", description: "Add a CRM contact", icon: Users, tone: "lav", href: "/crm" },
+  { label: "Create Order", description: "Place a bulk order", icon: Wallet, tone: "mint", href: "/invoices/new" },
+  { label: "View Reports", description: "Check analytics and insights", icon: BarChart3, tone: "peach", href: "/invoices/reports" },
+  { label: "Add Buyer", description: "Invite and add a new buyer", icon: UserPlus, tone: "butter", href: "/buyer-directory" },
+  { label: "Create Campaign", description: "Launch a marketing campaign", icon: Megaphone, tone: "rose", href: "/marketing/email-campaigns" },
+  { label: "Upload Catalog", description: "Upload your product catalog", icon: Upload, tone: "sage", href: "/catalog" },
+  { label: "Manage Inventory", description: "Track and manage inventory", icon: Warehouse, tone: "sky", href: "/inventory/admin" },
 ];
 
-const QUICK_ADD_ITEMS = [
-  { label: "Add Supplier", href: "/directory", icon: Building2, color: "text-blue-500", bg: "bg-blue-500/10" },
-  { label: "New Contact", href: "/crm", icon: Users, color: "text-violet-500", bg: "bg-violet-500/10" },
-  { label: "Create Invoice", href: "/invoices/new", icon: Receipt, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-  { label: "Add Product", href: "/catalog/new", icon: ShoppingBag, color: "text-indigo-500", bg: "bg-indigo-500/10" },
-  { label: "Add Expense", href: "/invoices/expenses/new", icon: Wallet, color: "text-orange-500", bg: "bg-orange-500/10" },
-  { label: "Create Content", href: "/content/new", icon: NotebookText, color: "text-pink-500", bg: "bg-pink-500/10" },
+const QUICK_ADD_ITEMS: Array<{ label: string; href: string; icon: typeof Building2; tone: Tone }> = [
+  { label: "Add Supplier", href: "/directory", icon: Building2, tone: "sky" },
+  { label: "New Contact", href: "/crm", icon: Users, tone: "lav" },
+  { label: "Create Invoice", href: "/invoices/new", icon: Receipt, tone: "mint" },
+  { label: "Add Product", href: "/catalog/new", icon: ShoppingBag, tone: "sage" },
+  { label: "Add Expense", href: "/invoices/expenses/new", icon: Wallet, tone: "peach" },
+  { label: "Create Content", href: "/content/new", icon: NotebookText, tone: "rose" },
 ];
 
 const CAMPAIGN_LINKS = [
@@ -75,12 +82,26 @@ const CAMPAIGN_LINKS = [
   { label: "Supplier Campaigns", href: "/marketing/supplier-campaigns" },
 ];
 
-const ACTIVITY_STYLE: Record<AdminActivityItem["kind"], { icon: typeof Building2; bg: string; color: string }> = {
-  invoice: { icon: Receipt, bg: "bg-emerald-500/10", color: "text-emerald-500" },
-  supplier: { icon: Building2, bg: "bg-blue-500/10", color: "text-blue-500" },
-  buyer: { icon: Users, bg: "bg-sky-500/10", color: "text-sky-500" },
-  article: { icon: BookOpen, bg: "bg-amber-500/10", color: "text-amber-500" },
-  conversation: { icon: MessageSquare, bg: "bg-violet-500/10", color: "text-violet-500" },
+const ACTIVITY_STYLE: Record<AdminActivityItem["kind"], { icon: typeof Building2; tone: Tone }> = {
+  invoice: { icon: Receipt, tone: "mint" },
+  supplier: { icon: Building2, tone: "sky" },
+  buyer: { icon: Users, tone: "lav" },
+  article: { icon: BookOpen, tone: "butter" },
+  conversation: { icon: MessageSquare, tone: "rose" },
+};
+
+/** Pastel chip used for the tool-link row */
+const CHIP = "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium outline-none transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[var(--shadow-soft)] focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] motion-reduce:transition-none";
+
+const GRADIENT_FROM: Record<Tone, string> = {
+  sky: "from-sky",
+  mint: "from-mint",
+  peach: "from-peach",
+  lav: "from-lav",
+  rose: "from-rose",
+  butter: "from-butter",
+  sage: "from-sage",
+  primary: "from-soft",
 };
 
 const GETTING_STARTED_STEPS = (state: AdminGettingStartedState) => [
@@ -97,6 +118,8 @@ interface DashboardOverviewProps {
   gettingStarted: AdminGettingStartedState;
   tasksState: AdminTasksState;
   activity: AdminActivityItem[];
+  ordersSeries?: OrdersPoint[];
+  network?: NetworkCounts;
 }
 
 const greetingByHour = () => {
@@ -112,226 +135,202 @@ const roleLabel: Record<string, string> = {
   BUYER: "Buyer",
 };
 
-export function DashboardOverview({ user, stats, gettingStarted, tasksState, activity }: DashboardOverviewProps) {
+export function DashboardOverview({ user, stats, gettingStarted, tasksState, activity, ordersSeries, network }: DashboardOverviewProps) {
   const steps = GETTING_STARTED_STEPS(gettingStarted);
   const completedSteps = steps.filter((s) => s.done).length;
   const progressPct = Math.round((completedSteps / steps.length) * 100);
 
-  const STATS = [
-    { title: "Active Suppliers", value: stats.activeSuppliers, icon: Building2, iconColor: "text-blue-500" },
-    { title: "CRM Contacts", value: stats.crmContacts, icon: Users, iconColor: "text-violet-500" },
-    { title: "Pending Invoices", value: stats.pendingInvoices, icon: Receipt, iconColor: "text-emerald-500" },
+  const openTasks = tasksState.totalCount - tasksState.completedCount;
+  const revenueTrend = stats.revenueTrendPct;
+
+  const STATS: Array<{ label: string; value: number | string; icon: typeof Building2; tone: Tone; trend?: { label: string; direction: "up" | "down" | "flat" } }> = [
+    { label: "Active Suppliers", value: stats.activeSuppliers, icon: Building2, tone: "sky" },
+    { label: "CRM Contacts", value: stats.crmContacts, icon: Users, tone: "lav" },
+    { label: "Pending Invoices", value: stats.pendingInvoices, icon: Receipt, tone: "mint" },
     {
-      title: "Revenue MTD",
+      label: "Revenue MTD",
       value: formatMoney(stats.revenueMTD, "INR"),
-      change: stats.revenueTrendPct ?? undefined,
       icon: TrendingUp,
-      iconColor: "text-orange-500",
+      tone: "peach",
+      // Only shown when there is a real previous month to compare against.
+      trend: revenueTrend == null ? undefined : { label: `${revenueTrend > 0 ? "+" : ""}${revenueTrend}%`, direction: revenueTrend > 0 ? "up" : revenueTrend < 0 ? "down" : "flat" },
     },
   ];
 
+  const stagger = (i: number) => ({
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.22, ease: "easeOut" as const, delay: i * 0.04 },
+  });
+
   return (
-    <div className="space-y-8">
-      {/* Top quick-navigation row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/content" />} nativeButton={false}>
-          <NotebookText className="h-3.5 w-3.5" /> Content Management
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/projects" />} nativeButton={false}>
-          <FolderKanban className="h-3.5 w-3.5" /> Project Management
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/shop" />} nativeButton={false}>
-          <ShoppingBag className="h-3.5 w-3.5" /> Shop
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="gap-1.5" />}>
-            <Megaphone className="h-3.5 w-3.5" /> Campaigns <ChevronDown className="h-3 w-3" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {CAMPAIGN_LINKS.map((c) => (
-              <DropdownMenuItem key={c.href} render={<Link href={c.href} />}>
-                {c.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/marketing/scheduled-campaigns" />} nativeButton={false}>
-          <CalendarClock className="h-3.5 w-3.5" /> Scheduled Campaigns
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/marketing/email-campaigns" />} nativeButton={false}>
-          <Mail className="h-3.5 w-3.5" /> Email Campaigns
-        </Button>
-        <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/marketing/whatsapp-campaigns" />} nativeButton={false}>
-          <MessageCircle className="h-3.5 w-3.5" /> WhatsApp Campaigns
-        </Button>
+    <div className="space-y-6 sm:space-y-8">
+      {/* Hero */}
+      <motion.section {...stagger(0)} className="relative overflow-hidden rounded-[20px] bg-hero p-6 ring-1 ring-border sm:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 space-y-3">
+            <Badge variant="default" className="gap-1.5 bg-surface/70 text-pri-text">
+              <Zap className="h-3 w-3" />
+              {roleLabel[user.role] ?? user.role} account
+            </Badge>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {greetingByHour()}, {user.name.split(" ")[0]}
+            </h1>
+            <p className="max-w-xl text-sm text-foreground/70">Here&apos;s what&apos;s happening across your workspace today.</p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface/70 px-3 py-1 text-xs font-medium tabular-nums">
+                <ListChecks className="h-3.5 w-3.5 text-pri-text" /> {openTasks} open {openTasks === 1 ? "task" : "tasks"}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface/70 px-3 py-1 text-xs font-medium tabular-nums">
+                <Sparkles className="h-3.5 w-3.5 text-pri-text" /> Setup {completedSteps}/{steps.length}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-surface/70 px-3 py-1 text-xs font-medium tabular-nums">
+                <Receipt className="h-3.5 w-3.5 text-pri-text" /> {stats.pendingInvoices} pending {stats.pendingInvoices === 1 ? "invoice" : "invoices"}
+              </span>
+            </div>
+          </div>
+          <Link href="/invoices/new" className={cn(buttonVariants({ size: "lg" }), "shrink-0 gap-2 self-start lg:self-auto")}>
+            <FilePlus2 className="h-4 w-4" /> Create invoice
+          </Link>
+        </div>
+      </motion.section>
+
+      {/* Tool chips — horizontally scrollable pastel row */}
+      <motion.div {...stagger(1)} className="-mx-4 overflow-x-auto px-4 pb-1 hide-scrollbar sm:mx-0 sm:px-0">
+        <div className="flex w-max items-center gap-2 sm:w-auto sm:flex-wrap">
+          <Link href="/content" className={cn(CHIP, TONE_CLASS.sky)}><NotebookText className="h-4 w-4" /> Content Management</Link>
+          <Link href="/projects" className={cn(CHIP, TONE_CLASS.lav)}><FolderKanban className="h-4 w-4" /> Project Management</Link>
+          <Link href="/shop" className={cn(CHIP, TONE_CLASS.mint)}><ShoppingBag className="h-4 w-4" /> Shop</Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger className={cn(CHIP, TONE_CLASS.rose)}>
+              <Megaphone className="h-4 w-4" /> Campaigns <ChevronDown className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {CAMPAIGN_LINKS.map((c) => (
+                <DropdownMenuItem key={c.href} render={<Link href={c.href} />}>
+                  {c.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Link href="/marketing/scheduled-campaigns" className={cn(CHIP, TONE_CLASS.peach)}><CalendarClock className="h-4 w-4" /> Scheduled Campaigns</Link>
+          <Link href="/marketing/email-campaigns" className={cn(CHIP, TONE_CLASS.butter)}><Mail className="h-4 w-4" /> Email Campaigns</Link>
+          <Link href="/marketing/whatsapp-campaigns" className={cn(CHIP, TONE_CLASS.sage)}><MessageCircle className="h-4 w-4" /> WhatsApp Campaigns</Link>
+        </div>
+      </motion.div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {STATS.map((stat, i) => (
+          <motion.div key={stat.label} {...stagger(i + 2)}>
+            <StatCard {...stat} className="h-full" />
+          </motion.div>
+        ))}
       </div>
 
-      {/* Welcome */}
-      <PageHeader
-        title={`${greetingByHour()}, ${user.name.split(" ")[0]}`}
-        description="Here's what's happening across your workspace today."
-        className="mb-0"
-      />
+      {/* Charts — only when the page supplied the data */}
+      {(ordersSeries || network) && (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          {ordersSeries && <motion.div {...stagger(6)} className="min-w-0"><OrdersChart series={ordersSeries} /></motion.div>}
+          {network && <motion.div {...stagger(7)}><NetworkDonut counts={network} /></motion.div>}
+        </div>
+      )}
 
-      {/* Quick add stays visible as compact tiles instead of hiding actions
-          in a dropdown. Each tile is a real route link. */}
-      <div className="space-y-2.5">
-        <p className="text-sm font-semibold text-foreground">Quick add</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
-          {QUICK_ADD_ITEMS.map((item, index) => (
-            <motion.div
-              key={item.href}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: index * 0.025 }}
-              whileHover={{ y: -2 }}
-            >
+      {/* Quick actions */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Quick Actions</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {QUICK_ACTIONS.map((action, i) => (
+            <motion.div key={action.label} {...stagger(i + 8)}>
               <Link
-                href={item.href}
-                className="group flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2 shadow-sm transition-all hover:border-primary/30 hover:shadow-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                href={action.href}
+                className={cn(
+                  "group flex items-center gap-3 rounded-[20px] bg-gradient-to-br to-card p-4 ring-1 ring-border outline-none",
+                  "transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+                  GRADIENT_FROM[action.tone]
+                )}
               >
-                <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", item.bg, item.color)}>
-                  <item.icon className="h-4 w-4" />
+                <IconTile icon={action.icon} tone={action.tone} className="bg-surface/70" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-tight">{action.label}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{action.description}</p>
+                </div>
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface text-pri-text shadow-sm transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+                  <ArrowUpRight className="h-4 w-4" />
                 </span>
-                <span className="min-w-0 text-xs font-medium leading-tight text-foreground">
-                  {item.label}
-                </span>
-                <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
               </Link>
             </motion.div>
           ))}
         </div>
-      </div>
+        {/* Quick add — the same real routes as before, as compact pastel chips */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">Quick add</span>
+          {QUICK_ADD_ITEMS.map((item) => (
+            <Link key={item.href} href={item.href} className={cn(CHIP, "py-1.5 text-xs", TONE_CLASS[item.tone])}>
+              <item.icon className="h-3.5 w-3.5" /> {item.label}
+            </Link>
+          ))}
+        </div>
+      </section>
 
-      {/* Role badge */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="flex items-center gap-2"
-      >
-        <Badge variant="secondary" className="gap-1.5 px-2.5 py-1 text-xs bg-primary/10 text-primary border-primary/20">
-          <Zap className="h-3 w-3" />
-          {roleLabel[user.role] ?? user.role} account
-        </Badge>
-        <Badge variant="secondary" className="text-xs text-muted-foreground">
-          {user.email}
-        </Badge>
-      </motion.div>
+      {/* Bottom row */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <DashboardTasksPanel initialTasksState={tasksState} />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STATS.map((stat, i) => (
-          <StatCard key={stat.title} {...stat} delay={i * 0.05} />
-        ))}
-      </div>
-
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
-        {/* Left column */}
-        <div className="space-y-6 min-w-0">
-          {/* Quick Actions */}
-          <div>
-            <SectionHeader title="Quick Actions" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {QUICK_ACTIONS.map((action, i) => (
-                <motion.div
-                  key={action.label}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.05 + i * 0.03 }}
-                  whileHover={{ y: -2, transition: { duration: 0.15 } }}
-                >
-                  <Link
-                    href={action.href}
-                    className="flex items-center gap-2.5 p-3 rounded-xl bg-card border border-border shadow-card hover:shadow-card-hover transition-shadow text-left group"
-                  >
-                    <div className={cn("flex items-center justify-center w-8 h-8 rounded-lg shrink-0", action.bg, action.color)}>
-                      <action.icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-foreground leading-tight">{action.label}</p>
-                      <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">{action.description}</p>
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
-                  </Link>
-                </motion.div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Getting Started</CardTitle>
+            <CardDescription>{completedSteps} of {steps.length} complete</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <ProgressRing value={progressPct} label="Getting started progress" />
+              <p className="text-sm text-muted-foreground">
+                {completedSteps === steps.length ? "All set — your workspace is ready." : "Finish these steps to set up your workspace."}
+              </p>
+            </div>
+            <div className="space-y-1">
+              {steps.map((step) => (
+                <Link key={step.label} href={step.href} className="group flex items-center gap-2.5 rounded-xl px-1 py-1.5 outline-none transition-colors hover:bg-soft focus-visible:ring-2 focus-visible:ring-ring">
+                  {step.done ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+                  ) : (
+                    <div className="h-4 w-4 shrink-0 rounded-full border-2 border-border" />
+                  )}
+                  <span className={cn("text-sm", step.done ? "text-muted-foreground line-through" : "text-foreground")}>{step.label}</span>
+                </Link>
               ))}
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Recent Activity */}
-          <div>
-            <SectionHeader title="Recent Activity" description="Latest events across your workspace" />
-            <AnimatedCard delay={0.2} hover={false} className="divide-y divide-border">
-              {activity.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-4 py-6 text-center">No activity yet.</p>
-              ) : (
-                activity.map((item) => {
-                  const { icon: Icon, bg, color } = ACTIVITY_STYLE[item.kind];
-                  return (
-                    <div key={item.id} className="flex items-start gap-3 px-4 py-3.5 hover:bg-muted/20 transition-colors">
-                      <div className={cn("flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5", bg, color)}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground leading-snug">{item.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.meta}</p>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground shrink-0 mt-0.5">{item.relativeTime}</span>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Activity</CardTitle>
+            <CardDescription>Latest events across your workspace</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {activity.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No activity yet.</p>
+            ) : (
+              activity.map((item) => {
+                const { icon, tone } = ACTIVITY_STYLE[item.kind];
+                return (
+                  <div key={item.id} className="flex items-start gap-3 rounded-xl px-1 py-2 transition-colors hover:bg-soft/60">
+                    <IconTile icon={icon} tone={tone} size="sm" className="mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-snug">{item.title}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{item.meta}</p>
                     </div>
-                  );
-                })
-              )}
-            </AnimatedCard>
-          </div>
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-6">
-          <DashboardTasksPanel initialTasksState={tasksState} />
-
-          {/* Onboarding checklist */}
-          <div>
-            <SectionHeader
-              title="Getting Started"
-              actions={
-                <Badge variant="secondary" className="text-xs shrink-0">
-                  {completedSteps} of {steps.length}
-                </Badge>
-              }
-            />
-            <AnimatedCard delay={0.2} hover={false} className="p-4">
-              <div className="space-y-3">
-                {steps.map((step) => (
-                  <Link key={step.label} href={step.href} className="flex items-center gap-2.5 group">
-                    {step.done ? (
-                      <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                    ) : (
-                      <div className="h-4 w-4 rounded-full border-2 border-border shrink-0" />
-                    )}
-                    <span className={cn("text-sm group-hover:text-foreground transition-colors", step.done ? "text-muted-foreground line-through" : "text-foreground")}>
-                      {step.label}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-              <div className="mt-4 pt-3 border-t border-border">
-                <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-                  <span>{completedSteps} of {steps.length} complete</span>
-                  <span>{progressPct}%</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progressPct}%` }}
-                    transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
-                    className="h-full rounded-full bg-primary"
-                  />
-                </div>
-              </div>
-            </AnimatedCard>
-          </div>
-        </div>
+                    <span className="mt-0.5 shrink-0 text-[11px] text-muted-foreground">{item.relativeTime}</span>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

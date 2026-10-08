@@ -22,12 +22,12 @@ export function SmartTipsCard({
   return (
     <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
       <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-        <Lightbulb className="h-3.5 w-3.5 text-amber-500" /> Smart Tips
+        <Lightbulb className="h-3.5 w-3.5 text-butter-ink" /> Smart Tips
       </h3>
       <ul className="space-y-1.5">
         {tips.map((tip) => (
           <li key={tip} className="text-[11px] text-muted-foreground flex gap-1.5">
-            <span className="text-amber-500 shrink-0">•</span> {tip}
+            <span className="text-butter-ink shrink-0">•</span> {tip}
           </li>
         ))}
       </ul>

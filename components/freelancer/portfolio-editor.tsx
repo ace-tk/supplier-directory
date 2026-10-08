@@ -47,11 +47,11 @@ import type { FreelancerProfile } from "@/types/freelancer-portal";
 import { cn } from "@/lib/utils";
 
 const SOCIAL_PLATFORMS = [
-  { key: "linkedinUrl" as const, label: "LinkedIn", icon: Link2, color: "bg-blue-500/10 text-blue-500" },
-  { key: "instagramUrl" as const, label: "Instagram", icon: Camera, color: "bg-pink-500/10 text-pink-500" },
-  { key: "behanceUrl" as const, label: "Behance", icon: Palette, color: "bg-indigo-500/10 text-indigo-500" },
-  { key: "dribbbleUrl" as const, label: "Dribbble", icon: Play, color: "bg-rose-500/10 text-rose-500" },
-  { key: "githubUrl" as const, label: "GitHub", icon: Code2, color: "bg-slate-500/10 text-slate-500" },
+  { key: "linkedinUrl" as const, label: "LinkedIn", icon: Link2, color: "bg-sky text-sky-ink" },
+  { key: "instagramUrl" as const, label: "Instagram", icon: Camera, color: "bg-rose text-rose-ink" },
+  { key: "behanceUrl" as const, label: "Behance", icon: Palette, color: "bg-lav text-lav-ink" },
+  { key: "dribbbleUrl" as const, label: "Dribbble", icon: Play, color: "bg-rose text-rose-ink" },
+  { key: "githubUrl" as const, label: "GitHub", icon: Code2, color: "bg-soft/10 text-muted-foreground" },
 ];
 
 export function PortfolioEditor({ initialProfile }: { initialProfile: FreelancerProfile }) {

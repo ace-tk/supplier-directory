@@ -71,8 +71,8 @@ export function CampaignsView({ title, description, campaigns, showChannelColumn
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatWidget icon={Megaphone} label="Campaigns" value={campaigns.length} />
         <StatWidget icon={Users2} label="Total Recipients" value={totalRecipients.toLocaleString("en-IN")} />
-        <StatWidget icon={Mail} label="Avg Open Rate" value={`${avgOpenRate}%`} accentClassName="text-emerald-500" />
-        <StatWidget icon={MousePointerClick} label="Avg Click Rate" value={`${avgClickRate}%`} accentClassName="text-blue-500" />
+        <StatWidget icon={Mail} label="Avg Open Rate" value={`${avgOpenRate}%`} accentClassName="text-mint-ink" />
+        <StatWidget icon={MousePointerClick} label="Avg Click Rate" value={`${avgClickRate}%`} accentClassName="text-sky-ink" />
       </div>
 
       <ListToolbar

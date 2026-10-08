@@ -42,7 +42,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
         )}
       >
         <div className={cn("flex items-center gap-2.5 min-w-0", collapsed && "justify-center")}>
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
+          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary shrink-0">
             <span className="text-primary-foreground font-bold text-sm">S</span>
           </div>
           {!collapsed && (
@@ -109,7 +109,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
                   const disabledItem = (
                     <div
                       className={cn(
-                        "relative flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/40 cursor-not-allowed select-none",
+                        "relative flex items-center gap-2.5 py-2 rounded-xl text-sm font-medium text-sidebar-foreground/40 cursor-not-allowed select-none",
                         collapsed ? "px-2.5 justify-center" : "px-2.5"
                       )}
                     >
@@ -136,7 +136,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
                   <Link
                     href={item.href}
                     className={cn(
-                      "relative flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
+                      "relative flex items-center gap-2.5 py-2 rounded-xl text-sm font-medium transition-all duration-150",
                       collapsed ? "px-2.5 justify-center" : "px-2.5",
                       "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       isActive
@@ -147,11 +147,10 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
                     {isActive && (
                       <motion.div
                         layoutId="sidebar-active"
-                        className="absolute inset-0 rounded-lg bg-sidebar-accent"
+                        className="absolute inset-0 rounded-xl bg-sidebar-accent"
                         transition={{ duration: 0.2, ease: "easeInOut" }}
                       />
                     )}
-                    {isActive && <span aria-hidden className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-sidebar-primary" />}
                     <item.icon
                       className={cn(
                         "relative z-10 h-4 w-4 shrink-0",
@@ -194,7 +193,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
             const disabled = (
               <div
                 className={cn(
-                  "flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/40 cursor-not-allowed select-none",
+                  "flex items-center gap-2.5 py-2 rounded-xl text-sm font-medium text-sidebar-foreground/40 cursor-not-allowed select-none",
                   collapsed ? "px-2.5 justify-center" : "px-2.5"
                 )}
               >
@@ -221,7 +220,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
             <Link
               href={item.href}
               className={cn(
-                "flex items-center gap-2.5 py-2 rounded-lg text-sm font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-150",
+                "flex items-center gap-2.5 py-2 rounded-xl text-sm font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-150",
                 collapsed ? "px-2.5 justify-center" : "px-2.5"
               )}
             >
@@ -249,7 +248,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <div className="flex items-center justify-center py-2 mt-2 rounded-lg hover:bg-sidebar-accent transition-all duration-150 cursor-pointer">
+                  <div className="flex items-center justify-center py-2 mt-2 rounded-xl hover:bg-sidebar-accent transition-all duration-150 cursor-pointer">
                     <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 text-primary text-xs font-semibold shrink-0">
                       {initials(user.name)}
                     </div>
@@ -259,7 +258,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
               <TooltipContent side="right">{user.name}</TooltipContent>
             </Tooltip>
           ) : (
-            <div className="flex items-center gap-2.5 px-2.5 py-2 mt-2 rounded-lg hover:bg-sidebar-accent transition-all duration-150 cursor-pointer group">
+            <div className="flex items-center gap-2.5 px-2.5 py-2 mt-2 rounded-xl hover:bg-sidebar-accent transition-all duration-150 cursor-pointer group">
               <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/20 text-primary text-xs font-semibold shrink-0">
                 {initials(user.name)}
               </div>
@@ -279,7 +278,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
                   type="button"
                   onClick={logout}
                   disabled={isLoggingOut}
-                  className="flex w-full items-center justify-center py-2 mt-1 rounded-lg text-sm font-medium text-red-500/80 hover:bg-red-500/10 hover:text-red-500 transition-all duration-150 disabled:opacity-50"
+                  className="flex w-full items-center justify-center py-2 mt-1 rounded-xl text-sm font-medium text-destructive/80 hover:bg-destructive/10 hover:text-destructive transition-all duration-150 disabled:opacity-50"
                 >
                   <LogOut className="h-4 w-4 shrink-0" />
                 </button>
@@ -292,7 +291,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
             type="button"
             onClick={logout}
             disabled={isLoggingOut}
-            className="flex w-full items-center gap-2.5 px-2.5 py-2 mt-1 rounded-lg text-sm font-medium text-red-500/80 hover:bg-red-500/10 hover:text-red-500 transition-all duration-150 disabled:opacity-50"
+            className="flex w-full items-center gap-2.5 px-2.5 py-2 mt-1 rounded-xl text-sm font-medium text-destructive/80 hover:bg-destructive/10 hover:text-destructive transition-all duration-150 disabled:opacity-50"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             {isLoggingOut ? "Signing out…" : "Logout"}

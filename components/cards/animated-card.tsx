@@ -24,8 +24,8 @@ export const AnimatedCard = forwardRef<HTMLDivElement, AnimatedCardProps>(
             : undefined
         }
         className={cn(
-          "rounded-xl bg-card text-card-foreground",
-          "shadow-card transition-shadow duration-200",
+          "rounded-[20px] bg-card text-card-foreground ring-1 ring-border",
+          "shadow-[var(--shadow-soft)] transition-shadow duration-200",
           hover && "hover:shadow-card-hover cursor-default",
           className
         )}

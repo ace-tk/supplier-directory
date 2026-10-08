@@ -164,7 +164,7 @@ export function ManufactureYourOwn({
           breadcrumbs={[{ label: "Product", href: basePath }, { label: row.productName, href: `${basePath}/${row.id}` }, { label: "Manufacture" }]}
         />
         <div className="rounded-2xl border border-border bg-card p-8 flex flex-col items-center text-center gap-3">
-          <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+          <CheckCircle2 className="h-10 w-10 text-mint-ink" />
           <p className="text-base font-semibold text-foreground">Manufacturing Request Created</p>
           <p className="text-sm text-muted-foreground max-w-md">
             Request for {submitted.quantity} units of {row.productName} has been submitted.

@@ -120,7 +120,7 @@ export default async function WishDetailPage({ params }: { params: Promise<{ id:
                 <div key={s.id} className="rounded-xl border border-border bg-card p-3 space-y-1.5">
                   <div className="flex items-center gap-1.5">
                     <p className="text-sm font-medium text-foreground truncate">{s.companyName}</p>
-                    {s.verified && <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />}
+                    {s.verified && <ShieldCheck className="h-3.5 w-3.5 text-mint-ink shrink-0" />}
                   </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <MapPin className="h-3 w-3" /> {s.city}, {s.country}

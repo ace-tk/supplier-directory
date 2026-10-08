@@ -41,7 +41,7 @@ function downloadDataUrl(dataUrl: string, filename: string) {
 function ReadinessRow({ label, done }: { label: string; done: boolean }) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${done ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/30"}`} />
+      <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${done ? "text-mint-ink " : "text-muted-foreground/30"}`} />
       <span className={done ? "text-foreground" : "text-muted-foreground"}>{label}</span>
     </div>
   );
@@ -156,7 +156,7 @@ export function ProductionPanel({
       {spec.warnings.length > 0 && (
         <div className="space-y-1.5">
           {spec.warnings.map((w, i) => (
-            <p key={i} className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+            <p key={i} className="flex items-start gap-1.5 text-xs text-butter-ink">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {w}
             </p>
           ))}

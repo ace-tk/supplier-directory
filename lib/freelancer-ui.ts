@@ -70,7 +70,7 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
 };
 
 export const PRIORITY_DOT: Record<ProjectPriority, string> = {
-  LOW: "bg-slate-400",
+  LOW: "bg-soft",
   MEDIUM: "bg-blue-500",
   HIGH: "bg-amber-500",
   URGENT: "bg-red-500",

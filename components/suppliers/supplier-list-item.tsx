@@ -56,7 +56,7 @@ export function SupplierListItem({ supplier, delay = 0, onClick }: SupplierListI
                   {supplier.companyName}
                 </h3>
                 {supplier.verified && (
-                  <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-mint-ink">
                     <BadgeCheck className="h-3 w-3" />
                     Verified
                   </span>
@@ -69,7 +69,7 @@ export function SupplierListItem({ supplier, delay = 0, onClick }: SupplierListI
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                 {/* Rating */}
                 <div className="flex items-center gap-1">
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                  <Star className="h-3 w-3 fill-amber-400 text-butter-ink" />
                   <span className="text-xs font-medium">{supplier.rating.toFixed(1)}</span>
                   <span className="text-xs text-muted-foreground">({supplier.reviewCount})</span>
                 </div>
@@ -136,13 +136,13 @@ export function SupplierListItem({ supplier, delay = 0, onClick }: SupplierListI
                   <Bookmark className="h-3.5 w-3.5" fill={saved ? "currentColor" : "none"} />
                 </Button>
                 <Button variant="outline" size="icon" className="h-7 w-7" title="WhatsApp">
-                  <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
+                  <MessageCircle className="h-3.5 w-3.5 text-mint-ink" />
                 </Button>
                 <Button variant="outline" size="icon" className="h-7 w-7" title={supplier.email ?? undefined}>
-                  <Mail className="h-3.5 w-3.5 text-blue-500" />
+                  <Mail className="h-3.5 w-3.5 text-sky-ink" />
                 </Button>
                 <Button variant="outline" size="icon" className="h-7 w-7" title={supplier.phone ?? undefined}>
-                  <Phone className="h-3.5 w-3.5 text-violet-500" />
+                  <Phone className="h-3.5 w-3.5 text-lav-ink" />
                 </Button>
                 <Button size="sm" className="h-7 gap-1 text-xs">
                   <ExternalLink className="h-3 w-3" />

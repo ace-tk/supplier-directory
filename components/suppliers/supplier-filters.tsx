@@ -43,29 +43,29 @@ const FILTER_GROUPS = [
 ];
 
 const colorMap: Record<string, string> = {
-  emerald: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400",
-  blue: "bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-400",
-  violet: "bg-violet-500/10 text-violet-700 border-violet-500/30 dark:text-violet-400",
-  orange: "bg-orange-500/10 text-orange-700 border-orange-500/30 dark:text-orange-400",
-  amber: "bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400",
-  red: "bg-red-500/10 text-red-700 border-red-500/30 dark:text-red-400",
-  slate: "bg-slate-500/10 text-slate-700 border-slate-500/30 dark:text-slate-400",
-  rose: "bg-rose-500/10 text-rose-700 border-rose-500/30 dark:text-rose-400",
-  pink: "bg-pink-500/10 text-pink-700 border-pink-500/30 dark:text-pink-400",
-  green: "bg-green-500/10 text-green-700 border-green-500/30 dark:text-green-400",
+  emerald: "bg-mint text-mint-ink border-mint-ink/30 ",
+  blue: "bg-sky text-sky-ink border-sky-ink/30 ",
+  violet: "bg-lav text-lav-ink border-lav-ink/30 ",
+  orange: "bg-peach text-peach-ink border-peach-ink/30 ",
+  amber: "bg-butter text-butter-ink border-butter-ink/30 ",
+  red: "bg-rose text-rose-ink border-rose-ink/30 ",
+  slate: "bg-soft/10 text-foreground border-border ",
+  rose: "bg-rose text-rose-ink border-rose-ink/30 ",
+  pink: "bg-rose text-rose-ink border-rose-ink/30 ",
+  green: "bg-mint text-mint-ink border-mint-ink/30 ",
 };
 
 const activeColorMap: Record<string, string> = {
-  emerald: "bg-emerald-500 text-white border-emerald-500",
-  blue: "bg-blue-500 text-white border-blue-500",
-  violet: "bg-violet-500 text-white border-violet-500",
-  orange: "bg-orange-500 text-white border-orange-500",
-  amber: "bg-amber-500 text-white border-amber-500",
-  red: "bg-red-500 text-white border-red-500",
-  slate: "bg-slate-500 text-white border-slate-500",
-  rose: "bg-rose-500 text-white border-rose-500",
-  pink: "bg-pink-500 text-white border-pink-500",
-  green: "bg-green-500 text-white border-green-500",
+  emerald: "bg-emerald-500 text-white border-mint-ink/30",
+  blue: "bg-blue-500 text-white border-sky-ink/30",
+  violet: "bg-violet-500 text-white border-lav-ink/30",
+  orange: "bg-orange-500 text-white border-peach-ink/30",
+  amber: "bg-amber-500 text-white border-butter-ink/30",
+  red: "bg-red-500 text-white border-rose-ink/30",
+  slate: "bg-muted-foreground text-background border-border",
+  rose: "bg-rose-500 text-white border-rose-ink/30",
+  pink: "bg-pink-500 text-white border-rose-ink/30",
+  green: "bg-green-500 text-white border-mint-ink/30",
 };
 
 interface SupplierFiltersProps {

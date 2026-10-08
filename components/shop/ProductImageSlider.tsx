@@ -79,7 +79,7 @@ export function ProductImageSlider({ images, alt }: { images: string[]; alt: str
                 aria-label={`Show image ${i + 1}`}
                 className={cn(
                   "h-1.5 rounded-full transition-all duration-200",
-                  i === index ? "w-4 bg-white" : "w-1.5 bg-white/50 hover:bg-white/75"
+                  i === index ? "w-4 bg-card" : "w-1.5 bg-card/50 hover:bg-card/75"
                 )}
               />
             ))}

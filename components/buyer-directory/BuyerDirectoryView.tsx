@@ -58,7 +58,7 @@ export function BuyerDirectoryView({ buyers }: { buyers: BuyerDirectoryEntry[] }
           {filtered.map((buyer) => (
             <div key={buyer.id} className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-card">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-sky-500/15 text-sky-600 text-sm font-semibold shrink-0">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-sky text-sky-ink text-sm font-semibold shrink-0">
                   {initials(buyer.companyName || buyer.name)}
                 </div>
                 <div className="min-w-0">

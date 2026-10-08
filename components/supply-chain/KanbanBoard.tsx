@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { BOARD_COLUMNS, type MilestoneRecord, type BoardColumn } from "@/types/supply-chain";
 
 const COLUMN_ACCENT: Record<BoardColumn, string> = {
-  PLANNING: "bg-slate-500",
+  PLANNING: "bg-soft",
   IN_PROGRESS: "bg-primary",
   REVIEW: "bg-amber-500",
   COMPLETED: "bg-emerald-500",

@@ -33,7 +33,7 @@ function NoteContent({ content, editing, onCommit }: { content: Extract<MoodBoar
   const [bulletsText, setBulletsText] = useState(content.bullets.join("\n"));
   if (editing) {
     return (
-      <div className="w-full h-full p-3 flex flex-col gap-1.5 bg-amber-50" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full h-full p-3 flex flex-col gap-1.5 bg-butter" onClick={(e) => e.stopPropagation()}>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -52,11 +52,11 @@ function NoteContent({ content, editing, onCommit }: { content: Extract<MoodBoar
     );
   }
   return (
-    <div className="w-full h-full p-3 bg-amber-50 overflow-hidden">
+    <div className="w-full h-full p-3 bg-butter overflow-hidden">
       {content.title && <p className="font-semibold text-sm mb-1.5">{content.title}</p>}
       <ul className="space-y-1">
         {content.bullets.map((b, i) => (
-          <li key={i} className="text-xs text-neutral-700 flex gap-1.5">
+          <li key={i} className="text-xs text-foreground flex gap-1.5">
             <span>•</span> {b}
           </li>
         ))}
@@ -70,13 +70,13 @@ function AnnotationContent({ content, editing, onCommit }: { content: Extract<Mo
   const [description, setDescription] = useState(content.description);
   if (editing) {
     return (
-      <div className="w-full h-full p-3 flex flex-col gap-1.5 bg-rose-50" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full h-full p-3 flex flex-col gap-1.5 bg-rose" onClick={(e) => e.stopPropagation()}>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => onCommit({ ...content, title, description })}
           placeholder="Annotation title"
-          className="font-semibold text-[11px] uppercase tracking-wide outline-none bg-transparent text-rose-700"
+          className="font-semibold text-[11px] uppercase tracking-wide outline-none bg-transparent text-rose-ink"
         />
         <textarea
           value={description}
@@ -88,9 +88,9 @@ function AnnotationContent({ content, editing, onCommit }: { content: Extract<Mo
     );
   }
   return (
-    <div className="w-full h-full p-3 bg-rose-50 overflow-hidden">
-      <p className="font-semibold text-[11px] uppercase tracking-wide text-rose-700 mb-1">{content.title}</p>
-      <p className="text-xs text-neutral-700">{content.description}</p>
+    <div className="w-full h-full p-3 bg-rose overflow-hidden">
+      <p className="font-semibold text-[11px] uppercase tracking-wide text-rose-ink mb-1">{content.title}</p>
+      <p className="text-xs text-foreground">{content.description}</p>
     </div>
   );
 }
@@ -111,9 +111,9 @@ function renderContent(item: MoodBoardItemRecord, editing: boolean, onCommit: (c
       return <AnnotationContent content={content} editing={editing} onCommit={onCommit} />;
     case "material":
       return (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-neutral-100">
-          <div className="w-10 h-10 rounded-full bg-neutral-300" />
-          <p className="text-xs font-medium text-neutral-700">{content.name}</p>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-soft">
+          <div className="w-10 h-10 rounded-full bg-soft" />
+          <p className="text-xs font-medium text-foreground">{content.name}</p>
         </div>
       );
     case "swatch":
@@ -172,7 +172,7 @@ export function CanvasItem({
           if (editable) setEditing(true);
         }}
         className={cn(
-          "relative w-full h-full rounded-lg overflow-hidden bg-white border shadow-sm",
+          "relative w-full h-full rounded-lg overflow-hidden bg-card border shadow-sm",
           selected ? "border-primary ring-2 ring-primary/30" : "border-border"
         )}
       >
@@ -191,7 +191,7 @@ export function CanvasItem({
               e.stopPropagation();
               onDelete();
             }}
-            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center z-10 hover:bg-red-600"
+            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-foreground text-background flex items-center justify-center z-10 hover:bg-red-600"
             aria-label="Delete item"
           >
             <X className="w-3 h-3" />

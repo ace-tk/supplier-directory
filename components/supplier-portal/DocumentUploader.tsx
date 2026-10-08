@@ -87,7 +87,7 @@ export function DocumentUploader({ state, onChange }: DocumentUploaderProps) {
               className={cn(
                 "relative rounded-xl border-2 p-4 transition-all duration-200",
                 uploaded
-                  ? "border-emerald-500/40 bg-emerald-500/5"
+                  ? "border-mint-ink/40 bg-mint"
                   : "border-border bg-card hover:border-primary/40"
               )}
             >
@@ -95,13 +95,13 @@ export function DocumentUploader({ state, onChange }: DocumentUploaderProps) {
                 <div
                   className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0",
-                    uploaded ? "bg-emerald-500/10" : "bg-muted"
+                    uploaded ? "bg-mint" : "bg-muted"
                   )}
                 >
                   {isUploading ? (
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                   ) : uploaded ? (
-                    <IconComp className="h-5 w-5 text-emerald-600" />
+                    <IconComp className="h-5 w-5 text-mint-ink" />
                   ) : (
                     <span>{icon}</span>
                   )}
@@ -142,7 +142,7 @@ export function DocumentUploader({ state, onChange }: DocumentUploaderProps) {
                         <motion.span
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-mint-ink"
                         >
                           <Check className="h-3 w-3" /> Uploaded
                         </motion.span>

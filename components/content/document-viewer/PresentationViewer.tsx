@@ -118,7 +118,7 @@ export function PresentationViewer({ file, variant = "compact" }: { file: DraftA
       ) : slide && nativeWidth && nativeHeight ? (
         <div style={{ width: nativeWidth * scale, height: nativeHeight * scale }}>
           <div
-            className="relative bg-white shadow-card rounded overflow-hidden origin-top-left"
+            className="relative bg-card shadow-card rounded overflow-hidden origin-top-left"
             style={{ width: nativeWidth, height: nativeHeight, transform: `scale(${scale})` }}
           >
             {slide.shapes.map((shape, i) =>
@@ -140,7 +140,7 @@ export function PresentationViewer({ file, variant = "compact" }: { file: DraftA
               ) : (
                 <div
                   key={i}
-                  className="absolute text-neutral-900 overflow-hidden"
+                  className="absolute text-foreground overflow-hidden"
                   style={{ left: shape.x / EMU_PER_PX, top: shape.y / EMU_PER_PX, width: shape.w / EMU_PER_PX, height: shape.h / EMU_PER_PX }}
                 >
                   {shape.paragraphs.map((p, pi) => (

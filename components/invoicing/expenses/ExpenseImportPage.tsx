@@ -139,10 +139,10 @@ export function ExpenseImportPage({ basePath }: { basePath: string }) {
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card px-4 py-3 flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-4 text-sm">
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              <span className="flex items-center gap-1.5 text-mint-ink">
                 <CheckCircle2 className="h-4 w-4" /> {validCount} valid
               </span>
-              <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+              <span className="flex items-center gap-1.5 text-rose-ink">
                 <XCircle className="h-4 w-4" /> {invalidCount} invalid
               </span>
               <span className="text-muted-foreground">— invalid rows will be skipped, not imported.</span>
@@ -174,7 +174,7 @@ export function ExpenseImportPage({ basePath }: { basePath: string }) {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {previewRows.map((row) => (
-                    <tr key={row.rowNumber} className={row.status === "invalid" ? "bg-red-500/5" : undefined}>
+                    <tr key={row.rowNumber} className={row.status === "invalid" ? "bg-rose" : undefined}>
                       <td className="px-3 py-2 align-top tabular-nums text-muted-foreground">{row.rowNumber}</td>
                       <td className="px-3 py-2 align-top">
                         {row.resolved.occurredAt ? formatShortDate(row.resolved.occurredAt) : row.raw.date || "—"}
@@ -191,15 +191,15 @@ export function ExpenseImportPage({ basePath }: { basePath: string }) {
                       <td className="px-3 py-2 align-top font-mono">{row.resolved.relatedInvoiceLabel || row.raw.invoice || "—"}</td>
                       <td className="px-3 py-2 align-top">
                         {row.status === "valid" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-mint text-mint-ink">
                             <CheckCircle2 className="h-3 w-3" /> Valid
                           </span>
                         ) : (
                           <div className="space-y-1">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-500/10 text-red-600 dark:text-red-400">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose text-rose-ink">
                               <XCircle className="h-3 w-3" /> Invalid
                             </span>
-                            <ul className="text-[11px] text-red-600 dark:text-red-400 list-disc list-inside">
+                            <ul className="text-[11px] text-rose-ink list-disc list-inside">
                               {row.errors.map((err, i) => (
                                 <li key={i}>{err}</li>
                               ))}
@@ -219,8 +219,8 @@ export function ExpenseImportPage({ basePath }: { basePath: string }) {
       {step === "result" && summary && (
         <div className="rounded-2xl border border-border bg-card p-8 max-w-xl space-y-6">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            <div className="h-10 w-10 rounded-full bg-mint flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-mint-ink" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">

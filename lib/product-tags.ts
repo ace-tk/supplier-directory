@@ -55,25 +55,25 @@ export function getProductTags(product: Product): string[] {
 }
 
 const TAG_COLORS: Record<string, string> = {
-  Cotton: "bg-emerald-500/15 text-emerald-400",
-  Linen: "bg-amber-500/15 text-amber-400",
-  Silk: "bg-fuchsia-500/15 text-fuchsia-400",
-  Denim: "bg-blue-500/15 text-blue-400",
-  Leather: "bg-orange-500/15 text-orange-400",
-  Manufacturer: "bg-indigo-500/15 text-indigo-400",
-  Wholesaler: "bg-cyan-500/15 text-cyan-400",
-  Exporter: "bg-violet-500/15 text-violet-400",
-  "Export Quality": "bg-sky-500/15 text-sky-400",
-  "Ready Stock": "bg-teal-500/15 text-teal-400",
-  "Best Seller": "bg-rose-500/15 text-rose-400",
-  Trending: "bg-red-500/15 text-red-400",
-  Premium: "bg-yellow-500/15 text-yellow-400",
-  Sustainable: "bg-green-500/15 text-green-400",
-  Wholesale: "bg-purple-500/15 text-purple-400",
+  Cotton: "bg-mint text-mint-ink",
+  Linen: "bg-butter text-butter-ink",
+  Silk: "bg-lav text-lav-ink",
+  Denim: "bg-sky text-sky-ink",
+  Leather: "bg-peach text-peach-ink",
+  Manufacturer: "bg-lav text-lav-ink",
+  Wholesaler: "bg-sky text-sky-ink",
+  Exporter: "bg-lav text-lav-ink",
+  "Export Quality": "bg-sky text-sky-ink",
+  "Ready Stock": "bg-mint text-mint-ink",
+  "Best Seller": "bg-rose text-rose-ink",
+  Trending: "bg-rose text-rose-ink",
+  Premium: "bg-butter text-butter-ink",
+  Sustainable: "bg-mint text-mint-ink",
+  Wholesale: "bg-lav text-lav-ink",
 };
 
 export function getTagColor(tag: string): string {
   if (TAG_COLORS[tag]) return TAG_COLORS[tag];
-  if (tag.startsWith("MOQ")) return "bg-pink-500/15 text-pink-400";
+  if (tag.startsWith("MOQ")) return "bg-rose text-rose-ink";
   return "bg-secondary text-secondary-foreground";
 }

@@ -1,14 +1,14 @@
 import type { SupplyChainPriority, MilestoneStatus, SupplyChainStatus, BoardColumn } from "@/types/supply-chain";
 
 export const PRIORITY_STYLES: Record<SupplyChainPriority, string> = {
-  LOW: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-  MEDIUM: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  HIGH: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  URGENT: "bg-red-500/10 text-red-600 dark:text-red-400",
+  LOW: "bg-soft/10 text-muted-foreground ",
+  MEDIUM: "bg-sky text-sky-ink ",
+  HIGH: "bg-butter text-butter-ink ",
+  URGENT: "bg-rose text-rose-ink ",
 };
 
 export const PRIORITY_DOT: Record<SupplyChainPriority, string> = {
-  LOW: "bg-slate-400",
+  LOW: "bg-soft",
   MEDIUM: "bg-blue-500",
   HIGH: "bg-amber-500",
   URGENT: "bg-red-500",
@@ -45,9 +45,9 @@ export const BOARD_COLUMN_LABELS: Record<BoardColumn, string> = {
 
 export const MILESTONE_CARD_STYLES: Record<MilestoneStatus, { ring: string; glow: string; text: string }> = {
   COMPLETED: {
-    ring: "border-emerald-500/40",
+    ring: "border-mint-ink/40",
     glow: "shadow-[0_0_20px_-4px_rgba(16,185,129,0.35)]",
-    text: "text-emerald-500",
+    text: "text-mint-ink",
   },
   IN_PROGRESS: {
     ring: "border-primary/50",
@@ -55,14 +55,14 @@ export const MILESTONE_CARD_STYLES: Record<MilestoneStatus, { ring: string; glow
     text: "text-primary",
   },
   WAITING: {
-    ring: "border-amber-500/40",
+    ring: "border-butter-ink/40",
     glow: "shadow-[0_0_16px_-4px_rgba(245,158,11,0.3)]",
-    text: "text-amber-500",
+    text: "text-butter-ink",
   },
   DELAYED: {
-    ring: "border-red-500/40",
+    ring: "border-rose-ink/40",
     glow: "shadow-[0_0_20px_-4px_rgba(239,68,68,0.35)]",
-    text: "text-red-500",
+    text: "text-rose-ink",
   },
   NOT_STARTED: {
     ring: "border-border",

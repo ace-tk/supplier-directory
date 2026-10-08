@@ -31,8 +31,8 @@ const BIO_MAX_LENGTH = 160;
 const THUMBS_PER_PAGE = 3;
 
 const STATUS_DISPLAY: Record<string, { label: string; dot: string; text: string }> = {
-  Available: { label: "AVAILABLE", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
-  Busy: { label: "BUSY", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  Available: { label: "AVAILABLE", dot: "bg-emerald-500", text: "text-mint-ink " },
+  Busy: { label: "BUSY", dot: "bg-amber-500", text: "text-butter-ink " },
   Unavailable: { label: "OFFLINE", dot: "bg-muted-foreground", text: "text-muted-foreground" },
   Deactivated: { label: "INACTIVE", dot: "bg-destructive", text: "text-destructive" },
 };

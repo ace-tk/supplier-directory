@@ -62,10 +62,10 @@ export default function SupplierInventoryPage() {
       render: (i) =>
         i.approvalStatus === "Pending" ? (
           <div className="flex items-center gap-1 justify-end">
-            <Button variant="ghost" size="icon-sm" className="text-emerald-600 hover:text-emerald-700" onClick={() => handleApprove(i.id)}>
+            <Button variant="ghost" size="icon-sm" className="text-mint-ink hover:text-mint-ink" onClick={() => handleApprove(i.id)}>
               <Check className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" className="text-red-500 hover:text-red-600" onClick={() => handleReject(i.id)}>
+            <Button variant="ghost" size="icon-sm" className="text-rose-ink hover:text-rose-ink" onClick={() => handleReject(i.id)}>
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -82,9 +82,9 @@ export default function SupplierInventoryPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatWidget icon={Boxes} label="Total Items" value={items.length} />
-        <StatWidget icon={Clock} label="Pending Approval" value={pendingCount} accentClassName="text-amber-500" />
-        <StatWidget icon={AlertTriangle} label="Low Stock" value={lowStockCount} accentClassName="text-amber-500" />
-        <StatWidget icon={PackageX} label="Out of Stock" value={outOfStockCount} accentClassName="text-red-500" />
+        <StatWidget icon={Clock} label="Pending Approval" value={pendingCount} accentClassName="text-butter-ink" />
+        <StatWidget icon={AlertTriangle} label="Low Stock" value={lowStockCount} accentClassName="text-butter-ink" />
+        <StatWidget icon={PackageX} label="Out of Stock" value={outOfStockCount} accentClassName="text-rose-ink" />
       </div>
 
       <ListToolbar

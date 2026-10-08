@@ -95,7 +95,7 @@ export function AssignedBusinessStep({
                         <h5 className="truncate text-sm font-semibold">{p.name}</h5>
                         <p className="truncate text-xs text-muted-foreground">{p.detail || "—"}</p>
                       </div>
-                      <button type="button" aria-label={`Remove ${p.name}`} disabled={busy === partyKey(p)} onClick={() => void remove(p)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-red-600 disabled:opacity-50">
+                      <button type="button" aria-label={`Remove ${p.name}`} disabled={busy === partyKey(p)} onClick={() => void remove(p)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-rose-ink disabled:opacity-50">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -202,7 +202,7 @@ function PartyPicker({
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${meta.label.toLowerCase()}`} aria-label={`Search ${meta.label.toLowerCase()}`} className={`${fieldCls} pl-8`} autoFocus />
         </label>
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-rose-ink">
             {error}
           </p>
         )}

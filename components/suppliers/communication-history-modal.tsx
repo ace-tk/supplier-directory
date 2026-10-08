@@ -33,12 +33,12 @@ const TYPE_ICON: Record<CommunicationType, ComponentType<{ className?: string }>
 };
 
 const STATUS_STYLE: Record<CommunicationStatus, string> = {
-  Sent: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  Opened: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-  Completed: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  Pending: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  Missed: "bg-red-500/10 text-red-600 dark:text-red-400",
-  Scheduled: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  Sent: "bg-sky text-sky-ink ",
+  Opened: "bg-lav text-lav-ink ",
+  Completed: "bg-mint text-mint-ink ",
+  Pending: "bg-butter text-butter-ink ",
+  Missed: "bg-rose text-rose-ink ",
+  Scheduled: "bg-sky text-sky-ink ",
 };
 
 export function CommunicationHistoryModal({

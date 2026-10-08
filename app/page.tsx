@@ -25,32 +25,32 @@ const features = [
     title: "Supplier Directory",
     description:
       "Discover, evaluate, and onboard verified suppliers from a curated global network.",
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
+    color: "text-sky-ink",
+    bg: "bg-sky",
   },
   {
     icon: Users,
     title: "CRM",
     description:
       "Manage contacts, track relationships, and streamline your B2B sales pipeline.",
-    color: "text-violet-500",
-    bg: "bg-violet-500/10",
+    color: "text-lav-ink",
+    bg: "bg-lav",
   },
   {
     icon: ShoppingCart,
     title: "Wholesale Shop",
     description:
       "Place bulk orders, manage procurement workflows, and track shipments in real-time.",
-    color: "text-emerald-500",
-    bg: "bg-emerald-500/10",
+    color: "text-mint-ink",
+    bg: "bg-mint",
   },
   {
     icon: BarChart3,
     title: "Analytics",
     description:
       "Deep insights into supplier performance, order trends, and revenue analytics.",
-    color: "text-orange-500",
-    bg: "bg-orange-500/10",
+    color: "text-peach-ink",
+    bg: "bg-peach",
   },
 ];
 
@@ -156,7 +156,7 @@ export default function HomePage() {
               change={18}
               delay={0.0}
               icon={Building2}
-              iconColor="text-blue-500"
+              iconColor="text-sky-ink"
             />
             <StatCard
               title="B2B Transactions"
@@ -164,7 +164,7 @@ export default function HomePage() {
               change={32}
               delay={0.05}
               icon={ShoppingCart}
-              iconColor="text-emerald-500"
+              iconColor="text-mint-ink"
             />
             <StatCard
               title="Platform Users"
@@ -172,14 +172,14 @@ export default function HomePage() {
               change={24}
               delay={0.1}
               icon={Users}
-              iconColor="text-violet-500"
+              iconColor="text-lav-ink"
             />
             <StatCard
               title="Countries"
               value="60+"
               delay={0.15}
               icon={Globe}
-              iconColor="text-orange-500"
+              iconColor="text-peach-ink"
             />
           </div>
         </section>

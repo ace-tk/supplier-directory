@@ -93,7 +93,7 @@ export function ProductDrawer({
                   onClick={() => onToggleSave(product)}
                   className={cn(
                     "p-2 rounded-full hover:bg-muted transition-colors",
-                    isSaved ? "text-rose-500" : "text-muted-foreground"
+                    isSaved ? "text-rose-ink" : "text-muted-foreground"
                   )}
                   aria-label="Save product"
                 >
@@ -196,7 +196,7 @@ export function ProductDrawer({
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <h4 className="font-bold text-foreground text-xl">{supplier.companyName}</h4>
                               {supplier.verified && (
-                                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-500">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-mint-ink">
                                   <ShieldCheck className="w-4 h-4" /> Verified
                                 </span>
                               )}
@@ -210,7 +210,7 @@ export function ProductDrawer({
                               </span>
                               {!!supplier.rating && (
                                 <span className="flex items-center gap-1">
-                                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                                  <Star className="w-3.5 h-3.5 fill-amber-400 text-butter-ink" />
                                   {supplier.rating.toFixed(1)}
                                 </span>
                               )}

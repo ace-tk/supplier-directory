@@ -88,7 +88,7 @@ export function WordViewer({ file, variant = "compact" }: { file: DraftAttachmen
         <LoadingState />
       ) : (
         <div
-          className="tiptap-content w-full max-w-[8.5in] bg-white text-neutral-900 rounded-lg p-10 border border-border shadow-card transition-transform origin-top"
+          className="tiptap-content w-full max-w-[8.5in] bg-card text-foreground rounded-lg p-10 border border-border shadow-card transition-transform origin-top"
           style={{ transform: `scale(${scale})` }}
           dangerouslySetInnerHTML={{ __html: html ?? "" }}
         />

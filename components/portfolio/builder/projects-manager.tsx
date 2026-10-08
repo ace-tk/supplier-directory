@@ -210,7 +210,7 @@ export function ProjectsManager({ data, onChange }: { data: PortfolioViewModel; 
                       size="icon-sm"
                       onClick={() => toggleFeatured(project)}
                       aria-label="Toggle featured"
-                      className={cn(project.featured && "text-amber-500")}
+                      className={cn(project.featured && "text-butter-ink")}
                     >
                       <Star className={cn("h-3.5 w-3.5", project.featured && "fill-current")} />
                     </Button>

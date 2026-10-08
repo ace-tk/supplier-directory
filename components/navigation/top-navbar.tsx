@@ -6,6 +6,7 @@ import { Search, Menu, Settings, LogOut, User, ChevronDown, Building2, MessageSq
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SearchBar } from "@/components/shared/search-bar";
+import { CommandPalette } from "@/components/shared/command-palette";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -25,10 +26,10 @@ import { permissionForAdminHref, PORTAL_CONFIG, type PortalKey } from "@/lib/rol
 import type { SessionUser } from "@/types/auth";
 
 const ROLE_COLORS: Record<string, string> = {
-  ADMIN: "bg-orange-500/20 text-orange-500",
-  SUPPLIER: "bg-blue-500/20 text-blue-500",
-  BUYER: "bg-emerald-500/20 text-emerald-500",
-  FREELANCER: "bg-purple-500/20 text-purple-500",
+  ADMIN: "bg-peach text-peach-ink",
+  SUPPLIER: "bg-sky text-sky-ink",
+  BUYER: "bg-mint text-mint-ink",
+  FREELANCER: "bg-lav text-lav-ink",
 };
 
 interface TopNavbarProps {
@@ -49,7 +50,8 @@ export function TopNavbar({ user, portal = "admin", permissions = [] }: TopNavba
   }) })).filter((group) => group.items.length > 0);
 
   return (
-    <header className="flex items-center justify-between h-16 px-6 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-40">
+    <header className="flex items-center justify-between h-16 gap-3 px-4 md:px-6 border-b border-border bg-background/75 backdrop-blur-md supports-[backdrop-filter]:bg-background/65 sticky top-0 z-40">
+      <CommandPalette navGroups={navGroups} />
       {/* Mobile menu trigger */}
       <Button variant="ghost" size="icon" className="md:hidden h-9 w-9" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation menu">
         <Menu className="h-4 w-4" />
@@ -64,7 +66,7 @@ export function TopNavbar({ user, portal = "admin", permissions = [] }: TopNavba
           </Button>
         </div>
       ) : (
-        <div className="hidden md:flex flex-1 max-w-md">
+        <div className="hidden md:flex flex-1 max-w-md min-w-0">
           <SearchBar placeholder="Search suppliers, contacts, orders..." className="w-full" />
         </div>
       )}
@@ -78,10 +80,10 @@ export function TopNavbar({ user, portal = "admin", permissions = [] }: TopNavba
 
       {/* Right actions */}
       <div className={cn("items-center gap-1", mobileSearchOpen ? "hidden md:flex" : "flex")}>
-        {/* Admin-only real quick links — no dead buttons, only routes that exist. Hidden below lg; reachable via the mobile drawer instead. */}
+        {/* Admin-only real quick links — no dead buttons, only routes that exist. Hidden below 2xl (they would crowd the search + switcher); reachable via the mobile drawer instead. */}
         {user?.role === "ADMIN" && (
           <>
-            <div className="hidden lg:flex items-center gap-1">
+            <div className="hidden 2xl:flex items-center gap-1">
               <Button variant="outline" size="sm" className="gap-1.5" render={<Link href="/directory" />} nativeButton={false}>
                 <Building2 className="h-3.5 w-3.5" /> Supplier Directory
               </Button>
@@ -95,7 +97,7 @@ export function TopNavbar({ user, portal = "admin", permissions = [] }: TopNavba
                 <MessageSquare className="h-3.5 w-3.5" /> CRM Inbox
               </Button>
             </div>
-            <Separator orientation="vertical" className="h-5 mx-1 hidden lg:block" />
+            <Separator orientation="vertical" className="h-5 mx-1 hidden 2xl:block" />
           </>
         )}
 
@@ -110,7 +112,7 @@ export function TopNavbar({ user, portal = "admin", permissions = [] }: TopNavba
             <Separator orientation="vertical" className="h-5 mx-1" />
             <DropdownMenu>
               <DropdownMenuTrigger render={
-                <button className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <button className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-soft transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span />
                 </button>
               }>

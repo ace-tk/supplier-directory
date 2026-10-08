@@ -15,11 +15,11 @@ interface CardDef {
 }
 
 const CARDS: CardDef[] = [
-  { key: "activeCount", label: "Active Supply Chains", icon: Workflow, accent: "text-blue-500 bg-blue-500/10", bar: "bg-blue-500" },
-  { key: "delayedCount", label: "Delayed Orders", icon: AlertTriangle, accent: "text-red-500 bg-red-500/10", bar: "bg-red-500" },
-  { key: "completedCount", label: "Completed Orders", icon: CheckCircle2, accent: "text-emerald-500 bg-emerald-500/10", bar: "bg-emerald-500" },
-  { key: "inProgressCount", label: "In Progress", icon: Clock3, accent: "text-violet-500 bg-violet-500/10", bar: "bg-violet-500" },
-  { key: "upcomingDeadlines", label: "Upcoming Deadlines", icon: CalendarClock, accent: "text-amber-500 bg-amber-500/10", bar: "bg-amber-500" },
+  { key: "activeCount", label: "Active Supply Chains", icon: Workflow, accent: "text-sky-ink bg-sky", bar: "bg-blue-500" },
+  { key: "delayedCount", label: "Delayed Orders", icon: AlertTriangle, accent: "text-rose-ink bg-rose", bar: "bg-red-500" },
+  { key: "completedCount", label: "Completed Orders", icon: CheckCircle2, accent: "text-mint-ink bg-mint", bar: "bg-emerald-500" },
+  { key: "inProgressCount", label: "In Progress", icon: Clock3, accent: "text-lav-ink bg-lav", bar: "bg-violet-500" },
+  { key: "upcomingDeadlines", label: "Upcoming Deadlines", icon: CalendarClock, accent: "text-butter-ink bg-butter", bar: "bg-amber-500" },
 ];
 
 export function AnalyticsCards({ analytics }: { analytics: SupplyChainAnalytics }) {

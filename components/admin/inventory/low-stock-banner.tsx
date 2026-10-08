@@ -4,9 +4,9 @@ export function LowStockBanner({ lowStockCount, outOfStockCount }: { lowStockCou
   if (lowStockCount === 0 && outOfStockCount === 0) return null;
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 mb-6">
-      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-      <p className="text-sm text-amber-700 dark:text-amber-300">
+    <div className="flex items-center gap-3 rounded-xl border border-butter-ink/20 bg-butter px-4 py-3 mb-6">
+      <AlertTriangle className="h-4 w-4 text-butter-ink shrink-0" />
+      <p className="text-sm text-butter-ink">
         <span className="font-medium">{lowStockCount} item{lowStockCount !== 1 ? "s" : ""}</span> running low on stock
         {outOfStockCount > 0 && (
           <>

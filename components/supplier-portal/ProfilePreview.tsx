@@ -89,12 +89,12 @@ export function ProfilePreview({ state, supplierCode }: ProfilePreviewProps) {
                 {[state.city, state.country].filter(Boolean).join(", ")}
               </span>
             )}
-            <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+            <span className="flex items-center gap-1 text-xs text-mint-ink font-medium">
               <BadgeCheck className="h-3.5 w-3.5" />
               Verified Supplier
             </span>
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <Star className="h-3 w-3 fill-amber-400 text-butter-ink" />
               New Listing
             </span>
           </div>
@@ -187,7 +187,7 @@ export function ProfilePreview({ state, supplierCode }: ProfilePreviewProps) {
                   </div>
                 )}
                 {state.whatsapp && (
-                  <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-center gap-1.5 text-xs text-mint-ink">
                     <MessageCircle className="h-3 w-3" />{state.whatsapp}
                   </div>
                 )}
@@ -227,7 +227,7 @@ export function ProfilePreview({ state, supplierCode }: ProfilePreviewProps) {
                     key={d.key}
                     className={cn(
                       "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border",
-                      "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                      "bg-mint border-mint-ink/30 text-mint-ink "
                     )}
                   >
                     <FileText className="h-3 w-3" />{d.label}

@@ -148,7 +148,7 @@ export function SupplierDrawer({
                       </h2>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {supplier.verified && (
-                          <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                          <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-mint-ink">
                             <BadgeCheck className="h-3 w-3" />
                             Verified
                           </span>
@@ -181,7 +181,7 @@ export function SupplierDrawer({
                           className={cn(
                             "h-3 w-3",
                             s <= Math.floor(supplier.rating)
-                              ? "fill-amber-400 text-amber-400"
+                              ? "fill-amber-400 text-butter-ink"
                               : "fill-muted text-muted-foreground/30"
                           )}
                         />
@@ -316,7 +316,7 @@ export function SupplierDrawer({
                     <FileText className="h-3 w-3" />
                     Internal Notes
                   </SectionTitle>
-                  <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 p-3">
+                  <div className="rounded-lg bg-butter border border-butter-ink/20 p-3">
                     <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
                       {supplier.notes}
                     </p>
@@ -353,15 +353,15 @@ export function SupplierDrawer({
               href={"/crm?supplierId=" + supplier.id}
               className="flex flex-1 items-center justify-center gap-1.5 h-8 text-xs rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground transition-colors font-medium"
             >
-              <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
+              <MessageCircle className="h-3.5 w-3.5 text-mint-ink" />
               WhatsApp
             </Link>
             <Button variant="outline" size="sm" className="flex-1 gap-1.5 h-8 text-xs">
-              <Mail className="h-3.5 w-3.5 text-blue-500" />
+              <Mail className="h-3.5 w-3.5 text-sky-ink" />
               Email
             </Button>
             <Button variant="outline" size="sm" className="flex-1 gap-1.5 h-8 text-xs">
-              <Phone className="h-3.5 w-3.5 text-violet-500" />
+              <Phone className="h-3.5 w-3.5 text-lav-ink" />
               Call
             </Button>
           </div>

@@ -267,13 +267,13 @@ export function BusinessStructureTree({
       <Card className="border-border bg-gradient-to-r from-background via-muted/20 to-background">
         <CardHeader className="p-4 sm:p-5 flex flex-row items-center justify-between cursor-pointer select-none" onClick={() => setShowPool(!showPool)}>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky text-sky-ink">
               <Briefcase className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle className="text-base font-bold">MAIN ADMIN ENTITY POOL</CardTitle>
-                <Badge variant="outline" className="text-xs bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300">
+                <Badge variant="outline" className="text-xs bg-sky text-sky-ink">
                   Global Pool
                 </Badge>
               </div>
@@ -291,8 +291,8 @@ export function BusinessStructureTree({
           <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 border-t border-border/60">
             <div className="grid gap-3 pt-4 sm:grid-cols-3 text-xs">
               {/* Buyers Pool */}
-              <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-3 space-y-1">
-                <div className="flex items-center justify-between font-semibold text-sky-800 dark:text-sky-200">
+              <div className="rounded-lg border border-sky-ink/20 bg-sky p-3 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-sky-ink">
                   <span className="flex items-center gap-1.5"><UserSquare2 className="h-4 w-4" /> Buyers Pool</span>
                   <Badge variant="secondary" className="font-bold">{assignedBusiness?.buyers.length ?? 0}</Badge>
                 </div>
@@ -300,8 +300,8 @@ export function BusinessStructureTree({
               </div>
 
               {/* Suppliers Pool */}
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1">
-                <div className="flex items-center justify-between font-semibold text-emerald-800 dark:text-emerald-200">
+              <div className="rounded-lg border border-mint-ink/20 bg-mint p-3 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-mint-ink">
                   <span className="flex items-center gap-1.5"><Truck className="h-4 w-4" /> Suppliers Pool</span>
                   <Badge variant="secondary" className="font-bold">{assignedBusiness?.suppliers.length ?? 0}</Badge>
                 </div>
@@ -309,8 +309,8 @@ export function BusinessStructureTree({
               </div>
 
               {/* Freelancers Pool */}
-              <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 space-y-1">
-                <div className="flex items-center justify-between font-semibold text-purple-800 dark:text-purple-200">
+              <div className="rounded-lg border border-lav-ink/20 bg-lav p-3 space-y-1">
+                <div className="flex items-center justify-between font-semibold text-lav-ink">
                   <span className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Freelancers Pool</span>
                   <Badge variant="secondary" className="font-bold">{assignedBusiness?.freelancers.length ?? 0}</Badge>
                 </div>
@@ -336,13 +336,13 @@ export function BusinessStructureTree({
         {/* Tree Layout Container */}
         <div className="mt-6 space-y-8">
           {/* SECTION 1: TEAM MANAGEMENT */}
-          <div className="relative pl-6 sm:pl-8 border-l-2 border-blue-500/30">
+          <div className="relative pl-6 sm:pl-8 border-l-2 border-sky-ink/30">
             <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-blue-500 ring-4 ring-background" />
 
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">1. TEAM MANAGEMENT</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-sky-ink">1. TEAM MANAGEMENT</span>
                   <Badge variant="secondary" className="gap-1 text-xs">
                     <Users className="h-3 w-3" /> {saved.members.length} Member{saved.members.length === 1 ? "" : "s"}
                   </Badge>
@@ -381,7 +381,7 @@ export function BusinessStructureTree({
                       <div key={m.code} className="rounded-lg border border-border bg-background p-3.5 space-y-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
                           <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 font-bold text-xs">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-sky text-sky-ink font-bold text-xs">
                               {m.name[0]?.toUpperCase() ?? "M"}
                             </div>
                             <div>
@@ -423,7 +423,7 @@ export function BusinessStructureTree({
                               <span className="text-[11px] text-muted-foreground italic">None configured</span>
                             ) : (
                               memberAccess.map((acc) => (
-                                <Badge key={acc.tool} variant="outline" className="text-[10px] bg-blue-50/50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800">
+                                <Badge key={acc.tool} variant="outline" className="text-[10px] bg-sky border-sky-ink/20">
                                   {acc.tool} ({[acc.view && "V", acc.create && "C", acc.edit && "E", acc.approve && "A"].filter(Boolean).join("")})
                                 </Badge>
                               ))
@@ -454,9 +454,9 @@ export function BusinessStructureTree({
                             <div className="flex flex-wrap gap-1">
                               {assignedEntities.map((ae) => (
                                 <span key={`${ae.entityType}-${ae.entityId}`} className="inline-flex items-center gap-1 rounded bg-background border border-border px-1.5 py-0.5 text-[10px] font-medium">
-                                  {ae.entityType === "BUYER" && <UserSquare2 className="h-3 w-3 text-sky-500" />}
-                                  {ae.entityType === "SUPPLIER" && <Truck className="h-3 w-3 text-emerald-500" />}
-                                  {ae.entityType === "FREELANCER" && <Users className="h-3 w-3 text-purple-500" />}
+                                  {ae.entityType === "BUYER" && <UserSquare2 className="h-3 w-3 text-sky-ink" />}
+                                  {ae.entityType === "SUPPLIER" && <Truck className="h-3 w-3 text-mint-ink" />}
+                                  {ae.entityType === "FREELANCER" && <Users className="h-3 w-3 text-lav-ink" />}
                                   <span>{ae.entityName}</span>
                                 </span>
                               ))}
@@ -472,14 +472,14 @@ export function BusinessStructureTree({
           </div>
 
           {/* SECTION 2: COMPANY 1 */}
-          <div className="relative pl-6 sm:pl-8 border-l-2 border-emerald-500/30">
+          <div className="relative pl-6 sm:pl-8 border-l-2 border-mint-ink/30">
             <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-emerald-500 ring-4 ring-background" />
 
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">2. COMPANY</span>
-                  <Badge variant="outline" className="font-bold border-emerald-500/40 text-emerald-700 dark:text-emerald-300">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-mint-ink">2. COMPANY</span>
+                  <Badge variant="outline" className="font-bold border-mint-ink/40 text-mint-ink">
                     {business.name}
                   </Badge>
                 </div>
@@ -489,8 +489,8 @@ export function BusinessStructureTree({
               </div>
 
               {/* Company Box Node */}
-              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-4">
-                <div className="flex items-center justify-between border-b border-emerald-500/10 pb-3">
+              <div className="rounded-lg border border-mint-ink/20 bg-mint p-4 space-y-4">
+                <div className="flex items-center justify-between border-b border-mint-ink/10 pb-3">
                   <div>
                     <h3 className="font-semibold text-sm text-foreground">{business.name}</h3>
                     <p className="text-xs text-muted-foreground">{entity.legalName} {business.operationalAddress ? `· ${business.operationalAddress}` : ""}</p>
@@ -505,9 +505,9 @@ export function BusinessStructureTree({
                   <Card size="sm" className="bg-background/80 border-border">
                     <CardHeader className="p-3">
                       <div className="flex items-center gap-2">
-                        <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        <ShieldCheck className="h-4 w-4 text-mint-ink" />
                         <CardTitle className="text-sm font-semibold">GST Details</CardTitle>
-                        <Badge variant="outline" className="ml-auto text-[10px] bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">One GST</Badge>
+                        <Badge variant="outline" className="ml-auto text-[10px] bg-mint text-mint-ink">One GST</Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="p-3 pt-0 text-xs space-y-1">
@@ -525,7 +525,7 @@ export function BusinessStructureTree({
                   <Card size="sm" className="bg-background/80 border-border">
                     <CardHeader className="p-3 flex-row items-center justify-between space-y-0">
                       <div className="flex items-center gap-2">
-                        <WarehouseIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <WarehouseIcon className="h-4 w-4 text-butter-ink" />
                         <CardTitle className="text-sm font-semibold">Warehouses</CardTitle>
                         <Badge variant="secondary" className="text-[10px]">{warehouses.length}</Badge>
                       </div>
@@ -555,7 +555,7 @@ export function BusinessStructureTree({
                   <Card size="sm" className="bg-background/80 border-border">
                     <CardHeader className="p-3 flex-row items-center justify-between space-y-0">
                       <div className="flex items-center gap-2">
-                        <Store className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                        <Store className="h-4 w-4 text-lav-ink" />
                         <CardTitle className="text-sm font-semibold">Retail Stores</CardTitle>
                         <Badge variant="secondary" className="text-[10px]">{stores.length}</Badge>
                       </div>
@@ -585,7 +585,7 @@ export function BusinessStructureTree({
                   <Card size="sm" className="bg-background/80 border-border">
                     <CardHeader className="p-3 flex-row items-center justify-between space-y-0">
                       <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        <Building className="h-4 w-4 text-lav-ink" />
                         <CardTitle className="text-sm font-semibold">Back Offices</CardTitle>
                         <Badge variant="secondary" className="text-[10px]">{backOffices.length}</Badge>
                       </div>
@@ -617,7 +617,7 @@ export function BusinessStructureTree({
                 <Card size="sm" className="bg-background border-border">
                   <CardHeader className="p-3">
                     <div className="flex items-center gap-2">
-                      <Briefcase className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                      <Briefcase className="h-4 w-4 text-sky-ink" />
                       <CardTitle className="text-sm font-semibold">Assigned Business Summary</CardTitle>
                       <Badge variant="outline" className="text-[10px]">Buyers, Suppliers &amp; Freelancers</Badge>
                     </div>
@@ -628,7 +628,7 @@ export function BusinessStructureTree({
                       {/* Buyers */}
                       <div className="rounded-md border border-border bg-muted/20 p-2.5 space-y-1.5">
                         <div className="flex items-center justify-between font-semibold">
-                          <span className="flex items-center gap-1 text-sky-700 dark:text-sky-300">
+                          <span className="flex items-center gap-1 text-sky-ink">
                             <UserSquare2 className="h-3.5 w-3.5" /> Buyers ({assignedBusiness?.buyers.length ?? 0})
                           </span>
                         </div>
@@ -647,7 +647,7 @@ export function BusinessStructureTree({
                       {/* Suppliers */}
                       <div className="rounded-md border border-border bg-muted/20 p-2.5 space-y-1.5">
                         <div className="flex items-center justify-between font-semibold">
-                          <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                          <span className="flex items-center gap-1 text-mint-ink">
                             <Truck className="h-3.5 w-3.5" /> Suppliers ({assignedBusiness?.suppliers.length ?? 0})
                           </span>
                         </div>
@@ -666,7 +666,7 @@ export function BusinessStructureTree({
                       {/* Freelancers */}
                       <div className="rounded-md border border-border bg-muted/20 p-2.5 space-y-1.5">
                         <div className="flex items-center justify-between font-semibold">
-                          <span className="flex items-center gap-1 text-purple-700 dark:text-purple-300">
+                          <span className="flex items-center gap-1 text-lav-ink">
                             <Users className="h-3.5 w-3.5" /> Freelancers ({assignedBusiness?.freelancers.length ?? 0})
                           </span>
                         </div>
@@ -796,7 +796,7 @@ export function BusinessStructureTree({
             <div className="space-y-4 py-2 text-xs max-h-96 overflow-y-auto pr-1">
               {/* Assign Buyers */}
               <div className="space-y-2">
-                <p className="font-semibold text-sky-700 dark:text-sky-300 flex items-center gap-1">
+                <p className="font-semibold text-sky-ink flex items-center gap-1">
                   <UserSquare2 className="h-3.5 w-3.5" /> Buyers
                 </p>
                 <div className="grid gap-1.5 sm:grid-cols-2">
@@ -809,11 +809,11 @@ export function BusinessStructureTree({
                         key={b.id}
                         onClick={() => toggleMemberEntityAssignment(selectedMemberCode, "BUYER", b.id, b.name)}
                         className={`flex items-center justify-between rounded-md border p-2 cursor-pointer transition-colors ${
-                          isAssigned ? "border-sky-500 bg-sky-50 dark:bg-sky-950/40" : "border-border hover:bg-muted/50"
+                          isAssigned ? "border-sky-ink/30 bg-sky " : "border-border hover:bg-muted/50"
                         }`}
                       >
                         <span className="font-medium truncate">{b.name}</span>
-                        {isAssigned && <Check className="h-3.5 w-3.5 text-sky-600 shrink-0" />}
+                        {isAssigned && <Check className="h-3.5 w-3.5 text-sky-ink shrink-0" />}
                       </div>
                     );
                   })}
@@ -822,7 +822,7 @@ export function BusinessStructureTree({
 
               {/* Assign Suppliers */}
               <div className="space-y-2 pt-2 border-t border-border">
-                <p className="font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                <p className="font-semibold text-mint-ink flex items-center gap-1">
                   <Truck className="h-3.5 w-3.5" /> Suppliers
                 </p>
                 <div className="grid gap-1.5 sm:grid-cols-2">
@@ -835,11 +835,11 @@ export function BusinessStructureTree({
                         key={s.id}
                         onClick={() => toggleMemberEntityAssignment(selectedMemberCode, "SUPPLIER", s.id, s.name)}
                         className={`flex items-center justify-between rounded-md border p-2 cursor-pointer transition-colors ${
-                          isAssigned ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40" : "border-border hover:bg-muted/50"
+                          isAssigned ? "border-mint-ink/30 bg-mint " : "border-border hover:bg-muted/50"
                         }`}
                       >
                         <span className="font-medium truncate">{s.name}</span>
-                        {isAssigned && <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />}
+                        {isAssigned && <Check className="h-3.5 w-3.5 text-mint-ink shrink-0" />}
                       </div>
                     );
                   })}
@@ -848,7 +848,7 @@ export function BusinessStructureTree({
 
               {/* Assign Freelancers */}
               <div className="space-y-2 pt-2 border-t border-border">
-                <p className="font-semibold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                <p className="font-semibold text-lav-ink flex items-center gap-1">
                   <Users className="h-3.5 w-3.5" /> Freelancers
                 </p>
                 <div className="grid gap-1.5 sm:grid-cols-2">
@@ -861,11 +861,11 @@ export function BusinessStructureTree({
                         key={f.id}
                         onClick={() => toggleMemberEntityAssignment(selectedMemberCode, "FREELANCER", f.id, f.name)}
                         className={`flex items-center justify-between rounded-md border p-2 cursor-pointer transition-colors ${
-                          isAssigned ? "border-purple-500 bg-purple-50 dark:bg-purple-950/40" : "border-border hover:bg-muted/50"
+                          isAssigned ? "border-lav-ink/30 bg-lav " : "border-border hover:bg-muted/50"
                         }`}
                       >
                         <span className="font-medium truncate">{f.name}</span>
-                        {isAssigned && <Check className="h-3.5 w-3.5 text-purple-600 shrink-0" />}
+                        {isAssigned && <Check className="h-3.5 w-3.5 text-lav-ink shrink-0" />}
                       </div>
                     );
                   })}

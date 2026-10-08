@@ -159,7 +159,7 @@ export function DirectoryView({ initialSuppliers }: { initialSuppliers?: Supplie
           {
             label: "Verified",
             value: loading ? "—" : suppliers.filter((s) => s.verified).length,
-            accent: "text-emerald-600 dark:text-emerald-400",
+            accent: "text-mint-ink ",
           },
           {
             label: "Countries",

@@ -151,7 +151,7 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
                       type="button"
                       onClick={() => move(idx, -1)}
                       disabled={idx === 0}
-                      className="w-6 h-6 rounded bg-white/90 flex items-center justify-center disabled:opacity-30"
+                      className="w-6 h-6 rounded bg-card/90 flex items-center justify-center disabled:opacity-30"
                     >
                       <ArrowUp className="h-3 w-3" />
                     </button>
@@ -166,7 +166,7 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
                       type="button"
                       onClick={() => move(idx, 1)}
                       disabled={idx === images.length - 1}
-                      className="w-6 h-6 rounded bg-white/90 flex items-center justify-center disabled:opacity-30"
+                      className="w-6 h-6 rounded bg-card/90 flex items-center justify-center disabled:opacity-30"
                     >
                       <ArrowDown className="h-3 w-3" />
                     </button>

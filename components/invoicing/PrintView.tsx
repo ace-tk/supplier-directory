@@ -19,7 +19,7 @@ export function PrintView({ invoice }: { invoice: InvoiceRecord }) {
   const props: InvoicePreviewProps = toInvoicePreviewProps(invoice);
 
   return (
-    <div className="min-h-screen bg-white py-8 print:py-0">
+    <div className="min-h-screen bg-card py-8 print:py-0">
       <style>{`
         @page { size: A4; margin: 14mm; }
         @media print {

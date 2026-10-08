@@ -175,16 +175,16 @@ export function InvoiceOverview({ basePath, inventoryPath }: { basePath: string;
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatWidget icon={Receipt} label="Total Sales" value={formatMoney(stats.totalSales)} accentClassName="text-primary" />
             <StatWidget icon={ShoppingCart} label="Total Purchases" value={formatMoney(stats.totalPurchases)} accentClassName="text-primary" />
-            <StatWidget icon={Landmark} label="Receivables" value={formatMoney(stats.receivables)} accentClassName="text-amber-500" />
-            <StatWidget icon={CreditCard} label="Payables" value={formatMoney(stats.payables)} accentClassName="text-amber-500" />
-            <StatWidget icon={CircleCheck} label="Paid" value={formatMoney(stats.paidAmount)} accentClassName="text-emerald-500" />
-            <StatWidget icon={AlertTriangle} label="Overdue Invoices" value={stats.overdueCount} accentClassName="text-red-500" />
+            <StatWidget icon={Landmark} label="Receivables" value={formatMoney(stats.receivables)} accentClassName="text-butter-ink" />
+            <StatWidget icon={CreditCard} label="Payables" value={formatMoney(stats.payables)} accentClassName="text-butter-ink" />
+            <StatWidget icon={CircleCheck} label="Paid" value={formatMoney(stats.paidAmount)} accentClassName="text-mint-ink" />
+            <StatWidget icon={AlertTriangle} label="Overdue Invoices" value={stats.overdueCount} accentClassName="text-rose-ink" />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatWidget icon={AlertTriangle} label="Overdue Receivable" value={formatMoney(stats.overdueReceivable)} accentClassName="text-red-500" />
-            <StatWidget icon={AlertTriangle} label="Overdue Payable" value={formatMoney(stats.overduePayable)} accentClassName="text-red-500" />
-            <StatWidget icon={Wallet} label="Total Expenses" value={formatMoney(stats.totalExpenses)} accentClassName="text-violet-500" />
+            <StatWidget icon={AlertTriangle} label="Overdue Receivable" value={formatMoney(stats.overdueReceivable)} accentClassName="text-rose-ink" />
+            <StatWidget icon={AlertTriangle} label="Overdue Payable" value={formatMoney(stats.overduePayable)} accentClassName="text-rose-ink" />
+            <StatWidget icon={Wallet} label="Total Expenses" value={formatMoney(stats.totalExpenses)} accentClassName="text-lav-ink" />
             <StatWidget icon={FileClock} label="Draft Invoices" value={stats.draftCount} accentClassName="text-muted-foreground" />
           </div>
 
@@ -224,7 +224,7 @@ export function InvoiceOverview({ basePath, inventoryPath }: { basePath: string;
             <QuickActionPanel
               id="expenses"
               icon={Wallet}
-              iconClassName="bg-violet-500/10 text-violet-500"
+              iconClassName="bg-lav text-lav-ink"
               title="Expenses"
               description="Track and manage business expenses"
               viewAllHref={`${basePath}/expenses`}
@@ -238,7 +238,7 @@ export function InvoiceOverview({ basePath, inventoryPath }: { basePath: string;
             />
             <QuickActionPanel
               icon={Package}
-              iconClassName="bg-emerald-500/10 text-emerald-500"
+              iconClassName="bg-mint text-mint-ink"
               title="Product Management"
               description="Manage products, categories & inventory"
               actions={[
@@ -254,7 +254,7 @@ export function InvoiceOverview({ basePath, inventoryPath }: { basePath: string;
             <QuickActionPanel
               id="cash-bank"
               icon={Landmark}
-              iconClassName="bg-amber-500/10 text-amber-500"
+              iconClassName="bg-butter text-butter-ink"
               title="Cash & Bank"
               description="Manage cash flow, bank accounts & transactions"
               actions={[{ label: "View Payment History", href: `${reportsPath}?kind=PAYMENT`, icon: History }]}
@@ -262,7 +262,7 @@ export function InvoiceOverview({ basePath, inventoryPath }: { basePath: string;
             />
             <QuickActionPanel
               icon={BarChart3}
-              iconClassName="bg-sky-500/10 text-sky-500"
+              iconClassName="bg-sky text-sky-ink"
               title="Reports"
               description="View insights and business reports"
               viewAllHref={reportsPath}

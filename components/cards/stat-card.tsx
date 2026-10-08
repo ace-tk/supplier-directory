@@ -21,7 +21,7 @@ export function StatCard({
   change,
   changeLabel = "vs last month",
   icon: Icon,
-  iconColor = "text-primary",
+  iconColor = "text-pri-text",
   delay = 0,
   className,
 }: StatCardProps) {
@@ -36,7 +36,7 @@ export function StatCard({
       transition={{ duration: 0.3, delay, ease: [0.4, 0, 0.2, 1] }}
       whileHover={{ y: -2, transition: { duration: 0.15 } }}
       className={cn(
-        "rounded-xl border border-border bg-card p-5 shadow-card hover:shadow-card-hover transition-shadow duration-200",
+        "rounded-[20px] bg-card p-5 ring-1 ring-border shadow-[var(--shadow-soft)] hover:shadow-card-hover transition-shadow duration-200",
         className
       )}
     >
@@ -47,7 +47,7 @@ export function StatCard({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, delay: delay + 0.1 }}
-            className="text-3xl font-semibold tracking-tight text-foreground"
+            className="text-3xl font-semibold tracking-tight tabular-nums text-foreground"
           >
             {value}
           </motion.p>
@@ -72,7 +72,7 @@ export function StatCard({
         </div>
         {Icon && (
           <div className={cn(
-            "flex items-center justify-center w-10 h-10 rounded-lg bg-muted/50",
+            "flex items-center justify-center w-10 h-10 rounded-xl bg-soft",
             iconColor
           )}>
             <Icon className="h-5 w-5" />

@@ -350,7 +350,7 @@ export default function SupplierPortalPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 px-1"
+          className="flex items-center gap-2 text-xs text-butter-ink px-1"
         >
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           Fill in all required fields to continue.
@@ -360,7 +360,7 @@ export default function SupplierPortalPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 px-1"
+          className="flex items-center gap-2 text-xs text-butter-ink px-1"
         >
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           Select at least one category to continue.
@@ -442,9 +442,9 @@ function SuccessScreen({
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center"
+        className="w-20 h-20 rounded-2xl bg-mint border border-mint-ink/30 flex items-center justify-center"
       >
-        <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+        <CheckCircle2 className="h-10 w-10 text-mint-ink" />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>

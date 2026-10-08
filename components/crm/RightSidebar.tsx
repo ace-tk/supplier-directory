@@ -78,20 +78,20 @@ export function RightSidebar({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-white relative z-20">
+    <div className="flex-1 flex flex-col h-full bg-card relative z-20">
       {/* Header */}
-      <div className="h-16 px-4 border-b border-slate-200 flex items-center gap-3 shrink-0 bg-slate-50">
+      <div className="h-16 px-4 border-b border-border flex items-center gap-3 shrink-0 bg-soft">
         <button 
           onClick={onClose}
-          className="p-2 -ml-2 text-slate-500 hover:bg-slate-200 rounded-full transition-colors"
+          className="p-2 -ml-2 text-muted-foreground hover:bg-soft rounded-full transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
-        <h2 className="font-bold text-slate-800">CRM Information</h2>
+        <h2 className="font-bold text-foreground">CRM Information</h2>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 px-2 shrink-0">
+      <div className="flex border-b border-border px-2 shrink-0">
         {[
           { id: "overview", label: "Overview" },
           { id: "notes", label: "Notes" },
@@ -103,8 +103,8 @@ export function RightSidebar({
             onClick={() => setActiveTab(tab.id as Tab)}
             className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${
               activeTab === tab.id 
-                ? "border-indigo-600 text-indigo-700" 
-                : "border-transparent text-slate-500 hover:text-slate-700"
+                ? "border-lav-ink/30 text-lav-ink" 
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {tab.label}
@@ -130,38 +130,38 @@ export function RightSidebar({
                 >
                   {supplier.initials || supplier.companyName.substring(0,2).toUpperCase()}
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2 justify-center">
+                <h3 className="text-xl font-bold text-foreground flex items-center gap-2 justify-center">
                   {supplier.companyName}
-                  {supplier.verified && <ShieldCheck className="w-5 h-5 text-blue-500" />}
+                  {supplier.verified && <ShieldCheck className="w-5 h-5 text-sky-ink" />}
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">{supplier.industry}</p>
-                <div className="flex items-center gap-1 mt-2 text-sm text-slate-600 font-medium">
-                  <MapPin className="w-4 h-4 text-slate-400" />
+                <p className="text-sm text-muted-foreground mt-1">{supplier.industry}</p>
+                <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground font-medium">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
                   {supplier.city}, {supplier.country}
                 </div>
               </div>
 
               {/* Stats */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <Clock className="w-5 h-5 text-indigo-500 mb-2" />
-                  <p className="text-xs text-slate-500 font-medium">Response Time</p>
-                  <p className="text-sm font-bold text-slate-800">{supplier.responseTime || "< 2 hours"}</p>
+                <div className="bg-soft rounded-xl p-4 border border-border">
+                  <Clock className="w-5 h-5 text-lav-ink mb-2" />
+                  <p className="text-xs text-muted-foreground font-medium">Response Time</p>
+                  <p className="text-sm font-bold text-foreground">{supplier.responseTime || "< 2 hours"}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <Calendar className="w-5 h-5 text-emerald-500 mb-2" />
-                  <p className="text-xs text-slate-500 font-medium">Established</p>
-                  <p className="text-sm font-bold text-slate-800">{supplier.yearEstablished || "2010"}</p>
+                <div className="bg-soft rounded-xl p-4 border border-border">
+                  <Calendar className="w-5 h-5 text-mint-ink mb-2" />
+                  <p className="text-xs text-muted-foreground font-medium">Established</p>
+                  <p className="text-sm font-bold text-foreground">{supplier.yearEstablished || "2010"}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <Package className="w-5 h-5 text-amber-500 mb-2" />
-                  <p className="text-xs text-slate-500 font-medium">Total Products</p>
-                  <p className="text-sm font-bold text-slate-800">{supplier.products?.length || 0}</p>
+                <div className="bg-soft rounded-xl p-4 border border-border">
+                  <Package className="w-5 h-5 text-butter-ink mb-2" />
+                  <p className="text-xs text-muted-foreground font-medium">Total Products</p>
+                  <p className="text-sm font-bold text-foreground">{supplier.products?.length || 0}</p>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <TrendingUp className="w-5 h-5 text-rose-500 mb-2" />
-                  <p className="text-xs text-slate-500 font-medium">Total Orders</p>
-                  <p className="text-sm font-bold text-slate-800">12</p>
+                <div className="bg-soft rounded-xl p-4 border border-border">
+                  <TrendingUp className="w-5 h-5 text-rose-ink mb-2" />
+                  <p className="text-xs text-muted-foreground font-medium">Total Orders</p>
+                  <p className="text-sm font-bold text-foreground">12</p>
                 </div>
               </div>
 
@@ -177,24 +177,24 @@ export function RightSidebar({
               animate={{ opacity: 1 }}
               className="p-5 flex flex-col h-full"
             >
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 flex gap-2 text-sm text-amber-800">
-                <ShieldCheck className="w-5 h-5 shrink-0 text-amber-600" />
+              <div className="bg-butter border border-butter-ink/20 rounded-xl p-3 mb-4 flex gap-2 text-sm text-butter-ink">
+                <ShieldCheck className="w-5 h-5 shrink-0 text-butter-ink" />
                 <p>Notes are for internal use only and are not visible to the supplier.</p>
               </div>
 
               <div className="flex-1 space-y-4">
                 {conversation.notes && conversation.notes.length > 0 ? (
                   conversation.notes.map(note => (
-                    <div key={note.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{note.content}</p>
-                      <div className="flex justify-between items-center mt-3 text-[11px] text-slate-400 font-medium uppercase tracking-wider">
+                    <div key={note.id} className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{note.content}</p>
+                      <div className="flex justify-between items-center mt-3 text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
                         <span>{note.author}</span>
                         <span>{format(new Date(note.createdAt), 'MMM d, h:mm a')}</span>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-10 text-slate-500 text-sm">
+                  <div className="text-center py-10 text-muted-foreground text-sm">
                     No notes added yet.
                   </div>
                 )}
@@ -205,7 +205,7 @@ export function RightSidebar({
                   value={newNote}
                   onChange={e => setNewNote(e.target.value)}
                   placeholder="Type a note..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
+                  className="w-full bg-soft border border-border rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-lav-ink/20 focus:border-lav-ink/30 resize-none"
                   rows={2}
                 />
                 <button className="absolute right-3 bottom-4 p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
@@ -222,19 +222,19 @@ export function RightSidebar({
               className="p-5"
             >
               {addingTask ? (
-                <div className="mb-6 p-3 border border-slate-200 rounded-xl bg-slate-50 space-y-2">
+                <div className="mb-6 p-3 border border-border rounded-xl bg-soft space-y-2">
                   <input
                     autoFocus
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
                     placeholder="Task title..."
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lav-ink/20 focus:border-lav-ink/30"
                   />
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={() => { setAddingTask(false); setNewTaskTitle(""); }}
-                      className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-soft rounded-lg transition-colors"
                     >
                       Cancel
                     </button>
@@ -250,7 +250,7 @@ export function RightSidebar({
               ) : (
                 <button
                   onClick={() => setAddingTask(true)}
-                  className="w-full py-2.5 mb-6 border-2 border-dashed border-slate-300 text-slate-600 font-medium rounded-xl hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 mb-6 border-2 border-dashed border-border text-muted-foreground font-medium rounded-xl hover:border-lav-ink/30 hover:text-lav-ink hover:bg-lav transition-colors flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" /> Add Task
                 </button>
@@ -259,19 +259,19 @@ export function RightSidebar({
               <div className="space-y-3">
                 {localTasks.length > 0 ? (
                   localTasks.map(task => (
-                    <div key={task.id} className={`flex items-start gap-3 p-3 rounded-xl border ${task.completed ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 shadow-sm'}`}>
-                      <button onClick={() => handleToggleTask(task)} className={`mt-0.5 shrink-0 ${task.completed ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}>
+                    <div key={task.id} className={`flex items-start gap-3 p-3 rounded-xl border ${task.completed ? 'bg-soft border-border opacity-60' : 'bg-card border-border shadow-sm'}`}>
+                      <button onClick={() => handleToggleTask(task)} className={`mt-0.5 shrink-0 ${task.completed ? 'text-lav-ink' : 'text-muted-foreground hover:text-lav-ink'}`}>
                         <CheckSquare className="w-5 h-5" />
                       </button>
                       <div>
-                        <p className={`text-sm font-medium ${task.completed ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{task.title}</p>
+                        <p className={`text-sm font-medium ${task.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{task.title}</p>
                         <div className="flex gap-2 mt-1">
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            task.priority === 'High' ? 'bg-rose-100 text-rose-700' :
-                            task.priority === 'Low' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'
+                            task.priority === 'High' ? 'bg-rose text-rose-ink' :
+                            task.priority === 'Low' ? 'bg-soft text-muted-foreground' : 'bg-butter text-butter-ink'
                           }`}>{task.priority}</span>
                           {task.dueDate && (
-                            <span className="text-[10px] text-slate-500 font-medium pt-0.5">
+                            <span className="text-[10px] text-muted-foreground font-medium pt-0.5">
                               Due: {format(new Date(task.dueDate), 'MMM d')}
                             </span>
                           )}
@@ -280,7 +280,7 @@ export function RightSidebar({
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-10 text-slate-500 text-sm">
+                  <div className="text-center py-10 text-muted-foreground text-sm">
                     No active tasks.
                   </div>
                 )}
@@ -298,22 +298,22 @@ export function RightSidebar({
                 {conversation.activities && conversation.activities.length > 0 ? (
                   conversation.activities.map(activity => (
                     <div key={activity.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                      <div className="flex items-center justify-center w-6 h-6 rounded-full border border-white bg-slate-200 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full border border-white bg-soft text-muted-foreground shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                         {activity.type === 'System' ? <Activity className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
                       </div>
-                      <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-1.5rem)] p-3 rounded bg-slate-50 border border-slate-100 shadow-sm">
+                      <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-1.5rem)] p-3 rounded bg-soft border border-border shadow-sm">
                         <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-semibold text-slate-800 text-sm">{activity.title}</h4>
+                          <h4 className="font-semibold text-foreground text-sm">{activity.title}</h4>
                         </div>
-                        {activity.description && <p className="text-xs text-slate-500">{activity.description}</p>}
-                        <time className="text-[10px] text-slate-400 mt-2 block uppercase tracking-wider font-medium">
+                        {activity.description && <p className="text-xs text-muted-foreground">{activity.description}</p>}
+                        <time className="text-[10px] text-muted-foreground mt-2 block uppercase tracking-wider font-medium">
                           {format(new Date(activity.createdAt), 'MMM d, h:mm a')}
                         </time>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-10 text-slate-500 text-sm">
+                  <div className="text-center py-10 text-muted-foreground text-sm">
                     No activity recorded.
                   </div>
                 )}

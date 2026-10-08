@@ -126,9 +126,9 @@ export default function FreelancersPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatWidget icon={Users} label="Total Freelancers" value={activeCount} />
-        <StatWidget icon={UserCheck} label="Available Now" value={availableCount} accentClassName="text-emerald-500" />
+        <StatWidget icon={UserCheck} label="Available Now" value={availableCount} accentClassName="text-mint-ink" />
         <StatWidget icon={Briefcase} label="Active Projects" value={totalProjects} />
-        <StatWidget icon={TrendingUp} label="Avg Performance" value={`${avgPerformance}%`} accentClassName="text-blue-500" />
+        <StatWidget icon={TrendingUp} label="Avg Performance" value={`${avgPerformance}%`} accentClassName="text-sky-ink" />
       </div>
 
       <ListToolbar

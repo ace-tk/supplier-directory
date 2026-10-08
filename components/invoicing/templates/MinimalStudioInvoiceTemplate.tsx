@@ -50,33 +50,33 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
   const hasBankingDetails = Boolean(bankAccountHolder || bankName || bankAccountNumber || bankIfscCode || bankBranch || bankUpiId);
 
   return (
-    <div className={`overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-card ${className ?? ""}`}>
+    <div className={`overflow-hidden rounded-2xl border border-border bg-card text-foreground shadow-card ${className ?? ""}`}>
       <div className="p-8 sm:p-12 space-y-8">
         {/* Brand */}
         <p className="text-xl font-black tracking-tight uppercase">{sellerName || "Your Company"}</p>
 
         {/* Metadata row + title */}
-        <div className="flex items-start justify-between gap-6 flex-wrap border-t border-b border-neutral-200 py-4">
+        <div className="flex items-start justify-between gap-6 flex-wrap border-t border-b border-border py-4">
           <div className="grid grid-cols-2 gap-x-10 gap-y-2 text-xs">
             <div>
-              <p className="text-neutral-400 uppercase tracking-wide">Invoice Date</p>
+              <p className="text-muted-foreground uppercase tracking-wide">Invoice Date</p>
               <p className="font-medium mt-0.5">{isoOrRaw(invoiceDate)}</p>
             </div>
             <div>
-              <p className="text-neutral-400 uppercase tracking-wide">Invoice Number</p>
+              <p className="text-muted-foreground uppercase tracking-wide">Invoice Number</p>
               <p className="font-mono font-medium mt-0.5">{invoiceNumber || "—"}</p>
             </div>
             <div>
-              <p className="text-neutral-400 uppercase tracking-wide">Due Date</p>
+              <p className="text-muted-foreground uppercase tracking-wide">Due Date</p>
               <p className="font-medium mt-0.5">{isoOrRaw(dueDate)}</p>
             </div>
             <div>
-              <p className="text-neutral-400 uppercase tracking-wide">{partyLabel}</p>
+              <p className="text-muted-foreground uppercase tracking-wide">{partyLabel}</p>
               <p className="font-medium mt-0.5">{partyName || "—"}</p>
             </div>
             {referenceNumber && (
               <div>
-                <p className="text-neutral-400 uppercase tracking-wide">Reference</p>
+                <p className="text-muted-foreground uppercase tracking-wide">Reference</p>
                 <p className="font-medium mt-0.5">{referenceNumber}</p>
               </div>
             )}
@@ -85,7 +85,7 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
         </div>
 
         {/* Party detail */}
-        <div className="text-xs text-neutral-600 space-y-0.5">
+        <div className="text-xs text-muted-foreground space-y-0.5">
           {partyContactPerson && <p>Attn: {partyContactPerson}</p>}
           <div className="space-x-3">
             {partyEmail && <span>{partyEmail}</span>}
@@ -97,7 +97,7 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
         {/* Items table */}
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-neutral-900">
+            <tr className="border-b border-border">
               <th className="text-left font-semibold uppercase tracking-wide py-2">Item / Description</th>
               <th className="text-right font-semibold uppercase tracking-wide py-2">Qty</th>
               <th className="text-right font-semibold uppercase tracking-wide py-2">Rate</th>
@@ -105,10 +105,10 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
               <th className="text-right font-semibold uppercase tracking-wide py-2">Total</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-border">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-8 text-neutral-400">
+                <td colSpan={5} className="text-center py-8 text-muted-foreground">
                   No items added yet
                 </td>
               </tr>
@@ -117,13 +117,13 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
                 <tr key={i}>
                   <td className="py-2.5 align-top">
                     <p className="font-medium">{item.productName || "Untitled item"}</p>
-                    {item.description && <p className="text-neutral-400 mt-0.5">{item.description}</p>}
+                    {item.description && <p className="text-muted-foreground mt-0.5">{item.description}</p>}
                   </td>
                   <td className="py-2.5 align-top text-right tabular-nums">
                     {item.quantity} {item.unit}
                   </td>
                   <td className="py-2.5 align-top text-right tabular-nums">{money(String(item.rate))}</td>
-                  <td className="py-2.5 align-top text-right tabular-nums text-neutral-500">{item.taxPercent ? `${item.taxPercent}%` : "—"}</td>
+                  <td className="py-2.5 align-top text-right tabular-nums text-muted-foreground">{item.taxPercent ? `${item.taxPercent}%` : "—"}</td>
                   <td className="py-2.5 align-top text-right tabular-nums font-medium">{money(item.lineTotal)}</td>
                 </tr>
               ))
@@ -164,13 +164,13 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
             </div>
             {balanceDue !== undefined && (
               <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-neutral-500">Balance Due</span>
+                <span className="text-muted-foreground">Balance Due</span>
                 <span className="tabular-nums font-semibold">{money(balanceDue)}</span>
               </div>
             )}
             {amountPaid !== undefined && Number(amountPaid) > 0 && (
               <div className="flex items-center justify-between text-xs">
-                <span className="text-neutral-500">Amount Paid</span>
+                <span className="text-muted-foreground">Amount Paid</span>
                 <span className="tabular-nums">{money(amountPaid)}</span>
               </div>
             )}
@@ -179,9 +179,9 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
 
         {/* Payment */}
         {hasBankingDetails && (
-          <div className="border-t border-neutral-200 pt-5">
+          <div className="border-t border-border pt-5">
             <p className="text-xs font-semibold uppercase tracking-wide mb-2">Payment</p>
-            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-xs text-neutral-600">
+            <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-xs text-muted-foreground">
               {bankName && <p>{bankName}</p>}
               {bankAccountHolder && <p>{bankAccountHolder}</p>}
               {bankAccountNumber && <p>A/C {bankAccountNumber}</p>}
@@ -190,21 +190,21 @@ export function MinimalStudioInvoiceTemplate(props: InvoicePreviewProps) {
               {bankUpiId && <p>UPI {bankUpiId}</p>}
               {paymentTerms && <p>Terms: {paymentTerms}</p>}
             </div>
-            {bankPaymentInstructions && <p className="text-xs text-neutral-500 whitespace-pre-line mt-2">{bankPaymentInstructions}</p>}
+            {bankPaymentInstructions && <p className="text-xs text-muted-foreground whitespace-pre-line mt-2">{bankPaymentInstructions}</p>}
           </div>
         )}
 
         {/* Terms */}
         {(termsAndConditions || customerNotes) && (
-          <div className="border-t border-neutral-200 pt-5 text-xs">
+          <div className="border-t border-border pt-5 text-xs">
             <p className="font-semibold uppercase tracking-wide mb-1.5">Terms &amp; Conditions</p>
-            {termsAndConditions && <p className="text-neutral-500 whitespace-pre-line">{termsAndConditions}</p>}
-            {customerNotes && <p className="text-neutral-500 whitespace-pre-line mt-1.5">{customerNotes}</p>}
+            {termsAndConditions && <p className="text-muted-foreground whitespace-pre-line">{termsAndConditions}</p>}
+            {customerNotes && <p className="text-muted-foreground whitespace-pre-line mt-1.5">{customerNotes}</p>}
           </div>
         )}
 
         {/* Footer */}
-        <div className="border-t border-neutral-200 pt-4 text-[11px] text-neutral-400 flex flex-wrap gap-x-3 gap-y-1">
+        <div className="border-t border-border pt-4 text-[11px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
           <span>{sellerName}</span>
           {sellerAddress && <span>{sellerAddress}</span>}
           {sellerEmail && <span>{sellerEmail}</span>}
@@ -225,9 +225,9 @@ function isoOrRaw(date: string): string {
 
 function MinimalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-neutral-500">
+    <div className="flex items-center justify-between text-muted-foreground">
       <span>{label}</span>
-      <span className="tabular-nums text-neutral-900 font-medium">{value}</span>
+      <span className="tabular-nums text-foreground font-medium">{value}</span>
     </div>
   );
 }

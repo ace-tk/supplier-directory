@@ -323,14 +323,14 @@ export function SupplierForm({
                     className={cn(
                       "flex items-center gap-2 px-3 h-8 rounded-lg border text-sm font-medium transition-all duration-150 w-full",
                       watchedVerified
-                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                        ? "border-mint-ink/40 bg-mint text-mint-ink "
                         : "border-border bg-muted/30 text-muted-foreground"
                     )}
                   >
                     <span
                       className={cn(
                         "w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-colors",
-                        watchedVerified ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground"
+                        watchedVerified ? "border-mint-ink/30 bg-emerald-500" : "border-muted-foreground"
                       )}
                     >
                       {watchedVerified && (

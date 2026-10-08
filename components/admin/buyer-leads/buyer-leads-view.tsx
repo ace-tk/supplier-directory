@@ -115,9 +115,9 @@ export function BuyerLeadsView({ initialLeads, suppliers }: BuyerLeadsViewProps)
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatWidget icon={Users2} label="Total Leads" value={leads.length} />
-        <StatWidget icon={Clock} label="Pending Verification" value={pendingCount} accentClassName="text-amber-500" />
-        <StatWidget icon={GitMerge} label="Supplier Matching" value={matchingCount} accentClassName="text-blue-500" />
-        <StatWidget icon={CheckCircle2} label="Closed" value={closedCount} accentClassName="text-emerald-500" />
+        <StatWidget icon={Clock} label="Pending Verification" value={pendingCount} accentClassName="text-butter-ink" />
+        <StatWidget icon={GitMerge} label="Supplier Matching" value={matchingCount} accentClassName="text-sky-ink" />
+        <StatWidget icon={CheckCircle2} label="Closed" value={closedCount} accentClassName="text-mint-ink" />
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => v && setActiveTab(v)}>

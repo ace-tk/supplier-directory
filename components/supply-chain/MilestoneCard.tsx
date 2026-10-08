@@ -51,7 +51,7 @@ export function MilestoneCard({
       {isCompleted && (
         <motion.div
           aria-hidden
-          className="absolute inset-0 rounded-2xl pointer-events-none ring-1 ring-emerald-500/30"
+          className="absolute inset-0 rounded-2xl pointer-events-none ring-1 ring-mint-ink/30"
           animate={{ opacity: [0.4, 0.9, 0.4] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
         />
