@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BusinessSetup, type BusinessSetupActions } from "@/components/business-structure/BusinessSetup";
-import { EMPTY_SETUP, assignMembers, registerBusiness, saveLocation, saveTeamMember, type SetupData } from "@/lib/business-structure";
+import { EMPTY_SETUP, NO_ACCESS, assignMembers, registerBusiness, saveLocation, saveTeamMember, setToolAccess, type SetupData } from "@/lib/business-structure";
 import { ROLE_PRESETS } from "@/lib/team-permissions";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -432,5 +432,105 @@ describe("Business Setup — tool access", () => {
     fireEvent.click(screen.getByRole("tab", { name: /01 · Team members/ }));
     openStep3();
     expect((screen.getByLabelText("Banking") as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+
+describe("Business Setup — structure overview", () => {
+  /** Asha (top) → Ravi; a warehouse with both, a back office with Asha; Ravi has two tools. */
+  function full(): SetupData {
+    let s = withTeam();
+    const next = (c: ReturnType<typeof saveLocation>) => {
+      if (!c.ok) throw new Error(c.error);
+      s = c.setup;
+    };
+    next(saveLocation(s, "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "Bhiwandi" }));
+    next(saveLocation(s, "B001", { type: "OFFICE", name: "Head office", address: "" }));
+    next(assignMembers(s, "B001", "L001", ["M001", "M002"]));
+    for (const tool of ["Inventory", "Banking"]) next(setToolAccess(s, "B001", "M002", tool, { ...NO_ACCESS, view: true }));
+    return s;
+  }
+  const openOverview = () => fireEvent.click(screen.getByRole("tab", { name: "Structure overview" }));
+
+  it("shows the metrics, the business and its GST", () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const map = screen.getByLabelText("Organisation map");
+    expect(within(map).getByText("A clear view of your business")).toBeTruthy();
+    const metric = (label: string) => within(map).getByText(label).previousElementSibling?.textContent;
+    expect(metric("Team members")).toBe("2");
+    expect(metric("Business locations")).toBe("2");
+    expect(metric("Tools in use")).toBe("2");
+    expect(within(map).getAllByText(`GST ${GST}`).length).toBeGreaterThan(0);
+  });
+
+  it("draws the reporting hierarchy: the manager at the top with the person who reports to them below", () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const tree = screen.getByLabelText("Reporting hierarchy");
+    const top = within(tree).getByRole("button", { name: /Asha/ });
+    const ravi = within(tree).getByRole("button", { name: /Ravi/ });
+    // Ravi's node sits inside Asha's list item
+    expect(top.closest("li")?.contains(ravi)).toBe(true);
+    expect(ravi.closest("li")?.contains(top)).toBe(false);
+  });
+
+  it("clicking a person opens their profile; clicking a location's Assign opens the assign dialog", async () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    fireEvent.click(within(screen.getByLabelText("Reporting hierarchy")).getByRole("button", { name: /Ravi/ }));
+    expect(await screen.findByText("Edit member")).toBeTruthy();
+    expect((screen.getByLabelText("Member name") as HTMLInputElement).value).toBe("Ravi");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByText("Edit member")).toBeNull());
+
+    fireEvent.click(within(screen.getByRole("article", { name: "Head office overview" })).getByRole("button", { name: /Assign/ }));
+    expect(await screen.findByText("Assign members · Head office")).toBeTruthy();
+  });
+
+  it("lists each vertical with its locations and the people there; a person's badge opens their profile", async () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const warehouse = screen.getByRole("article", { name: "Warehouse 1 overview" });
+    expect(within(warehouse).getByText("Bhiwandi")).toBeTruthy();
+    expect(within(warehouse).getByRole("button", { name: "Asha" })).toBeTruthy();
+    expect(within(warehouse).getByRole("button", { name: "Ravi" })).toBeTruthy();
+    const office = screen.getByRole("article", { name: "Head office overview" });
+    expect(within(office).getByText("Location details pending")).toBeTruthy();
+    expect(within(office).getByText("No assigned members")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Retail Stores overview" })).getByText("0 locations · one GST")).toBeTruthy();
+    fireEvent.click(within(warehouse).getByRole("button", { name: "Asha" }));
+    expect(await screen.findByText("Edit member")).toBeTruthy();
+  });
+
+  it("can add a location from here", async () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    fireEvent.click(within(screen.getByRole("region", { name: "Retail Stores overview" })).getByRole("button", { name: /Add Retail Store/ }));
+    expect((await screen.findByLabelText("Location name") as HTMLInputElement).value).toBe("Retail Store 1");
+  });
+
+  it("shows the tools each person has, or that they have none", () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const rows = screen.getByLabelText("Tools by member");
+    expect(within(rows).getByText("No tools assigned")).toBeTruthy();
+    expect(within(rows).getByText("Inventory")).toBeTruthy();
+    expect(within(rows).getByText("Banking")).toBeTruthy();
+  });
+
+  it("Print chart prints the page", () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    render(<Harness initial={full()} />);
+    openOverview();
+    fireEvent.click(screen.getByRole("button", { name: /Print chart/ }));
+    expect(print).toHaveBeenCalledTimes(1);
+    print.mockRestore();
+  });
+
+  it("with no team it says so", () => {
+    render(<Harness initial={withBusiness()} />);
+    openOverview();
+    expect(screen.getByText("No team members yet.")).toBeTruthy();
   });
 });

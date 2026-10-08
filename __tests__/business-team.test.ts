@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_SETUP, LOCATION_TYPE_LABEL, NO_ACCESS, PLANNED_TOOLS, TOOLS, VERTICALS, membersWithTools, setToolAccess, toolAccessOf, assignMembers, checkSetup, isValidGstin, registerBusiness, removeLocation, removeTeamMember, saveLocation, saveTeamMember, teamOf, updateBusiness, type Change, type SetupData } from "@/lib/business-structure";
+import { EMPTY_SETUP, LOCATION_TYPE_LABEL, NO_ACCESS, reportingTree, toolsInUse, toolsOfMember, PLANNED_TOOLS, TOOLS, VERTICALS, membersWithTools, setToolAccess, toolAccessOf, assignMembers, checkSetup, isValidGstin, registerBusiness, removeLocation, removeTeamMember, saveLocation, saveTeamMember, teamOf, updateBusiness, type Change, type SetupData } from "@/lib/business-structure";
 
 const GST1 = "27AAAAA0001A1Z1";
 const GST2 = "29BBBBB0002B1Z2";
@@ -294,5 +294,45 @@ describe("tool access", () => {
     s = done(setToolAccess(s, "B001", "M002", "Inventory", view));
     s = done(assignMembers(s, "B001", "L001", ["M002"]));
     expect(toolAccessOf(s, "B001", "M002").get("Inventory")).toEqual(view);
+  });
+});
+
+
+// ---------------------------------------------------------------- structure overview
+describe("reporting tree and tools overview", () => {
+  const tree = (s: SetupData) => reportingTree(teamOf(s, "B001")).map(function walk(n): unknown {
+    return n.children.length ? { [n.member.name]: n.children.map(walk) } : n.member.name;
+  });
+
+  it("people with no manager are the top; everyone else hangs under whoever they report to", () => {
+    let s = done(saveTeamMember(oneBusiness(), "B001", person("Asha", { designation: "Director" })));
+    s = done(saveTeamMember(s, "B001", person("Ravi", { reportsToCode: "M001" })));
+    s = done(saveTeamMember(s, "B001", person("Sana", { reportsToCode: "M001" })));
+    s = done(saveTeamMember(s, "B001", person("Kiran", { reportsToCode: "M002" })));
+    s = done(saveTeamMember(s, "B001", person("Meera")));
+    expect(tree(s)).toEqual([{ Asha: [{ Ravi: ["Kiran"] }, "Sana"] }, "Meera"]);
+  });
+  it("an empty team has no tree", () => {
+    expect(reportingTree([])).toEqual([]);
+  });
+  it("a loop in old data cannot hide anyone: they are all still shown, once", () => {
+    const team = [
+      { memberCode: "M001", name: "A", email: "", mobile: "", designation: "Director", reportsToCode: "M002", locationCodes: [], assignmentCodes: [] },
+      { memberCode: "M002", name: "B", email: "", mobile: "", designation: "Director", reportsToCode: "M001", locationCodes: [], assignmentCodes: [] },
+      { memberCode: "M003", name: "C", email: "", mobile: "", designation: "Director", reportsToCode: "M003", locationCodes: [], assignmentCodes: [] },
+    ];
+    const names: string[] = [];
+    const walk = (nodes: ReturnType<typeof reportingTree>) => nodes.forEach((n) => (names.push(n.member.name), walk(n.children)));
+    walk(reportingTree(team));
+    expect(names.sort()).toEqual(["A", "B", "C"]);
+  });
+  it("tools of a member are in the order of the tool list; tools in use counts different tools across the team", () => {
+    let s = team3();
+    s = done(setToolAccess(s, "B001", "M002", "Banking", { ...NO_ACCESS, view: true }));
+    s = done(setToolAccess(s, "B001", "M002", "Dashboard", { ...NO_ACCESS, view: true }));
+    s = done(setToolAccess(s, "B001", "M003", "Banking", { ...NO_ACCESS, view: true }));
+    expect(toolsOfMember(s, "B001", "M002").map((t) => t.tool)).toEqual(["Dashboard", "Banking"]);
+    expect(toolsOfMember(s, "B001", "M001")).toEqual([]);
+    expect(toolsInUse(s, "B001")).toBe(2);
   });
 });

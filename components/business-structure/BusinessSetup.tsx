@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Building, Building2, Copy, KeyRound, Loader2, MapPin, Plus, Search, ShieldCheck, Store, UserPlus, Users, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StructureOverview } from "@/components/business-structure/StructureOverview";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -217,10 +218,16 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                   onGoToTeam={() => setStep(0)}
                 />
               ) : (
-                <div className="py-10 text-center">
-                  <h3 className="text-lg font-semibold">{STEPS[step].replace(/^\d+ · /, "")}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">This step is built next. The team you add here is what it will use.</p>
-                </div>
+                <StructureOverview
+                  setup={saved}
+                  businessCode={business.code}
+                  businessName={business.name}
+                  gstin={entity?.gstin ?? ""}
+                  team={team}
+                  onOpenMember={(memberCode) => setDialog({ kind: "member", memberCode })}
+                  onAssign={(locationCode) => setDialog({ kind: "assign", locationCode })}
+                  onAddLocation={(type) => setDialog({ kind: "location", type })}
+                />
               )}
             </section>
 

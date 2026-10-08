@@ -580,3 +580,46 @@ export function setToolAccess(setup: SetupData, businessCode: string, memberCode
 export function membersWithTools(setup: SetupData, businessCode: string): number {
   return teamOf(setup, businessCode).filter((m) => [...toolAccessOf(setup, businessCode, m.memberCode).values()].some(hasAnyAccess)).length;
 }
+
+
+// ---------------------------------------------------------------- Business Setup: structure overview
+export interface OrgNode {
+  member: TeamMember;
+  children: OrgNode[];
+}
+
+/**
+ * The reporting tree of a team: people with no manager on the team are the top; everyone else hangs under the
+ * person they report to. A loop (which the checks refuse, but old data may hold) cannot hide anyone: whoever is
+ * not reached from the top is shown at the top instead.
+ */
+export function reportingTree(team: TeamMember[]): OrgNode[] {
+  const byCode = new Map(team.map((m) => [m.memberCode, m]));
+  const kids = new Map<string, TeamMember[]>();
+  const tops: TeamMember[] = [];
+  for (const m of team) {
+    if (m.reportsToCode && byCode.has(m.reportsToCode) && m.reportsToCode !== m.memberCode) kids.set(m.reportsToCode, [...(kids.get(m.reportsToCode) ?? []), m]);
+    else tops.push(m);
+  }
+  const seen = new Set<string>();
+  const build = (m: TeamMember): OrgNode => {
+    seen.add(m.memberCode);
+    return { member: m, children: (kids.get(m.memberCode) ?? []).filter((c) => !seen.has(c.memberCode)).map(build) };
+  };
+  const roots = tops.map(build);
+  for (const m of team) if (!seen.has(m.memberCode)) roots.push(build(m));
+  return roots;
+}
+
+/** The tools a person has, with their levels, in the order of the tool list. */
+export function toolsOfMember(setup: SetupData, businessCode: string, memberCode: string): { tool: string; levels: ToolLevels }[] {
+  const access = toolAccessOf(setup, businessCode, memberCode);
+  return TOOLS.filter((t) => hasAnyAccess(access.get(t))).map((tool) => ({ tool, levels: access.get(tool)! }));
+}
+
+/** How many different tools anyone on the team has. */
+export function toolsInUse(setup: SetupData, businessCode: string): number {
+  const used = new Set<string>();
+  for (const m of teamOf(setup, businessCode)) for (const t of toolsOfMember(setup, businessCode, m.memberCode)) used.add(t.tool);
+  return used.size;
+}
