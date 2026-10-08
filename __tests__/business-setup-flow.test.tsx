@@ -3,24 +3,30 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BusinessSetup, type BusinessSetupActions } from "@/components/business-structure/BusinessSetup";
-import { EMPTY_SETUP, NO_ACCESS, assignMembers, registerBusiness, saveLocation, saveTeamMember, setToolAccess, type SetupData } from "@/lib/business-structure";
+import { EMPTY_SETUP, NO_ACCESS, type AssignedParty, type PartyCandidate, assignMembers, registerBusiness, saveLocation, saveTeamMember, setToolAccess, type SetupData } from "@/lib/business-structure";
 import { ROLE_PRESETS } from "@/lib/team-permissions";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 // The real actions are server code; the screen is given fakes through its props.
-vi.mock("@/services/business-structure", () => ({ saveBusinessSetupAction: vi.fn(), getTeamDirectoryAction: vi.fn() }));
+vi.mock("@/services/business-structure", () => ({ saveBusinessSetupAction: vi.fn(), getTeamDirectoryAction: vi.fn(), getAssignedPartiesAction: vi.fn(), searchPartiesAction: vi.fn(), assignPartyAction: vi.fn(), setPartyResponsibleAction: vi.fn(), unassignPartyAction: vi.fn() }));
 vi.mock("@/services/team-management", () => ({ inviteTeamMemberAction: vi.fn() }));
 
 afterEach(() => cleanup());
 
 const GST = "27AAAAA0001A1Z1";
-let actions: BusinessSetupActions & { save: ReturnType<typeof vi.fn>; invite: ReturnType<typeof vi.fn>; teamDirectory: ReturnType<typeof vi.fn> };
+type Mocked = ReturnType<typeof vi.fn>;
+let actions: BusinessSetupActions & { save: Mocked; invite: Mocked; teamDirectory: Mocked; parties: Mocked; searchParties: Mocked; assignParty: Mocked; setResponsible: Mocked; unassignParty: Mocked };
 
 beforeEach(() => {
   actions = {
     save: vi.fn(async (s: SetupData) => ({ success: true as const, data: s })),
     teamDirectory: vi.fn(async () => ({ success: true as const, data: [{ userId: "u1", name: "Meera Shah", email: "meera@example.com", roleName: "Designer" }] })),
     invite: vi.fn(async () => ({ success: true as const, data: { token: "tok123", existingUser: false } })),
+    parties: vi.fn(async () => ({ success: true as const, data: [] })),
+    searchParties: vi.fn(async () => ({ success: true as const, data: [] })),
+    assignParty: vi.fn(async () => ({ success: false as const, error: "n/a" })),
+    setResponsible: vi.fn(async () => ({ success: false as const, error: "n/a" })),
+    unassignParty: vi.fn(async () => ({ success: true as const, data: null })),
   };
 });
 
@@ -532,5 +538,99 @@ describe("Business Setup — structure overview", () => {
     render(<Harness initial={withBusiness()} />);
     openOverview();
     expect(screen.getByText("No team members yet.")).toBeTruthy();
+  });
+});
+
+
+describe("Business Setup — assigned business", () => {
+  const openStep4 = () => fireEvent.click(screen.getByRole("tab", { name: /04 · Assigned business/ }));
+  const buyer: PartyCandidate = { type: "BUYER", id: "buy1", name: "Zara Retail", detail: "Mumbai, India" };
+  const asParty = (c: PartyCandidate, responsibleMemberCode = ""): AssignedParty => ({ ...c, businessCode: "B001", responsibleMemberCode });
+
+  it("shows buyers, suppliers and freelancers, each empty at first", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    for (const name of ["Buyers", "Suppliers", "Freelancers"]) expect(await within(screen.getByRole("region", { name })).findByText(`No ${name.toLowerCase()} assigned yet.`)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Assign buyer/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Assign supplier/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Assign freelancer/ })).toBeTruthy();
+  });
+
+  it("lists what is already assigned to this business, with its responsible person", async () => {
+    actions.parties.mockResolvedValue({ success: true, data: [asParty(buyer, "M002"), { ...asParty({ ...buyer, id: "b-other", name: "Other business buyer" }), businessCode: "B009" }] });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    const card = await screen.findByRole("article", { name: "Zara Retail" });
+    expect(within(card).getByText("Mumbai, India")).toBeTruthy();
+    expect((within(card).getByLabelText("Responsible team member") as HTMLSelectElement).value).toBe("M002");
+    expect(screen.queryByRole("article", { name: "Other business buyer" })).toBeNull();
+    expect(within(screen.getByLabelText("Live structure")).getByText("Buyers")).toBeTruthy();
+  });
+
+  it("searching shows matches; assigning one adds it to the list and the picker marks it Assigned", async () => {
+    actions.searchParties.mockImplementation(async (_g: string, q: string) => ({ success: true, data: [buyer, { type: "BUYER" as const, id: "buy2", name: "Zeta Stores", detail: "Delhi, India" }].filter((c) => c.name.toLowerCase().includes(q.toLowerCase())) }));
+    actions.assignParty.mockImplementation(async (i: { type: "BUYER"; id: string }) => ({ success: true, data: asParty(i.id === "buy1" ? buyer : { type: "BUYER", id: "buy2", name: "Zeta Stores", detail: "Delhi, India" }) }));
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    fireEvent.click(screen.getByRole("button", { name: /Assign buyer/ }));
+    expect(await screen.findByText("Zara Retail", { selector: "p" })).toBeTruthy();
+    expect(actions.searchParties).toHaveBeenCalledWith("BUYER", "");
+    fireEvent.change(screen.getByLabelText("Search buyers"), { target: { value: "zeta" } });
+    await waitFor(() => expect(screen.queryByText("Zara Retail", { selector: "p" })).toBeNull());
+    expect(actions.searchParties).toHaveBeenCalledWith("BUYER", "zeta");
+    fireEvent.click(screen.getByRole("button", { name: "Assign Zeta Stores" }));
+    await waitFor(() => expect(actions.assignParty).toHaveBeenCalledWith({ businessCode: "B001", type: "BUYER", id: "buy2" }));
+    expect(await screen.findByText("Assigned")).toBeTruthy();
+    // it is now in the list behind the dialog
+    expect(screen.getAllByText("Zeta Stores").length).toBeGreaterThan(0);
+  });
+
+  it("a search with no match says so; a failed search shows the reason", async () => {
+    actions.searchParties.mockResolvedValueOnce({ success: true, data: [] });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    fireEvent.click(screen.getByRole("button", { name: /Assign freelancer/ }));
+    expect(await screen.findByText("There are no freelancers in SupplyBase yet.")).toBeTruthy();
+    actions.searchParties.mockResolvedValueOnce({ success: false, error: "Search is down." });
+    fireEvent.change(screen.getByLabelText("Search freelancers"), { target: { value: "x" } });
+    expect((await screen.findByRole("alert")).textContent).toBe("Search is down.");
+  });
+
+  it("an assign that is refused shows the reason and adds nothing", async () => {
+    actions.searchParties.mockResolvedValue({ success: true, data: [buyer] });
+    actions.assignParty.mockResolvedValueOnce({ success: false, error: "This buyer, supplier or freelancer no longer exists." });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    fireEvent.click(screen.getByRole("button", { name: /Assign buyer/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Assign Zara Retail" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("This buyer, supplier or freelancer no longer exists.");
+    expect(screen.queryByRole("article", { name: "Zara Retail" })).toBeNull();
+  });
+
+  it("changes who is responsible, and removes a party from the business", async () => {
+    actions.parties.mockResolvedValue({ success: true, data: [asParty(buyer)] });
+    actions.setResponsible.mockImplementation(async (i: { responsibleMemberCode: string }) => ({ success: true, data: asParty(buyer, i.responsibleMemberCode) }));
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    const card = await screen.findByRole("article", { name: "Zara Retail" });
+    fireEvent.change(within(card).getByLabelText("Responsible team member"), { target: { value: "M002" } });
+    await waitFor(() => expect(actions.setResponsible).toHaveBeenCalledWith({ businessCode: "B001", type: "BUYER", id: "buy1", responsibleMemberCode: "M002" }));
+    await waitFor(() => expect((within(screen.getByRole("article", { name: "Zara Retail" })).getByLabelText("Responsible team member") as HTMLSelectElement).value).toBe("M002"));
+
+    fireEvent.click(within(screen.getByRole("article", { name: "Zara Retail" })).getByRole("button", { name: "Remove Zara Retail" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Zara Retail" })).toBeNull());
+    expect(actions.unassignParty).toHaveBeenCalledWith({ businessCode: "B001", type: "BUYER", id: "buy1" });
+  });
+
+  it("the overview lists them with who is responsible", async () => {
+    actions.parties.mockResolvedValue({ success: true, data: [asParty(buyer, "M001"), asParty({ type: "FREELANCER", id: "f1", name: "Meera Shah", detail: "Pune" })] });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    await screen.findByRole("article", { name: "Zara Retail" });
+    fireEvent.click(screen.getByRole("tab", { name: "Structure overview" }));
+    const overview = screen.getByLabelText("Assigned business overview");
+    expect(within(within(overview).getByRole("region", { name: "Buyers overview" })).getByText(/Zara Retail/).textContent).toContain("Asha");
+    expect(within(within(overview).getByRole("region", { name: "Freelancers overview" })).getByText(/nobody responsible yet/)).toBeTruthy();
+    expect(within(within(overview).getByRole("region", { name: "Suppliers overview" })).getByText("None assigned")).toBeTruthy();
   });
 });

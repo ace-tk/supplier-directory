@@ -623,3 +623,49 @@ export function toolsInUse(setup: SetupData, businessCode: string): number {
   for (const m of teamOf(setup, businessCode)) for (const t of toolsOfMember(setup, businessCode, m.memberCode)) used.add(t.tool);
   return used.size;
 }
+
+
+// ---------------------------------------------------------------- Business Setup: assigned business
+// Buyers, suppliers and freelancers connected to a business, with an optional responsible team member.
+
+/** Where a party lives: Buyer, Supplier (a registered supplier), SupplierListing (a supplier in the directory) or Freelancer. */
+export const PARTY_TYPES = ["BUYER", "SUPPLIER", "SUPPLIER_LISTING", "FREELANCER"] as const;
+export type PartyType = (typeof PARTY_TYPES)[number];
+export type PartyGroup = "BUYER" | "SUPPLIER" | "FREELANCER";
+
+export const PARTY_GROUPS: { id: PartyGroup; label: string; one: string }[] = [
+  { id: "BUYER", label: "Buyers", one: "buyer" },
+  { id: "SUPPLIER", label: "Suppliers", one: "supplier" },
+  { id: "FREELANCER", label: "Freelancers", one: "freelancer" },
+];
+
+/** Registered suppliers and directory listings are both "Suppliers" on the screen. */
+export const groupOfParty = (type: PartyType): PartyGroup => (type === "SUPPLIER_LISTING" ? "SUPPLIER" : type);
+export const isPartyType = (v: unknown): v is PartyType => (PARTY_TYPES as readonly string[]).includes(v as string);
+export const isPartyGroup = (v: unknown): v is PartyGroup => PARTY_GROUPS.some((g) => g.id === v);
+export const partyKey = (p: { type: PartyType; id: string }) => `${p.type}:${p.id}`;
+
+/** Someone who could be assigned (a search result). */
+export interface PartyCandidate {
+  type: PartyType;
+  id: string;
+  name: string;
+  /** "Mumbai, India", or a freelancer's location and skills. */
+  detail: string;
+}
+
+/** A party connected to a business. */
+export interface AssignedParty extends PartyCandidate {
+  businessCode: string;
+  /** The team member responsible for them, or empty. */
+  responsibleMemberCode: string;
+}
+
+export const partiesOf = (list: AssignedParty[], businessCode: string, group: PartyGroup) => list.filter((p) => p.businessCode === businessCode && groupOfParty(p.type) === group);
+
+/** Adds a party, or replaces it if it is already there (matched by type and id within the business). */
+export function withParty(list: AssignedParty[], party: AssignedParty): AssignedParty[] {
+  const same = (p: AssignedParty) => p.businessCode === party.businessCode && partyKey(p) === partyKey(party);
+  return list.some(same) ? list.map((p) => (same(p) ? party : p)) : [...list, party];
+}
+export const withoutParty = (list: AssignedParty[], businessCode: string, type: PartyType, id: string) => list.filter((p) => !(p.businessCode === businessCode && p.type === type && p.id === id));

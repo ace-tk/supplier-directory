@@ -11,7 +11,7 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/session";
-import { checkSetup, EMPTY_SETUP, type SetupData } from "@/lib/business-structure";
+import { checkSetup, EMPTY_SETUP, isPartyGroup, isPartyType, type AssignedParty, type PartyCandidate, type PartyGroup, type PartyType, type SetupData } from "@/lib/business-structure";
 
 export type SetupResult = { success: true; data: SetupData } | { success: false; errors: string[] };
 
@@ -174,6 +174,138 @@ export async function getTeamDirectoryAction(): Promise<{ success: true; data: T
     orderBy: { joinedAt: "asc" },
   });
   return { success: true, data: rows.map((m) => ({ userId: m.user.id, name: m.user.name || m.user.email, email: m.user.email, roleName: m.roleName })) };
+}
+
+
+// ---------------------------------------------------------------- assigned business (buyers, suppliers, freelancers)
+export type PartyActionResult<T> = { success: true; data: T } | { success: false; error: string };
+
+const place = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(", ");
+
+/** What a party is called and a short detail line, read from the table it lives in. Null if it no longer exists. */
+async function describeParty(type: PartyType, id: string): Promise<{ name: string; detail: string } | null> {
+  if (type === "BUYER") {
+    const b = await db.buyer.findUnique({ where: { id }, include: { user: { select: { name: true, email: true } } } });
+    return b ? { name: b.companyName || b.user.name || b.user.email, detail: place(b.city, b.country) } : null;
+  }
+  if (type === "SUPPLIER") {
+    const s = await db.supplier.findUnique({ where: { id }, include: { user: { select: { name: true, email: true } } } });
+    return s ? { name: s.companyName || s.user.name || s.user.email, detail: place(s.city, s.country) } : null;
+  }
+  if (type === "SUPPLIER_LISTING") {
+    const l = await db.supplierListing.findUnique({ where: { id } });
+    return l ? { name: l.companyName, detail: place(l.city, l.country) } : null;
+  }
+  const f = await db.freelancer.findUnique({ where: { id }, include: { user: { select: { name: true, email: true } } } });
+  return f ? { name: f.user.name || f.user.email, detail: place(f.location, f.skills.slice(0, 3).join(" · ")) } : null;
+}
+
+async function ownedBusiness(ownerId: string, code: string) {
+  return db.business.findFirst({ where: { ownerId, code }, select: { id: true } });
+}
+
+/** The team member (by code) if they are on this business's team, else null. */
+async function teamMember(ownerId: string, businessId: string, code: string) {
+  if (!code) return null;
+  const member = await db.businessMember.findFirst({ where: { ownerId, code }, select: { id: true, code: true } });
+  if (!member) return null;
+  const onTeam = await db.businessAssignment.findFirst({ where: { ownerId, businessId, memberId: member.id }, select: { id: true } });
+  return onTeam ? member : null;
+}
+
+type PartyRow = { businessId: string; partyType: string; partyId: string; partyName: string; responsibleMember: { code: string } | null; business: { code: string } };
+
+/** Every party the admin has assigned, with names read live (the saved name is used if the party is gone). */
+export async function getAssignedPartiesAction(): Promise<PartyActionResult<AssignedParty[]>> {
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Admins only." };
+  const rows = (await db.businessAssignedParty.findMany({
+    where: { ownerId: admin.id },
+    orderBy: { createdAt: "asc" },
+    include: { business: { select: { code: true } }, responsibleMember: { select: { code: true } } },
+  })) as PartyRow[];
+  const data: AssignedParty[] = [];
+  for (const r of rows) {
+    if (!isPartyType(r.partyType)) continue;
+    const live = await describeParty(r.partyType, r.partyId);
+    data.push({ businessCode: r.business.code, type: r.partyType, id: r.partyId, name: live?.name ?? r.partyName, detail: live?.detail ?? "", responsibleMemberCode: r.responsibleMember?.code ?? "" });
+  }
+  return { success: true, data };
+}
+
+/** People to choose from when assigning: up to 20 of one kind, matching the search text (all, newest names first, when it is empty). */
+export async function searchPartiesAction(group: PartyGroup, query: string): Promise<PartyActionResult<PartyCandidate[]>> {
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Admins only." };
+  if (!isPartyGroup(group)) return { success: false, error: "Choose buyers, suppliers or freelancers." };
+  const q = String(query ?? "").trim().slice(0, 80);
+  const like = { contains: q, mode: "insensitive" as const };
+  const take = 20;
+
+  if (group === "BUYER") {
+    const rows = await db.buyer.findMany({ where: q ? { OR: [{ companyName: like }, { user: { name: like } }] } : {}, take, orderBy: { companyName: "asc" }, include: { user: { select: { name: true, email: true } } } });
+    return { success: true, data: rows.map((b) => ({ type: "BUYER" as const, id: b.id, name: b.companyName || b.user.name || b.user.email, detail: place(b.city, b.country) })) };
+  }
+  if (group === "SUPPLIER") {
+    const [suppliers, listings] = await Promise.all([
+      db.supplier.findMany({ where: q ? { OR: [{ companyName: like }, { user: { name: like } }] } : {}, take, orderBy: { companyName: "asc" }, include: { user: { select: { name: true, email: true } } } }),
+      db.supplierListing.findMany({ where: q ? { companyName: like } : {}, take, orderBy: { companyName: "asc" } }),
+    ]);
+    const data: PartyCandidate[] = [
+      ...suppliers.map((s) => ({ type: "SUPPLIER" as const, id: s.id, name: s.companyName || s.user.name || s.user.email, detail: place(s.city, s.country) })),
+      ...listings.map((l) => ({ type: "SUPPLIER_LISTING" as const, id: l.id, name: l.companyName, detail: place(l.city, l.country) })),
+    ];
+    return { success: true, data: data.sort((a, b) => a.name.localeCompare(b.name)).slice(0, take) };
+  }
+  const rows = await db.freelancer.findMany({ where: q ? { OR: [{ user: { name: like } }, { location: like }, { skills: { has: q } }] } : {}, take, orderBy: { createdAt: "asc" }, include: { user: { select: { name: true, email: true } } } });
+  return { success: true, data: rows.map((f) => ({ type: "FREELANCER" as const, id: f.id, name: f.user.name || f.user.email, detail: place(f.location, f.skills.slice(0, 3).join(" · ")) })) };
+}
+
+/** Connects a buyer, supplier or freelancer to a business, with an optional responsible team member of that business. */
+export async function assignPartyAction(input: { businessCode: string; type: PartyType; id: string; responsibleMemberCode?: string }): Promise<PartyActionResult<AssignedParty>> {
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Admins only." };
+  if (!isPartyType(input?.type) || !input.id) return { success: false, error: "Choose who to assign." };
+  const business = await ownedBusiness(admin.id, input.businessCode);
+  if (!business) return { success: false, error: "Business not found. Save the business first." };
+  const party = await describeParty(input.type, input.id);
+  if (!party) return { success: false, error: "This buyer, supplier or freelancer no longer exists." };
+  const responsible = await teamMember(admin.id, business.id, input.responsibleMemberCode ?? "");
+  if (input.responsibleMemberCode && !responsible) return { success: false, error: "The responsible person must be on this business's team." };
+
+  await db.businessAssignedParty.upsert({
+    where: { businessId_partyType_partyId: { businessId: business.id, partyType: input.type, partyId: input.id } },
+    create: { ownerId: admin.id, businessId: business.id, partyType: input.type, partyId: input.id, partyName: party.name, responsibleMemberId: responsible?.id ?? null },
+    update: { partyName: party.name, ...(input.responsibleMemberCode !== undefined ? { responsibleMemberId: responsible?.id ?? null } : {}) },
+  });
+  return { success: true, data: { businessCode: input.businessCode, type: input.type, id: input.id, name: party.name, detail: party.detail, responsibleMemberCode: responsible?.code ?? "" } };
+}
+
+/** Changes (or clears) the team member responsible for an assigned party. */
+export async function setPartyResponsibleAction(input: { businessCode: string; type: PartyType; id: string; responsibleMemberCode: string }): Promise<PartyActionResult<AssignedParty>> {
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Admins only." };
+  if (!isPartyType(input?.type)) return { success: false, error: "Choose who to change." };
+  const business = await ownedBusiness(admin.id, input.businessCode);
+  if (!business) return { success: false, error: "Business not found." };
+  const existing = await db.businessAssignedParty.findFirst({ where: { ownerId: admin.id, businessId: business.id, partyType: input.type, partyId: input.id } });
+  if (!existing) return { success: false, error: "This party is not assigned to the business." };
+  const responsible = await teamMember(admin.id, business.id, input.responsibleMemberCode);
+  if (input.responsibleMemberCode && !responsible) return { success: false, error: "The responsible person must be on this business's team." };
+  await db.businessAssignedParty.update({ where: { id: existing.id }, data: { responsibleMemberId: responsible?.id ?? null } });
+  const live = await describeParty(input.type, input.id);
+  return { success: true, data: { businessCode: input.businessCode, type: input.type, id: input.id, name: live?.name ?? existing.partyName, detail: live?.detail ?? "", responsibleMemberCode: responsible?.code ?? "" } };
+}
+
+/** Takes a party off a business. The buyer, supplier or freelancer themselves are not touched. */
+export async function unassignPartyAction(input: { businessCode: string; type: PartyType; id: string }): Promise<PartyActionResult<null>> {
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Admins only." };
+  if (!isPartyType(input?.type)) return { success: false, error: "Choose who to remove." };
+  const business = await ownedBusiness(admin.id, input.businessCode);
+  if (!business) return { success: false, error: "Business not found." };
+  await db.businessAssignedParty.deleteMany({ where: { ownerId: admin.id, businessId: business.id, partyType: input.type, partyId: input.id } });
+  return { success: true, data: null };
 }
 
 export interface AssignedBusinessData {

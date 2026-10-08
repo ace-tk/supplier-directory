@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Building, Building2, Copy, KeyRound, Loader2, MapPin, Plus, Search, ShieldCheck, Store, UserPlus, Users, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AssignedBusinessStep, type AssignedBusinessActions } from "@/components/business-structure/AssignedBusiness";
 import { StructureOverview } from "@/components/business-structure/StructureOverview";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   DESIGNATIONS,
+  PARTY_GROUPS,
   NO_ACCESS,
   PLANNED_TOOLS,
   TOOLS,
@@ -18,6 +20,7 @@ import {
   LOCATION_TYPE_LABEL,
   assignMembers,
   entityOf,
+  groupOfParty,
   hasAnyAccess,
   membersWithTools,
   registerBusiness,
@@ -29,6 +32,7 @@ import {
   teamOf,
   toolAccessOf,
   updateBusiness,
+  type AssignedParty,
   type Change,
   type LocationType,
   type ToolLevels,
@@ -36,19 +40,29 @@ import {
   type TeamMember,
 } from "@/lib/business-structure";
 import { ROLE_PRESETS, type TeamRoleKey } from "@/lib/team-permissions";
-import { getTeamDirectoryAction, saveBusinessSetupAction, type SetupResult, type TeamDirectoryEntry } from "@/services/business-structure";
+import { assignPartyAction, getAssignedPartiesAction, getTeamDirectoryAction, saveBusinessSetupAction, searchPartiesAction, setPartyResponsibleAction, unassignPartyAction, type SetupResult, type TeamDirectoryEntry } from "@/services/business-structure";
 import { inviteTeamMemberAction } from "@/services/team-management";
 
 /** The server calls this screen makes. Passed in so the screen can be exercised without a server. */
-export interface BusinessSetupActions {
+export interface BusinessSetupActions extends AssignedBusinessActions {
+  parties: () => Promise<{ success: true; data: AssignedParty[] } | { success: false; error: string }>;
   save: (setup: SetupData) => Promise<SetupResult>;
   teamDirectory: () => Promise<{ success: true; data: TeamDirectoryEntry[] } | { success: false; error: string }>;
   invite: (input: { name: string; email: string; roleKey: string; roleName?: string; department?: string; permissions: string[] }) => Promise<{ success: true; data: { token: string; existingUser: boolean } } | { success: false; error: string }>;
 }
 
-const REAL_ACTIONS: BusinessSetupActions = { save: saveBusinessSetupAction, teamDirectory: getTeamDirectoryAction, invite: inviteTeamMemberAction };
+const REAL_ACTIONS: BusinessSetupActions = {
+  save: saveBusinessSetupAction,
+  teamDirectory: getTeamDirectoryAction,
+  invite: inviteTeamMemberAction,
+  parties: getAssignedPartiesAction,
+  searchParties: searchPartiesAction,
+  assignParty: assignPartyAction,
+  setResponsible: setPartyResponsibleAction,
+  unassignParty: unassignPartyAction,
+};
 
-const STEPS = ["01 · Team members", "02 · Verticals & locations", "03 · Tool access", "Structure overview"] as const;
+const STEPS = ["01 · Team members", "02 · Verticals & locations", "03 · Tool access", "04 · Assigned business", "Structure overview"] as const;
 const LOGIN_ROLES = (Object.entries(ROLE_PRESETS) as [TeamRoleKey, (typeof ROLE_PRESETS)[TeamRoleKey]][]).filter(([key]) => key !== "OWNER");
 
 const fieldCls = "h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
@@ -65,6 +79,8 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<Dialogs>(null);
   const [directory, setDirectory] = useState<TeamDirectoryEntry[]>([]);
+  const [parties, setParties] = useState<AssignedParty[]>([]);
+  const [partiesLoaded, setPartiesLoaded] = useState(false);
   const [activation, setActivation] = useState<{ link: string; existing: boolean; name: string } | null>(null);
 
   const business = saved.businesses.find((b) => b.code === selected) ?? saved.businesses[0];
@@ -74,6 +90,11 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
   useEffect(() => {
     let live = true;
     void actions.teamDirectory().then((r) => live && r.success && setDirectory(r.data));
+    void actions.parties().then((r) => {
+      if (!live) return;
+      if (r.success) setParties(r.data);
+      setPartiesLoaded(true);
+    });
     return () => {
       live = false;
     };
@@ -217,6 +238,8 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                   onChange={async (memberCode, tool, levels) => commit(setToolAccess(saved, business.code, memberCode, tool, levels))}
                   onGoToTeam={() => setStep(0)}
                 />
+              ) : step === 3 ? (
+                <AssignedBusinessStep businessCode={business.code} businessName={business.name} team={team} parties={parties} loaded={partiesLoaded} actions={actions} onParties={setParties} />
               ) : (
                 <StructureOverview
                   setup={saved}
@@ -224,6 +247,7 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                   businessName={business.name}
                   gstin={entity?.gstin ?? ""}
                   team={team}
+                  parties={parties}
                   onOpenMember={(memberCode) => setDialog({ kind: "member", memberCode })}
                   onAssign={(locationCode) => setDialog({ kind: "assign", locationCode })}
                   onAddLocation={(type) => setDialog({ kind: "location", type })}
@@ -246,6 +270,14 @@ export function BusinessSetup({ saved, onSaved, actions = REAL_ACTIONS }: { save
                   {VERTICALS.map((t) => (
                     <p key={t} className="mt-1">
                       {LOCATION_TYPE_LABEL[t]} <b>{saved.locations.filter((l) => l.businessCode === business.code && l.type === t).length}</b>
+                    </p>
+                  ))}
+                </div>
+                <div className="border-l-2 border-border pl-3">
+                  <h4 className="text-sm font-semibold">04 / Assigned</h4>
+                  {PARTY_GROUPS.map((g) => (
+                    <p key={g.id} className="mt-1">
+                      {g.label} <b>{parties.filter((p) => p.businessCode === business.code && groupOfParty(p.type) === g.id).length}</b>
                     </p>
                   ))}
                 </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { Building, Building2, MapPin, Plus, Printer, ShieldCheck, Store, User, Users, Warehouse } from "lucide-react";
+import { Briefcase, Building, Building2, MapPin, Plus, Printer, ShieldCheck, Store, User, Users, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { VERTICALS, LOCATION_TYPE_LABEL, reportingTree, toolsInUse, toolsOfMember, type LocationType, type OrgNode, type SetupData, type TeamMember } from "@/lib/business-structure";
+import { PARTY_GROUPS, VERTICALS, LOCATION_TYPE_LABEL, partiesOf, reportingTree, toolsInUse, toolsOfMember, type AssignedParty, type LocationType, type OrgNode, type SetupData, type TeamMember } from "@/lib/business-structure";
 
 const ICON = { WAREHOUSE: Warehouse, RETAIL_STORE: Store, OFFICE: Building } as const;
 const PLURAL: Record<LocationType, string> = { WAREHOUSE: "Warehouses", RETAIL_STORE: "Retail Stores", OFFICE: "Back Offices" };
@@ -45,6 +45,7 @@ export function StructureOverview({
   businessName,
   gstin,
   team,
+  parties = [],
   onOpenMember,
   onAssign,
   onAddLocation,
@@ -54,6 +55,7 @@ export function StructureOverview({
   businessName: string;
   gstin: string;
   team: TeamMember[];
+  parties?: AssignedParty[];
   onOpenMember: (memberCode: string) => void;
   onAssign: (locationCode: string) => void;
   onAddLocation: (type: LocationType) => void;
@@ -191,6 +193,33 @@ export function StructureOverview({
                 )}
               </div>
             </div>
+          );
+        })}
+      </div>
+      <h4 className="mt-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+        <Briefcase className="h-3.5 w-3.5" aria-hidden /> 04 / Assigned business
+      </h4>
+      <div className="mt-2 grid gap-3 sm:grid-cols-3" aria-label="Assigned business overview">
+        {PARTY_GROUPS.map((g) => {
+          const list = partiesOf(parties, businessCode, g.id);
+          return (
+            <section key={g.id} aria-label={`${g.label} overview`} className="rounded-xl border border-border p-3">
+              <b className="text-xs">
+                {g.label} <span className="font-normal text-muted-foreground">({list.length})</span>
+              </b>
+              {list.length ? (
+                <ul className="mt-2 space-y-1">
+                  {list.map((p) => (
+                    <li key={`${p.type}:${p.id}`} className="text-[11px]">
+                      {p.name}
+                      <span className="text-muted-foreground"> · {team.find((m) => m.memberCode === p.responsibleMemberCode)?.name ?? "nobody responsible yet"}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-[11px] text-muted-foreground">None assigned</p>
+              )}
+            </section>
           );
         })}
       </div>

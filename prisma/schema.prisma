@@ -161,6 +161,7 @@ model User {
   businessMembers        BusinessMember[]        @relation("BusinessMemberOwner")
   businessMemberLinks    BusinessMember[]        @relation("BusinessMemberUser")
   businessAssignments    BusinessAssignment[]    @relation("BusinessAssignmentOwner")
+  businessAssignedParties BusinessAssignedParty[] @relation("BusinessAssignedPartyOwner")
   embroideryDesigns  EmbroideryDesign[]   @relation("EmbroideryDesignOwner")
 
   passwordResetTokens PasswordResetToken[]
@@ -2777,6 +2778,7 @@ model Business {
 
   locations   BusinessLocation[]
   assignments BusinessAssignment[]
+  assignedParties BusinessAssignedParty[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2825,6 +2827,7 @@ model BusinessMember {
 
   assignments BusinessAssignment[] @relation("BusinessAssignmentMember")
   reports     BusinessAssignment[] @relation("BusinessAssignmentReportsTo")
+  responsibleFor BusinessAssignedParty[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2867,6 +2870,33 @@ model BusinessAssignment {
   @@index([businessId])
   @@index([locationId])
   @@index([reportsToMemberId])
+}
+
+// Buyers, suppliers and freelancers connected to a business ("Assigned Business"),
+// with an optional team member who is responsible for them. The party itself lives in
+// Buyer / Supplier / SupplierListing / Freelancer; partyType says which, partyId is its
+// id there (no foreign key, as it points at four tables), partyName is the name when it
+// was assigned.
+model BusinessAssignedParty {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("BusinessAssignedPartyOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  // BUYER | SUPPLIER | SUPPLIER_LISTING | FREELANCER
+  partyType String
+  partyId   String
+  partyName String
+
+  responsibleMemberId String?
+  responsibleMember   BusinessMember? @relation(fields: [responsibleMemberId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([businessId, partyType, partyId])
+  @@index([ownerId])
 }
 
 model BusinessToolAccess {
