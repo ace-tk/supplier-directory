@@ -9,9 +9,11 @@ import { PortalsSection, ModulesSection, FlowsSection, RoadmapSection } from "@/
 import { SetupTables } from "@/components/business-structure/SetupTables";
 import { Hierarchy } from "@/components/business-structure/Hierarchy";
 import { BusinessStructureTree } from "@/components/business-structure/BusinessStructureTree";
+import { BusinessSetup } from "@/components/business-structure/BusinessSetup";
 
 const TABS = [
   { id: "overview", label: "Overview" },
+  { id: "setup", label: "Business Setup" },
   { id: "tables", label: "Setup Tables" },
   { id: "hierarchy", label: "Hierarchy" },
   { id: "portals", label: "Portals" },
@@ -33,6 +35,8 @@ export function BusinessStructureTabs({
   const [tab, setTab] = useState<TabId>("overview");
   // The last saved setup. The overview and hierarchy show this, never unsaved edits.
   const [saved, setSaved] = useState<SetupData>(initialSetup);
+  // Goes up when the guided Business Setup saves, so the Setup Tables reload the new data.
+  const [version, setVersion] = useState(0);
 
   return (
     <div className="space-y-6">
@@ -55,9 +59,10 @@ export function BusinessStructureTabs({
         ))}
       </div>
 
-      {/* Setup Tables stays mounted, so unsaved edits survive switching tabs. */}
+      {/* Setup Tables stays mounted, so unsaved edits survive switching tabs. It starts again from the saved
+          setup whenever Business Setup has saved something. */}
       <div role="tabpanel" aria-label="Setup Tables" hidden={tab !== "tables"}>
-        <SetupTables initial={saved} onSaved={setSaved} />
+        <SetupTables key={version} initial={saved} onSaved={setSaved} />
       </div>
 
       {tab !== "tables" && (
@@ -68,6 +73,15 @@ export function BusinessStructureTabs({
               assignedBusiness={assignedBusiness}
               onSaved={setSaved}
               onOpen={setTab}
+            />
+          )}
+          {tab === "setup" && (
+            <BusinessSetup
+              saved={saved}
+              onSaved={(next) => {
+                setSaved(next);
+                setVersion((v) => v + 1);
+              }}
             />
           )}
           {tab === "hierarchy" && <Hierarchy saved={saved} onEdit={() => setTab("tables")} />}

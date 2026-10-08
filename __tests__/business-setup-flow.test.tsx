@@ -1,0 +1,636 @@
+// @vitest-environment jsdom
+import { useState } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { BusinessSetup, type BusinessSetupActions } from "@/components/business-structure/BusinessSetup";
+import { EMPTY_SETUP, NO_ACCESS, type AssignedParty, type PartyCandidate, assignMembers, registerBusiness, saveLocation, saveTeamMember, setToolAccess, type SetupData } from "@/lib/business-structure";
+import { ROLE_PRESETS } from "@/lib/team-permissions";
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+// The real actions are server code; the screen is given fakes through its props.
+vi.mock("@/services/business-structure", () => ({ saveBusinessSetupAction: vi.fn(), getTeamDirectoryAction: vi.fn(), getAssignedPartiesAction: vi.fn(), searchPartiesAction: vi.fn(), assignPartyAction: vi.fn(), setPartyResponsibleAction: vi.fn(), unassignPartyAction: vi.fn() }));
+vi.mock("@/services/team-management", () => ({ inviteTeamMemberAction: vi.fn() }));
+
+afterEach(() => cleanup());
+
+const GST = "27AAAAA0001A1Z1";
+type Mocked = ReturnType<typeof vi.fn>;
+let actions: BusinessSetupActions & { save: Mocked; invite: Mocked; teamDirectory: Mocked; parties: Mocked; searchParties: Mocked; assignParty: Mocked; setResponsible: Mocked; unassignParty: Mocked };
+
+beforeEach(() => {
+  actions = {
+    save: vi.fn(async (s: SetupData) => ({ success: true as const, data: s })),
+    teamDirectory: vi.fn(async () => ({ success: true as const, data: [{ userId: "u1", name: "Meera Shah", email: "meera@example.com", roleName: "Designer" }] })),
+    invite: vi.fn(async () => ({ success: true as const, data: { token: "tok123", existingUser: false } })),
+    parties: vi.fn(async () => ({ success: true as const, data: [] })),
+    searchParties: vi.fn(async () => ({ success: true as const, data: [] })),
+    assignParty: vi.fn(async () => ({ success: false as const, error: "n/a" })),
+    setResponsible: vi.fn(async () => ({ success: false as const, error: "n/a" })),
+    unassignParty: vi.fn(async () => ({ success: true as const, data: null })),
+  };
+});
+
+/** Holds the saved setup the way the page does, so the screen updates after each save. */
+function Harness({ initial }: { initial: SetupData }) {
+  const [saved, setSaved] = useState(initial);
+  return <BusinessSetup saved={saved} onSaved={setSaved} actions={actions} />;
+}
+
+function withBusiness(): SetupData {
+  const r = registerBusiness(EMPTY_SETUP, { businessName: "Business 1", legalName: "", gstin: GST });
+  if (!r.ok) throw new Error(r.error);
+  return r.setup;
+}
+function withTeam(): SetupData {
+  let s = withBusiness();
+  for (const p of [{ name: "Asha", designation: "Director", reportsToCode: "", email: "", mobile: "" }, { name: "Ravi", designation: "Operations", reportsToCode: "M001", email: "ravi@example.com", mobile: "" }]) {
+    const c = saveTeamMember(s, "B001", p);
+    if (!c.ok) throw new Error(c.error);
+    s = c.setup;
+  }
+  return s;
+}
+const type = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+
+describe("Business Setup — registering a business", () => {
+  it("starts with nothing to select and a way to register the first business", () => {
+    render(<Harness initial={EMPTY_SETUP} />);
+    expect(screen.getByText("No business yet")).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "Setup steps" })).toBeNull();
+  });
+
+  it("registers a business: it becomes a card with its GST and is saved", async () => {
+    render(<Harness initial={EMPTY_SETUP} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Register business/ })[0]);
+    type("Business name", "Business 1");
+    type("GSTIN", GST.toLowerCase());
+    fireEvent.click(screen.getByRole("button", { name: "Register" }));
+    await waitFor(() => expect(actions.save).toHaveBeenCalledTimes(1));
+    const sent = actions.save.mock.calls[0][0] as SetupData;
+    expect(sent.entities).toEqual([{ code: "E001", legalName: "Business 1", gstin: GST, registeredAddress: "" }]);
+    expect(await screen.findByRole("button", { name: /Business 1/ })).toBeTruthy();
+    expect(screen.getAllByText(`GST ${GST}`).length).toBeGreaterThan(0);
+    expect(screen.getByRole("tablist", { name: "Setup steps" })).toBeTruthy();
+  });
+
+  it("a wrong GSTIN stays in the dialog with a message, and nothing is saved", async () => {
+    render(<Harness initial={EMPTY_SETUP} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Register business/ })[0]);
+    type("Business name", "Business 1");
+    type("GSTIN", "12345");
+    fireEvent.click(screen.getByRole("button", { name: "Register" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/15-character GSTIN/);
+    expect(actions.save).not.toHaveBeenCalled();
+  });
+
+  it("shows the server's reasons when the save is refused", async () => {
+    actions.save.mockResolvedValueOnce({ success: false, errors: ["Something is wrong."] });
+    render(<Harness initial={EMPTY_SETUP} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Register business/ })[0]);
+    type("Business name", "Business 1");
+    fireEvent.click(screen.getByRole("button", { name: "Register" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Something is wrong.");
+  });
+
+  it("edits the business name and GST from the banner", async () => {
+    render(<Harness initial={withBusiness()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit business" }));
+    type("Business name", "Business One");
+    type("GSTIN", "29BBBBB0002B1Z2");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(actions.save).toHaveBeenCalled());
+    const sent = actions.save.mock.calls[0][0] as SetupData;
+    expect(sent.businesses[0].name).toBe("Business One");
+    expect(sent.entities[0].gstin).toBe("29BBBBB0002B1Z2");
+    // the card and the banner both show the new GST
+    expect((await screen.findAllByText(/GST 29BBBBB0002B1Z2/, { selector: "small" })).length).toBe(2);
+  });
+});
+
+describe("Business Setup — team members", () => {
+  it("shows the cards of the selected business with designation, reporting line and no location yet", () => {
+    render(<Harness initial={withTeam()} />);
+    const ravi = screen.getByRole("article", { name: "Ravi" });
+    expect(within(ravi).getByText("Operations")).toBeTruthy();
+    expect(within(ravi).getByText("Reports to Asha")).toBeTruthy();
+    expect(within(ravi).getByText("Unassigned")).toBeTruthy();
+    expect(screen.getByText("2 team members")).toBeTruthy();
+    expect(within(screen.getByLabelText("Live structure")).getByText("2 people in this business")).toBeTruthy();
+  });
+
+  it("searches by name or designation", () => {
+    render(<Harness initial={withTeam()} />);
+    fireEvent.change(screen.getByLabelText("Search members"), { target: { value: "direct" } });
+    expect(screen.queryByRole("article", { name: "Ravi" })).toBeNull();
+    expect(screen.getByRole("article", { name: "Asha" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search members"), { target: { value: "zzz" } });
+    expect(screen.getByText("No matching members.")).toBeTruthy();
+  });
+
+  it("adds a member with a designation and a manager; the card appears and the setup is saved", async () => {
+    render(<Harness initial={withTeam()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add member/ }));
+    type("Member name", "Sana");
+    type("Designation", "Accounts");
+    type("Reports to", "M002");
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    expect(await screen.findByRole("article", { name: "Sana" })).toBeTruthy();
+    const sent = actions.save.mock.calls[0][0] as SetupData;
+    expect(sent.assignments.at(-1)).toMatchObject({ memberCode: "M003", businessCode: "B001", locationCode: "", designation: "Accounts", reportsToCode: "M002" });
+    expect(within(screen.getByRole("article", { name: "Sana" })).getByText("Reports to Ravi")).toBeTruthy();
+  });
+
+  it("asks for a name and a designation, and refuses a circular reporting line", async () => {
+    render(<Harness initial={withTeam()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add member/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Enter the member's name.");
+    cleanup();
+    render(<Harness initial={withTeam()} />);
+    fireEvent.click(within(screen.getByRole("article", { name: "Asha" })).getByRole("button", { name: "Edit profile" }));
+    type("Reports to", "M002"); // Asha → Ravi, but Ravi already reports to Asha
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Reporting cannot create a circular hierarchy.");
+    expect(actions.save).not.toHaveBeenCalled();
+  });
+
+  it("edits a member and removes one from the business", async () => {
+    render(<Harness initial={withTeam()} />);
+    fireEvent.click(within(screen.getByRole("article", { name: "Ravi" })).getByRole("button", { name: "Edit profile" }));
+    type("Designation", "Store Manager");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(within(screen.getByRole("article", { name: "Ravi" })).getByText("Store Manager")).toBeTruthy());
+
+    fireEvent.click(within(screen.getByRole("article", { name: "Ravi" })).getByRole("button", { name: "Edit profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove from this business" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Ravi" })).toBeNull());
+    expect(screen.getByText("1 team member")).toBeTruthy();
+  });
+
+  it("each business has its own team", () => {
+    const b2 = registerBusiness(withTeam(), { businessName: "Business 2", legalName: "", gstin: "29BBBBB0002B1Z2" });
+    if (!b2.ok) throw new Error(b2.error);
+    render(<Harness initial={b2.setup} />);
+    expect(screen.getByText("2 team members")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Business 2/ }));
+    expect(screen.getByText("No team members yet. Add the first person to start.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Business 1/ }));
+    expect(screen.getByRole("article", { name: "Asha" })).toBeTruthy();
+  });
+});
+
+describe("Business Setup — logins (Team Management)", () => {
+  it("lists the people who already have a login, and picking one fills the form", async () => {
+    render(<Harness initial={withBusiness()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add member/ }));
+    const pick = (await screen.findByLabelText("Pick from Team Management (optional)")) as HTMLSelectElement;
+    fireEvent.change(pick, { target: { value: "u1" } });
+    expect((screen.getByLabelText("Member name") as HTMLInputElement).value).toBe("Meera Shah");
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("meera@example.com");
+    expect(screen.getByText(/already has a SupplyBase login/)).toBeTruthy();
+  });
+
+  it("a member whose email has a login shows its role on the card", async () => {
+    const c = saveTeamMember(withBusiness(), "B001", { name: "Meera Shah", designation: "Designer", reportsToCode: "", email: "meera@example.com", mobile: "" });
+    if (!c.ok) throw new Error(c.error);
+    render(<Harness initial={c.setup} />);
+    expect(await screen.findByText("Login · Designer")).toBeTruthy();
+  });
+
+  it("giving a login needs an email; then it creates the invitation with the role's permissions and shows the link", async () => {
+    render(<Harness initial={withBusiness()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add member/ }));
+    type("Member name", "Kiran");
+    type("Designation", "Accounts");
+    const box = screen.getByLabelText("Give this person a SupplyBase login") as HTMLInputElement;
+    expect(box.disabled).toBe(true);
+    type("Email", "kiran@example.com");
+    expect(box.disabled).toBe(false);
+    fireEvent.click(box);
+    type("Role", "ACCOUNTS");
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+
+    await waitFor(() => expect(actions.invite).toHaveBeenCalledTimes(1));
+    expect(actions.invite).toHaveBeenCalledWith({ name: "Kiran", email: "kiran@example.com", roleKey: "ACCOUNTS", roleName: ROLE_PRESETS.ACCOUNTS.name, department: ROLE_PRESETS.ACCOUNTS.department, permissions: [...ROLE_PRESETS.ACCOUNTS.permissions] });
+    // the member is saved first, then the login is made
+    expect(actions.save.mock.invocationCallOrder[0]).toBeLessThan(actions.invite.mock.invocationCallOrder[0]);
+    expect(await screen.findByText("Login created for Kiran")).toBeTruthy();
+    expect(screen.getByText(`${window.location.origin}/reset-password?token=tok123`)).toBeTruthy();
+  });
+
+  it("if the login cannot be made the member is still saved, and the reason is shown", async () => {
+    const { toast } = await import("sonner");
+    actions.invite.mockResolvedValueOnce({ success: false, error: "Seat limit reached (10)." });
+    render(<Harness initial={withBusiness()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add member/ }));
+    type("Member name", "Kiran");
+    type("Designation", "Accounts");
+    type("Email", "kiran@example.com");
+    fireEvent.click(screen.getByLabelText("Give this person a SupplyBase login"));
+    fireEvent.click(screen.getByRole("button", { name: "Add member" }));
+    expect(await screen.findByRole("article", { name: "Kiran" })).toBeTruthy();
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Member saved, but the login could not be created: Seat limit reached (10)."));
+    expect(screen.queryByText("Login created for Kiran")).toBeNull();
+  });
+});
+
+
+describe("Business Setup — verticals & locations", () => {
+  const openStep2 = () => fireEvent.click(screen.getByRole("tab", { name: /02 · Verticals & locations/ }));
+
+  it("shows the three verticals with the GST, and a way to add each kind of location", () => {
+    render(<Harness initial={withTeam()} />);
+    openStep2();
+    expect(screen.getByText("Three verticals. One GST.")).toBeTruthy();
+    for (const name of ["Warehouses", "Retail Stores", "Back Offices"]) expect(screen.getByRole("region", { name })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add Warehouse/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add Retail Store/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add Back Office/ })).toBeTruthy();
+  });
+
+  it("adds a warehouse with a suggested name and an address; it shows under Warehouses with the business GST", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: /Add Warehouse/ }));
+    expect((screen.getByLabelText("Location name") as HTMLInputElement).value).toBe("Warehouse 1");
+    type("Address", "Plot 4, Bhiwandi");
+    fireEvent.click(screen.getByRole("button", { name: "Add Warehouse" }));
+    const card = await screen.findByRole("article", { name: "Warehouse 1" });
+    expect(within(card).getByText("Plot 4, Bhiwandi")).toBeTruthy();
+    expect(within(card).getByText(GST)).toBeTruthy();
+    expect(within(card).getByText("No members assigned")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Warehouses" })).getByRole("article", { name: "Warehouse 1" })).toBeTruthy();
+    const sent = actions.save.mock.calls[0][0] as SetupData;
+    expect(sent.locations).toEqual([{ code: "L001", businessCode: "B001", type: "WAREHOUSE", name: "Warehouse 1", address: "Plot 4, Bhiwandi", mapPin: "" }]);
+    // the live panel counts it, with the new Back Office name
+    expect(within(screen.getByLabelText("Live structure")).getByText("Back Office")).toBeTruthy();
+  });
+
+  it("a second warehouse is suggested as Warehouse 2; a duplicate name is refused", async () => {
+    let s = withTeam();
+    const c = saveLocation(s, "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "" });
+    if (!c.ok) throw new Error(c.error);
+    s = c.setup;
+    render(<Harness initial={s} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: /Add Warehouse/ }));
+    expect((screen.getByLabelText("Location name") as HTMLInputElement).value).toBe("Warehouse 2");
+    type("Location name", "warehouse 1");
+    fireEvent.click(screen.getByRole("button", { name: "Add Warehouse" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("A location with this name already exists.");
+    expect(actions.save).not.toHaveBeenCalled();
+  });
+
+  it("assigns team members to a location: the card lists them and the member card shows the location", async () => {
+    const c = saveLocation(withTeam(), "B001", { type: "RETAIL_STORE", name: "Store 1", address: "" });
+    if (!c.ok) throw new Error(c.error);
+    render(<Harness initial={c.setup} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: "Assign members" }));
+    fireEvent.click(screen.getByLabelText(/Ravi/));
+    fireEvent.click(screen.getByRole("button", { name: "Save assignments" }));
+    await waitFor(() => expect(within(screen.getByRole("article", { name: "Store 1" })).getByText("Ravi")).toBeTruthy());
+    const sent = actions.save.mock.calls[0][0] as SetupData;
+    expect(sent.assignments.find((a) => a.memberCode === "M002")?.locationCode).toBe("L001");
+    // step 01 now shows the store on Ravi's card
+    fireEvent.click(screen.getByRole("tab", { name: /01 · Team members/ }));
+    expect(within(screen.getByRole("article", { name: "Ravi" })).getByText("Store 1")).toBeTruthy();
+    expect(within(screen.getByLabelText("Live structure")).getByText("1 assigned to locations")).toBeTruthy();
+  });
+
+  it("the assign dialog starts with the people already there, and unticking removes them", async () => {
+    const s = saveLocation(withTeam(), "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "" });
+    if (!s.ok) throw new Error(s.error);
+    const a = assignMembers(s.setup, "B001", "L001", ["M001", "M002"]);
+    if (!a.ok) throw new Error(a.error);
+    render(<Harness initial={a.setup} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: "Assign members" }));
+    expect((screen.getByLabelText(/Asha/) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText(/Ravi/) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText(/Ravi/));
+    fireEvent.click(screen.getByRole("button", { name: "Save assignments" }));
+    await waitFor(() => expect(within(screen.getByRole("article", { name: "Warehouse 1" })).queryByText("Ravi")).toBeNull());
+    expect(within(screen.getByRole("article", { name: "Warehouse 1" })).getByText("Asha")).toBeTruthy();
+  });
+
+  it("without a team it says so and points to step 01", () => {
+    render(<Harness initial={withBusiness()} />);
+    openStep2();
+    fireEvent.click(screen.getByRole("button", { name: "Add team members first" }));
+    expect(screen.getByText("Start with your people")).toBeTruthy();
+  });
+
+  it("edits a location (its type stays) and deletes it after confirming; the people stay on the team", async () => {
+    const s = saveLocation(withTeam(), "B001", { type: "OFFICE", name: "Head office", address: "" });
+    if (!s.ok) throw new Error(s.error);
+    const a = assignMembers(s.setup, "B001", "L001", ["M001"]);
+    if (!a.ok) throw new Error(a.error);
+    render(<Harness initial={a.setup} />);
+    openStep2();
+    fireEvent.click(within(screen.getByRole("article", { name: "Head office" })).getByRole("button", { name: "Edit" }));
+    type("Location name", "Registered office");
+    type("Address", "Mumbai");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    const card = await screen.findByRole("article", { name: "Registered office" });
+    expect(within(screen.getByRole("region", { name: "Back Offices" })).getByRole("article", { name: "Registered office" })).toBeTruthy();
+    expect(within(card).getByText("Mumbai")).toBeTruthy();
+
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(within(card).getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete location" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Registered office" })).toBeNull());
+    expect(confirm).toHaveBeenCalled();
+    confirm.mockRestore();
+    fireEvent.click(screen.getByRole("tab", { name: /01 · Team members/ }));
+    expect(within(screen.getByRole("article", { name: "Asha" })).getByText("Unassigned")).toBeTruthy();
+  });
+
+  it("only the selected business's locations are shown", () => {
+    const c = saveLocation(withTeam(), "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "" });
+    if (!c.ok) throw new Error(c.error);
+    const b2 = registerBusiness(c.setup, { businessName: "Business 2", legalName: "", gstin: "29BBBBB0002B1Z2" });
+    if (!b2.ok) throw new Error(b2.error);
+    render(<Harness initial={b2.setup} />);
+    openStep2();
+    expect(screen.getByRole("article", { name: "Warehouse 1" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Business 2/ }));
+    expect(screen.queryByRole("article", { name: "Warehouse 1" })).toBeNull();
+  });
+});
+
+describe("Business Setup — tool access", () => {
+  const openStep3 = () => fireEvent.click(screen.getByRole("tab", { name: /03 · Tool access/ }));
+  const lastSaved = () => actions.save.mock.calls.at(-1)![0] as SetupData;
+
+  it("without a team it says so and points to step 01", () => {
+    render(<Harness initial={withBusiness()} />);
+    openStep3();
+    expect(screen.getByText("Add your team before assigning tools.", { exact: false })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Go to team members" }));
+    expect(screen.getByText("Start with your people")).toBeTruthy();
+  });
+
+  it("shows the selected member, their locations and every tool switched off", () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    expect((screen.getByLabelText("Select team member") as HTMLSelectElement).value).toBe("M001");
+    expect(screen.getByText("Locations: Not assigned yet")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("0 of 22 tools on");
+    expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false);
+    // Create / Edit / Approve are behind "Advanced"
+    expect(screen.queryByLabelText("Inventory create")).toBeNull();
+  });
+
+  it("a switch saves at once, for the selected member only; Live structure counts them", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    fireEvent.change(screen.getByLabelText("Select team member"), { target: { value: "M002" } });
+    fireEvent.click(screen.getByLabelText("Inventory"));
+    await waitFor(() => expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(true));
+    expect(lastSaved().access).toEqual([{ assignmentCode: "A002", tool: "Inventory", view: true, create: false, edit: false, approve: false }]);
+    expect(screen.getByRole("status").textContent).toBe("1 of 22 tools on");
+    expect(within(screen.getByLabelText("Live structure")).getByText("1 member with tool access")).toBeTruthy();
+    // another person is unaffected
+    fireEvent.change(screen.getByLabelText("Select team member"), { target: { value: "M001" } });
+    expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false);
+    // and it can be switched off again
+    fireEvent.change(screen.getByLabelText("Select team member"), { target: { value: "M002" } });
+    fireEvent.click(screen.getByLabelText("Inventory"));
+    await waitFor(() => expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false));
+    expect(lastSaved().access).toEqual([]);
+  });
+
+  it("Advanced shows Create, Edit and Approve; ticking one turns View on", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    fireEvent.click(screen.getByLabelText("Advanced: Create, Edit, Approve"));
+    fireEvent.click(screen.getByLabelText("Catalog approve"));
+    await waitFor(() => expect((screen.getByLabelText("Catalog") as HTMLInputElement).checked).toBe(true));
+    expect((screen.getByLabelText("Catalog approve") as HTMLInputElement).checked).toBe(true);
+    expect(lastSaved().access).toEqual([{ assignmentCode: "A001", tool: "Catalog", view: true, create: false, edit: false, approve: true }]);
+    // switching View off clears the rest
+    fireEvent.click(screen.getByLabelText("Catalog"));
+    await waitFor(() => expect((screen.getByLabelText("Catalog approve") as HTMLInputElement).checked).toBe(false));
+  });
+
+  it("marks the tools that have no module yet", () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    expect(screen.getAllByText("Not built yet")).toHaveLength(3);
+    for (const t of ["Retail POS", "Purchases", "Banking"]) expect(screen.getByLabelText(t)).toBeTruthy();
+  });
+
+  it("if the save is refused the switch does not move and the reason is shown", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    actions.save.mockResolvedValueOnce({ success: false, errors: ["Not allowed right now."] });
+    fireEvent.click(screen.getByLabelText("Inventory"));
+    expect((await screen.findByRole("alert")).textContent).toBe("Not allowed right now.");
+    expect((screen.getByLabelText("Inventory") as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("tools survive a trip to the locations step and back", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep3();
+    fireEvent.click(screen.getByLabelText("Banking"));
+    await waitFor(() => expect((screen.getByLabelText("Banking") as HTMLInputElement).checked).toBe(true));
+    fireEvent.click(screen.getByRole("tab", { name: /01 · Team members/ }));
+    openStep3();
+    expect((screen.getByLabelText("Banking") as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+
+describe("Business Setup — structure overview", () => {
+  /** Asha (top) → Ravi; a warehouse with both, a back office with Asha; Ravi has two tools. */
+  function full(): SetupData {
+    let s = withTeam();
+    const next = (c: ReturnType<typeof saveLocation>) => {
+      if (!c.ok) throw new Error(c.error);
+      s = c.setup;
+    };
+    next(saveLocation(s, "B001", { type: "WAREHOUSE", name: "Warehouse 1", address: "Bhiwandi" }));
+    next(saveLocation(s, "B001", { type: "OFFICE", name: "Head office", address: "" }));
+    next(assignMembers(s, "B001", "L001", ["M001", "M002"]));
+    for (const tool of ["Inventory", "Banking"]) next(setToolAccess(s, "B001", "M002", tool, { ...NO_ACCESS, view: true }));
+    return s;
+  }
+  const openOverview = () => fireEvent.click(screen.getByRole("tab", { name: "Structure overview" }));
+
+  it("shows the metrics, the business and its GST", () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const map = screen.getByLabelText("Organisation map");
+    expect(within(map).getByText("A clear view of your business")).toBeTruthy();
+    const metric = (label: string) => within(map).getByText(label).previousElementSibling?.textContent;
+    expect(metric("Team members")).toBe("2");
+    expect(metric("Business locations")).toBe("2");
+    expect(metric("Tools in use")).toBe("2");
+    expect(within(map).getAllByText(`GST ${GST}`).length).toBeGreaterThan(0);
+  });
+
+  it("draws the reporting hierarchy: the manager at the top with the person who reports to them below", () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const tree = screen.getByLabelText("Reporting hierarchy");
+    const top = within(tree).getByRole("button", { name: /Asha/ });
+    const ravi = within(tree).getByRole("button", { name: /Ravi/ });
+    // Ravi's node sits inside Asha's list item
+    expect(top.closest("li")?.contains(ravi)).toBe(true);
+    expect(ravi.closest("li")?.contains(top)).toBe(false);
+  });
+
+  it("clicking a person opens their profile; clicking a location's Assign opens the assign dialog", async () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    fireEvent.click(within(screen.getByLabelText("Reporting hierarchy")).getByRole("button", { name: /Ravi/ }));
+    expect(await screen.findByText("Edit member")).toBeTruthy();
+    expect((screen.getByLabelText("Member name") as HTMLInputElement).value).toBe("Ravi");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByText("Edit member")).toBeNull());
+
+    fireEvent.click(within(screen.getByRole("article", { name: "Head office overview" })).getByRole("button", { name: /Assign/ }));
+    expect(await screen.findByText("Assign members · Head office")).toBeTruthy();
+  });
+
+  it("lists each vertical with its locations and the people there; a person's badge opens their profile", async () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const warehouse = screen.getByRole("article", { name: "Warehouse 1 overview" });
+    expect(within(warehouse).getByText("Bhiwandi")).toBeTruthy();
+    expect(within(warehouse).getByRole("button", { name: "Asha" })).toBeTruthy();
+    expect(within(warehouse).getByRole("button", { name: "Ravi" })).toBeTruthy();
+    const office = screen.getByRole("article", { name: "Head office overview" });
+    expect(within(office).getByText("Location details pending")).toBeTruthy();
+    expect(within(office).getByText("No assigned members")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Retail Stores overview" })).getByText("0 locations · one GST")).toBeTruthy();
+    fireEvent.click(within(warehouse).getByRole("button", { name: "Asha" }));
+    expect(await screen.findByText("Edit member")).toBeTruthy();
+  });
+
+  it("can add a location from here", async () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    fireEvent.click(within(screen.getByRole("region", { name: "Retail Stores overview" })).getByRole("button", { name: /Add Retail Store/ }));
+    expect((await screen.findByLabelText("Location name") as HTMLInputElement).value).toBe("Retail Store 1");
+  });
+
+  it("shows the tools each person has, or that they have none", () => {
+    render(<Harness initial={full()} />);
+    openOverview();
+    const rows = screen.getByLabelText("Tools by member");
+    expect(within(rows).getByText("No tools assigned")).toBeTruthy();
+    expect(within(rows).getByText("Inventory")).toBeTruthy();
+    expect(within(rows).getByText("Banking")).toBeTruthy();
+  });
+
+  it("Print chart prints the page", () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    render(<Harness initial={full()} />);
+    openOverview();
+    fireEvent.click(screen.getByRole("button", { name: /Print chart/ }));
+    expect(print).toHaveBeenCalledTimes(1);
+    print.mockRestore();
+  });
+
+  it("with no team it says so", () => {
+    render(<Harness initial={withBusiness()} />);
+    openOverview();
+    expect(screen.getByText("No team members yet.")).toBeTruthy();
+  });
+});
+
+
+describe("Business Setup — assigned business", () => {
+  const openStep4 = () => fireEvent.click(screen.getByRole("tab", { name: /04 · Assigned business/ }));
+  const buyer: PartyCandidate = { type: "BUYER", id: "buy1", name: "Zara Retail", detail: "Mumbai, India" };
+  const asParty = (c: PartyCandidate, responsibleMemberCode = ""): AssignedParty => ({ ...c, businessCode: "B001", responsibleMemberCode });
+
+  it("shows buyers, suppliers and freelancers, each empty at first", async () => {
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    for (const name of ["Buyers", "Suppliers", "Freelancers"]) expect(await within(screen.getByRole("region", { name })).findByText(`No ${name.toLowerCase()} assigned yet.`)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Assign buyer/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Assign supplier/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Assign freelancer/ })).toBeTruthy();
+  });
+
+  it("lists what is already assigned to this business, with its responsible person", async () => {
+    actions.parties.mockResolvedValue({ success: true, data: [asParty(buyer, "M002"), { ...asParty({ ...buyer, id: "b-other", name: "Other business buyer" }), businessCode: "B009" }] });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    const card = await screen.findByRole("article", { name: "Zara Retail" });
+    expect(within(card).getByText("Mumbai, India")).toBeTruthy();
+    expect((within(card).getByLabelText("Responsible team member") as HTMLSelectElement).value).toBe("M002");
+    expect(screen.queryByRole("article", { name: "Other business buyer" })).toBeNull();
+    expect(within(screen.getByLabelText("Live structure")).getByText("Buyers")).toBeTruthy();
+  });
+
+  it("searching shows matches; assigning one adds it to the list and the picker marks it Assigned", async () => {
+    actions.searchParties.mockImplementation(async (_g: string, q: string) => ({ success: true, data: [buyer, { type: "BUYER" as const, id: "buy2", name: "Zeta Stores", detail: "Delhi, India" }].filter((c) => c.name.toLowerCase().includes(q.toLowerCase())) }));
+    actions.assignParty.mockImplementation(async (i: { type: "BUYER"; id: string }) => ({ success: true, data: asParty(i.id === "buy1" ? buyer : { type: "BUYER", id: "buy2", name: "Zeta Stores", detail: "Delhi, India" }) }));
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    fireEvent.click(screen.getByRole("button", { name: /Assign buyer/ }));
+    expect(await screen.findByText("Zara Retail", { selector: "p" })).toBeTruthy();
+    expect(actions.searchParties).toHaveBeenCalledWith("BUYER", "");
+    fireEvent.change(screen.getByLabelText("Search buyers"), { target: { value: "zeta" } });
+    await waitFor(() => expect(screen.queryByText("Zara Retail", { selector: "p" })).toBeNull());
+    expect(actions.searchParties).toHaveBeenCalledWith("BUYER", "zeta");
+    fireEvent.click(screen.getByRole("button", { name: "Assign Zeta Stores" }));
+    await waitFor(() => expect(actions.assignParty).toHaveBeenCalledWith({ businessCode: "B001", type: "BUYER", id: "buy2" }));
+    expect(await screen.findByText("Assigned")).toBeTruthy();
+    // it is now in the list behind the dialog
+    expect(screen.getAllByText("Zeta Stores").length).toBeGreaterThan(0);
+  });
+
+  it("a search with no match says so; a failed search shows the reason", async () => {
+    actions.searchParties.mockResolvedValueOnce({ success: true, data: [] });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    fireEvent.click(screen.getByRole("button", { name: /Assign freelancer/ }));
+    expect(await screen.findByText("There are no freelancers in SupplyBase yet.")).toBeTruthy();
+    actions.searchParties.mockResolvedValueOnce({ success: false, error: "Search is down." });
+    fireEvent.change(screen.getByLabelText("Search freelancers"), { target: { value: "x" } });
+    expect((await screen.findByRole("alert")).textContent).toBe("Search is down.");
+  });
+
+  it("an assign that is refused shows the reason and adds nothing", async () => {
+    actions.searchParties.mockResolvedValue({ success: true, data: [buyer] });
+    actions.assignParty.mockResolvedValueOnce({ success: false, error: "This buyer, supplier or freelancer no longer exists." });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    fireEvent.click(screen.getByRole("button", { name: /Assign buyer/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Assign Zara Retail" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("This buyer, supplier or freelancer no longer exists.");
+    expect(screen.queryByRole("article", { name: "Zara Retail" })).toBeNull();
+  });
+
+  it("changes who is responsible, and removes a party from the business", async () => {
+    actions.parties.mockResolvedValue({ success: true, data: [asParty(buyer)] });
+    actions.setResponsible.mockImplementation(async (i: { responsibleMemberCode: string }) => ({ success: true, data: asParty(buyer, i.responsibleMemberCode) }));
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    const card = await screen.findByRole("article", { name: "Zara Retail" });
+    fireEvent.change(within(card).getByLabelText("Responsible team member"), { target: { value: "M002" } });
+    await waitFor(() => expect(actions.setResponsible).toHaveBeenCalledWith({ businessCode: "B001", type: "BUYER", id: "buy1", responsibleMemberCode: "M002" }));
+    await waitFor(() => expect((within(screen.getByRole("article", { name: "Zara Retail" })).getByLabelText("Responsible team member") as HTMLSelectElement).value).toBe("M002"));
+
+    fireEvent.click(within(screen.getByRole("article", { name: "Zara Retail" })).getByRole("button", { name: "Remove Zara Retail" }));
+    await waitFor(() => expect(screen.queryByRole("article", { name: "Zara Retail" })).toBeNull());
+    expect(actions.unassignParty).toHaveBeenCalledWith({ businessCode: "B001", type: "BUYER", id: "buy1" });
+  });
+
+  it("the overview lists them with who is responsible", async () => {
+    actions.parties.mockResolvedValue({ success: true, data: [asParty(buyer, "M001"), asParty({ type: "FREELANCER", id: "f1", name: "Meera Shah", detail: "Pune" })] });
+    render(<Harness initial={withTeam()} />);
+    openStep4();
+    await screen.findByRole("article", { name: "Zara Retail" });
+    fireEvent.click(screen.getByRole("tab", { name: "Structure overview" }));
+    const overview = screen.getByLabelText("Assigned business overview");
+    expect(within(within(overview).getByRole("region", { name: "Buyers overview" })).getByText(/Zara Retail/).textContent).toContain("Asha");
+    expect(within(within(overview).getByRole("region", { name: "Freelancers overview" })).getByText(/nobody responsible yet/)).toBeTruthy();
+    expect(within(within(overview).getByRole("region", { name: "Suppliers overview" })).getByText("None assigned")).toBeTruthy();
+  });
+});

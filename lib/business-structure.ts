@@ -31,6 +31,9 @@ export const TOOLS = [
   "CRM",
   "Invoices",
   "Expenses",
+  "Retail POS",
+  "Purchases",
+  "Banking",
   "Inventory",
   "Shop",
   "Deals",
@@ -42,7 +45,7 @@ export const TOOLS = [
 
 export const LOCATION_TYPES = ["RETAIL_STORE", "WAREHOUSE", "OFFICE"] as const;
 export type LocationType = (typeof LOCATION_TYPES)[number];
-export const LOCATION_TYPE_LABEL: Record<LocationType, string> = { RETAIL_STORE: "Retail Store", WAREHOUSE: "Warehouse", OFFICE: "Office" };
+export const LOCATION_TYPE_LABEL: Record<LocationType, string> = { RETAIL_STORE: "Retail Store", WAREHOUSE: "Warehouse", OFFICE: "Back Office" };
 
 export interface EntityRow {
   code: string;
@@ -75,6 +78,7 @@ export interface AssignmentRow {
   code: string;
   memberCode: string;
   businessCode: string;
+  /** Empty = the person is on the business's team but not assigned to a location yet. */
   locationCode: string;
   designation: string;
   reportsToCode: string;
@@ -180,7 +184,9 @@ export function validateSetup(data: SetupData): string[] {
     });
   }
 
-  checkRows("entities", data.entities, [{ key: "legalName", label: "Legal name" }]);
+  checkRows("entities", data.entities, [{ key: "legalName", label: "Legal name" }], (r, errs, where) => {
+    if (r.gstin.trim() && !isValidGstin(r.gstin)) errs.push(`${where}: GSTIN must be 15 characters in the GST format (for example 27AAAAA0001A1Z1).`);
+  });
 
   checkRows("businesses", data.businesses, [{ key: "entityCode", label: "Entity ID" }, { key: "name", label: "Business name" }], (r, errs, where) => {
     if (r.entityCode && !entityCodes.has(r.entityCode)) errs.push(`${where}: Entity ID ${r.entityCode} is not in Legal Entities.`);
@@ -201,7 +207,7 @@ export function validateSetup(data: SetupData): string[] {
   checkRows(
     "assignments",
     data.assignments,
-    [{ key: "memberCode", label: "Member ID" }, { key: "businessCode", label: "Business ID" }, { key: "locationCode", label: "Location ID" }, { key: "designation", label: "Designation" }],
+    [{ key: "memberCode", label: "Member ID" }, { key: "businessCode", label: "Business ID" }, { key: "designation", label: "Designation" }],
     (r, errs, where) => {
       if (r.memberCode && !memberCodes.has(r.memberCode)) errs.push(`${where}: Member ID ${r.memberCode} is not in Members.`);
       if (r.businessCode && !businessCodes.has(r.businessCode)) errs.push(`${where}: Business ID ${r.businessCode} is not in Businesses.`);
@@ -260,3 +266,406 @@ export function checkSetup(data: SetupData): { data: SetupData; errors: string[]
   const normalized = normalizeSetup(data);
   return { data: normalized, errors: validateSetup(normalized) };
 }
+
+
+// ---------------------------------------------------------------- GST
+/** 2 digits (state), 5 letters + 4 digits + 1 letter (PAN), 1 entity digit/letter, "Z", 1 check character. */
+export const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
+export const normalizeGstin = (v: string) => v.trim().toUpperCase();
+export const isValidGstin = (v: string) => GSTIN_PATTERN.test(normalizeGstin(v));
+
+// ---------------------------------------------------------------- Business Setup: the guided screen's operations
+// Plain functions on a SetupData, so the screen and the tests share the same rules. Each returns the new
+// setup, or a message for the user. None of them touches the database.
+
+export type Change = { ok: true; setup: SetupData; code: string } | { ok: false; error: string };
+const fail = (error: string): Change => ({ ok: false, error });
+const sameGst = (a: string, b: string) => normalizeGstin(a) === normalizeGstin(b);
+
+export function entityOf(setup: SetupData, businessCode: string): EntityRow | undefined {
+  const b = setup.businesses.find((x) => x.code === businessCode);
+  return b ? setup.entities.find((e) => e.code === b.entityCode) : undefined;
+}
+
+/**
+ * Registers a business: its company (legal entity, one GST) and the business itself. A GST that already
+ * belongs to a company is reused, so two businesses of one company share it.
+ */
+export function registerBusiness(setup: SetupData, input: { businessName: string; legalName: string; gstin: string }): Change {
+  const name = input.businessName.trim();
+  if (!name) return fail("Enter the business name.");
+  if (setup.businesses.some((b) => b.name.trim().toLowerCase() === name.toLowerCase())) return fail("A business with this name already exists.");
+  const gstin = normalizeGstin(input.gstin);
+  if (gstin && !isValidGstin(gstin)) return fail("Enter a 15-character GSTIN in the expected format.");
+  let entities = setup.entities;
+  let entity = gstin ? entities.find((e) => sameGst(e.gstin, gstin)) : undefined;
+  if (!entity) {
+    entity = { code: nextCode(ID_PREFIX.entities, entities), legalName: input.legalName.trim() || name, gstin, registeredAddress: "" };
+    entities = [...entities, entity];
+  }
+  const business: BusinessRow = { code: nextCode(ID_PREFIX.businesses, setup.businesses), entityCode: entity.code, name, operationalAddress: "" };
+  return { ok: true, setup: { ...setup, entities, businesses: [...setup.businesses, business] }, code: business.code };
+}
+
+/**
+ * Changes a business's name and GST. Moving to a GST that another company already has joins that company;
+ * otherwise the company's GST is changed (or, if other businesses share the company, a new company is made).
+ */
+export function updateBusiness(setup: SetupData, businessCode: string, input: { name: string; gstin: string }): Change {
+  const business = setup.businesses.find((b) => b.code === businessCode);
+  if (!business) return fail("Business not found.");
+  const name = input.name.trim();
+  if (!name) return fail("Enter the business name.");
+  if (setup.businesses.some((b) => b.code !== businessCode && b.name.trim().toLowerCase() === name.toLowerCase())) return fail("A business with this name already exists.");
+  const gstin = normalizeGstin(input.gstin);
+  if (gstin && !isValidGstin(gstin)) return fail("Enter a 15-character GSTIN in the expected format.");
+
+  let entities = setup.entities;
+  let entityCode = business.entityCode;
+  const current = entities.find((e) => e.code === entityCode);
+  if (!current || !sameGst(current.gstin, gstin)) {
+    const other = gstin ? entities.find((e) => e.code !== entityCode && sameGst(e.gstin, gstin)) : undefined;
+    const sharedWith = setup.businesses.filter((b) => b.entityCode === entityCode && b.code !== businessCode).length;
+    if (other) entityCode = other.code;
+    else if (current && sharedWith === 0) entities = entities.map((e) => (e.code === entityCode ? { ...e, gstin } : e));
+    else {
+      const created: EntityRow = { code: nextCode(ID_PREFIX.entities, entities), legalName: current?.legalName || name, gstin, registeredAddress: current?.registeredAddress ?? "" };
+      entities = [...entities, created];
+      entityCode = created.code;
+    }
+  }
+  const businesses = setup.businesses.map((b) => (b.code === businessCode ? { ...b, name, entityCode } : b));
+  // A company left with no business is removed, so the table does not fill with empty companies.
+  const used = new Set(businesses.map((b) => b.entityCode));
+  entities = entities.filter((e) => used.has(e.code));
+  return { ok: true, setup: { ...setup, entities, businesses }, code: businessCode };
+}
+
+export interface TeamMember {
+  memberCode: string;
+  name: string;
+  email: string;
+  mobile: string;
+  designation: string;
+  reportsToCode: string;
+  /** Locations of this business the member is assigned to. */
+  locationCodes: string[];
+  assignmentCodes: string[];
+}
+
+/** The people on a business's team: everyone with an assignment in it, however many locations they have. */
+export function teamOf(setup: SetupData, businessCode: string): TeamMember[] {
+  const byMember = new Map<string, AssignmentRow[]>();
+  for (const a of setup.assignments) if (a.businessCode === businessCode) byMember.set(a.memberCode, [...(byMember.get(a.memberCode) ?? []), a]);
+  const out: TeamMember[] = [];
+  for (const m of setup.members) {
+    const rows = byMember.get(m.code);
+    if (!rows) continue;
+    out.push({
+      memberCode: m.code,
+      name: m.name,
+      email: m.email,
+      mobile: m.mobile,
+      designation: rows[0].designation,
+      reportsToCode: rows[0].reportsToCode,
+      locationCodes: rows.map((r) => r.locationCode).filter(Boolean),
+      assignmentCodes: rows.map((r) => r.code),
+    });
+  }
+  return out;
+}
+
+/** Walks the reports-to chain upwards from `start`; true if it comes back to `target`. */
+function reportsUpTo(reportsTo: Map<string, string>, start: string, target: string): boolean {
+  const seen = new Set<string>();
+  for (let cur: string | undefined = start; cur && !seen.has(cur); cur = reportsTo.get(cur)) {
+    if (cur === target) return true;
+    seen.add(cur);
+  }
+  return false;
+}
+
+export interface MemberInput {
+  /** Set when editing. */
+  memberCode?: string;
+  name: string;
+  designation: string;
+  /** A member of the same business team, or empty for the top. */
+  reportsToCode: string;
+  email: string;
+  mobile: string;
+}
+
+/**
+ * Adds a person to a business's team, or edits them. The same designation and reporting line apply to all
+ * their locations in this business. A new person starts with no location (Verticals & locations assigns one).
+ */
+export function saveTeamMember(setup: SetupData, businessCode: string, input: MemberInput): Change {
+  if (!setup.businesses.some((b) => b.code === businessCode)) return fail("Business not found.");
+  const name = input.name.trim();
+  if (!name) return fail("Enter the member's name.");
+  if (!(DESIGNATIONS as readonly string[]).includes(input.designation)) return fail("Choose a designation.");
+  const email = input.email.trim().toLowerCase();
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) return fail("Enter a valid email address.");
+  const team = teamOf(setup, businessCode);
+  const existing = input.memberCode ? setup.members.find((m) => m.code === input.memberCode) : undefined;
+  if (input.memberCode && !existing) return fail("Member not found.");
+  // The same person (same email) is never added twice.
+  const twin = email ? setup.members.find((m) => m.email.toLowerCase() === email && m.code !== existing?.code) : undefined;
+  if (twin && team.some((t) => t.memberCode === twin.code)) return fail(`${twin.name} is already on this team.`);
+
+  let members = setup.members;
+  let memberCode = existing?.code ?? twin?.code ?? "";
+  if (existing) members = members.map((m) => (m.code === existing.code ? { ...m, name, email, mobile: input.mobile.trim() } : m));
+  else if (twin) members = members.map((m) => (m.code === twin.code ? { ...m, name: m.name || name, mobile: m.mobile || input.mobile.trim() } : m));
+  else {
+    memberCode = nextCode(ID_PREFIX.members, members);
+    members = [...members, { code: memberCode, name, mobile: input.mobile.trim(), email, photoUrl: "" }];
+  }
+
+  const reportsToCode = input.reportsToCode;
+  if (reportsToCode) {
+    if (reportsToCode === memberCode) return fail("A member cannot report to themselves.");
+    if (!team.some((t) => t.memberCode === reportsToCode)) return fail("A person can only report to someone on this business's team.");
+    const reportsTo = new Map(team.map((t) => [t.memberCode, t.reportsToCode]));
+    if (reportsUpTo(reportsTo, reportsToCode, memberCode)) return fail("Reporting cannot create a circular hierarchy.");
+  }
+
+  let assignments = setup.assignments;
+  const mine = assignments.filter((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+  if (mine.length) assignments = assignments.map((a) => (mine.includes(a) ? { ...a, designation: input.designation, reportsToCode } : a));
+  else assignments = [...assignments, { code: nextCode(ID_PREFIX.assignments, assignments), memberCode, businessCode, locationCode: "", designation: input.designation, reportsToCode }];
+  return { ok: true, setup: { ...setup, members, assignments }, code: memberCode };
+}
+
+/**
+ * Takes a person off a business's team: their locations and tool access in it go too, and people who
+ * reported to them move to the top. The person stays in Members if they are on another team.
+ */
+export function removeTeamMember(setup: SetupData, businessCode: string, memberCode: string): Change {
+  const gone = setup.assignments.filter((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+  if (!gone.length) return fail("This person is not on the team.");
+  const goneCodes = new Set(gone.map((a) => a.code));
+  let assignments = setup.assignments.filter((a) => !goneCodes.has(a.code));
+  assignments = assignments.map((a) => (a.businessCode === businessCode && a.reportsToCode === memberCode ? { ...a, reportsToCode: "" } : a));
+  const stillThere = assignments.some((a) => a.memberCode === memberCode || a.reportsToCode === memberCode);
+  const members = stillThere ? setup.members : setup.members.filter((m) => m.code !== memberCode);
+  const access = setup.access.filter((t) => !goneCodes.has(t.assignmentCode));
+  return { ok: true, setup: { ...setup, members, assignments, access }, code: memberCode };
+}
+
+
+// ---------------------------------------------------------------- Business Setup: verticals & locations
+/** Warehouse, Retail Store and Back Office, in the order the screen shows them. */
+export const VERTICALS: LocationType[] = ["WAREHOUSE", "RETAIL_STORE", "OFFICE"];
+
+export interface LocationInput {
+  /** Set when editing; the type of an existing location does not change. */
+  locationCode?: string;
+  type: LocationType;
+  name: string;
+  address: string;
+}
+
+/** Adds a location to a business (it shares the business's GST), or edits one. Names are unique within a business. */
+export function saveLocation(setup: SetupData, businessCode: string, input: LocationInput): Change {
+  if (!setup.businesses.some((b) => b.code === businessCode)) return fail("Business not found.");
+  const name = input.name.trim();
+  if (!name) return fail("Enter the location name.");
+  const existing = input.locationCode ? setup.locations.find((l) => l.code === input.locationCode && l.businessCode === businessCode) : undefined;
+  if (input.locationCode && !existing) return fail("Location not found.");
+  const type = existing?.type || input.type;
+  if (!(LOCATION_TYPES as readonly string[]).includes(type)) return fail("Choose Warehouse, Retail Store or Back Office.");
+  if (setup.locations.some((l) => l.businessCode === businessCode && l.code !== existing?.code && l.name.trim().toLowerCase() === name.toLowerCase())) return fail("A location with this name already exists.");
+  if (existing) {
+    return { ok: true, setup: { ...setup, locations: setup.locations.map((l) => (l.code === existing.code ? { ...l, name, address: input.address.trim() } : l)) }, code: existing.code };
+  }
+  const location: LocationRow = { code: nextCode(ID_PREFIX.locations, setup.locations), businessCode, type, name, address: input.address.trim(), mapPin: "" };
+  return { ok: true, setup: { ...setup, locations: [...setup.locations, location] }, code: location.code };
+}
+
+/** What a member's tool access looks like across their assignments in a business: the same on every one. */
+function accessCopies(setup: SetupData, fromAssignment: string, toAssignment: string): AccessRow[] {
+  return setup.access.filter((t) => t.assignmentCode === fromAssignment).map((t) => ({ ...t, assignmentCode: toAssignment }));
+}
+
+/**
+ * Sets who works at a location. Ticked people from the business's team are assigned (a person with no location
+ * yet gets this one; a person who already works elsewhere gets an extra assignment with the same designation,
+ * reporting line and tool access); unticked people are taken off it, and someone left with no location stays on
+ * the team as "unassigned".
+ */
+export function assignMembers(setup: SetupData, businessCode: string, locationCode: string, memberCodes: string[]): Change {
+  const location = setup.locations.find((l) => l.code === locationCode && l.businessCode === businessCode);
+  if (!location) return fail("Location not found.");
+  const team = new Map(teamOf(setup, businessCode).map((t) => [t.memberCode, t]));
+  for (const code of memberCodes) if (!team.has(code)) return fail("Only people on this business's team can be assigned.");
+  const wanted = new Set(memberCodes);
+
+  let assignments = setup.assignments;
+  let access = setup.access;
+  for (const [memberCode] of team) {
+    const mine = assignments.filter((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+    const here = mine.find((a) => a.locationCode === locationCode);
+    if (wanted.has(memberCode) && !here) {
+      const unplaced = mine.find((a) => !a.locationCode);
+      if (unplaced) assignments = assignments.map((a) => (a === unplaced ? { ...a, locationCode } : a));
+      else {
+        const base = mine[0];
+        const code = nextCode(ID_PREFIX.assignments, assignments);
+        assignments = [...assignments, { code, memberCode, businessCode, locationCode, designation: base.designation, reportsToCode: base.reportsToCode }];
+        access = [...access, ...accessCopies({ ...setup, access }, base.code, code)];
+      }
+    } else if (!wanted.has(memberCode) && here) {
+      if (mine.length > 1) {
+        assignments = assignments.filter((a) => a !== here);
+        access = access.filter((t) => t.assignmentCode !== here.code);
+      } else assignments = assignments.map((a) => (a === here ? { ...a, locationCode: "" } : a));
+    }
+  }
+  return { ok: true, setup: { ...setup, assignments, access }, code: locationCode };
+}
+
+/** Deletes a location. People who worked only there stay on the team as unassigned. */
+export function removeLocation(setup: SetupData, locationCode: string): Change {
+  const location = setup.locations.find((l) => l.code === locationCode);
+  if (!location) return fail("Location not found.");
+  const kept = assignMembers(setup, location.businessCode, locationCode, []);
+  if (!kept.ok) return kept;
+  return { ok: true, setup: { ...kept.setup, locations: kept.setup.locations.filter((l) => l.code !== locationCode) }, code: locationCode };
+}
+
+
+// ---------------------------------------------------------------- Business Setup: tool access
+/** Tools whose SupplyBase module does not exist yet: switching them on records the plan only. */
+export const PLANNED_TOOLS: readonly string[] = ["Retail POS", "Purchases", "Banking"];
+
+export interface ToolLevels {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  approve: boolean;
+}
+export const NO_ACCESS: ToolLevels = { view: false, create: false, edit: false, approve: false };
+
+/** Ticking Create, Edit or Approve turns View on; turning View off clears the rest. */
+export function normalizeLevels(l: ToolLevels): ToolLevels {
+  const view = l.view || l.create || l.edit || l.approve;
+  return view ? { ...l, view: true } : NO_ACCESS;
+}
+export const hasAnyAccess = (l: ToolLevels | undefined) => !!l && (l.view || l.create || l.edit || l.approve);
+
+/** A member's tool access in a business. It is the same on all their locations, so the first assignment tells it. */
+export function toolAccessOf(setup: SetupData, businessCode: string, memberCode: string): Map<string, ToolLevels> {
+  const first = setup.assignments.find((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+  const out = new Map<string, ToolLevels>();
+  if (!first) return out;
+  for (const t of setup.access) if (t.assignmentCode === first.code) out.set(t.tool, normalizeLevels({ view: t.view, create: t.create, edit: t.edit, approve: t.approve }));
+  return out;
+}
+
+/** Sets one tool for one member of a business team, on all of their locations. No levels ticked removes the tool. */
+export function setToolAccess(setup: SetupData, businessCode: string, memberCode: string, tool: string, levels: ToolLevels): Change {
+  if (!(TOOLS as readonly string[]).includes(tool)) return fail("Choose a tool from the list.");
+  const mine = setup.assignments.filter((a) => a.businessCode === businessCode && a.memberCode === memberCode);
+  if (!mine.length) return fail("This person is not on the team.");
+  const codes = new Set(mine.map((a) => a.code));
+  const next = normalizeLevels(levels);
+  const kept = setup.access.filter((t) => !(codes.has(t.assignmentCode) && t.tool === tool));
+  const added: AccessRow[] = hasAnyAccess(next) ? mine.map((a) => ({ assignmentCode: a.code, tool, ...next })) : [];
+  return { ok: true, setup: { ...setup, access: [...kept, ...added] }, code: memberCode };
+}
+
+/** How many people on a business's team have at least one tool. */
+export function membersWithTools(setup: SetupData, businessCode: string): number {
+  return teamOf(setup, businessCode).filter((m) => [...toolAccessOf(setup, businessCode, m.memberCode).values()].some(hasAnyAccess)).length;
+}
+
+
+// ---------------------------------------------------------------- Business Setup: structure overview
+export interface OrgNode {
+  member: TeamMember;
+  children: OrgNode[];
+}
+
+/**
+ * The reporting tree of a team: people with no manager on the team are the top; everyone else hangs under the
+ * person they report to. A loop (which the checks refuse, but old data may hold) cannot hide anyone: whoever is
+ * not reached from the top is shown at the top instead.
+ */
+export function reportingTree(team: TeamMember[]): OrgNode[] {
+  const byCode = new Map(team.map((m) => [m.memberCode, m]));
+  const kids = new Map<string, TeamMember[]>();
+  const tops: TeamMember[] = [];
+  for (const m of team) {
+    if (m.reportsToCode && byCode.has(m.reportsToCode) && m.reportsToCode !== m.memberCode) kids.set(m.reportsToCode, [...(kids.get(m.reportsToCode) ?? []), m]);
+    else tops.push(m);
+  }
+  const seen = new Set<string>();
+  const build = (m: TeamMember): OrgNode => {
+    seen.add(m.memberCode);
+    return { member: m, children: (kids.get(m.memberCode) ?? []).filter((c) => !seen.has(c.memberCode)).map(build) };
+  };
+  const roots = tops.map(build);
+  for (const m of team) if (!seen.has(m.memberCode)) roots.push(build(m));
+  return roots;
+}
+
+/** The tools a person has, with their levels, in the order of the tool list. */
+export function toolsOfMember(setup: SetupData, businessCode: string, memberCode: string): { tool: string; levels: ToolLevels }[] {
+  const access = toolAccessOf(setup, businessCode, memberCode);
+  return TOOLS.filter((t) => hasAnyAccess(access.get(t))).map((tool) => ({ tool, levels: access.get(tool)! }));
+}
+
+/** How many different tools anyone on the team has. */
+export function toolsInUse(setup: SetupData, businessCode: string): number {
+  const used = new Set<string>();
+  for (const m of teamOf(setup, businessCode)) for (const t of toolsOfMember(setup, businessCode, m.memberCode)) used.add(t.tool);
+  return used.size;
+}
+
+
+// ---------------------------------------------------------------- Business Setup: assigned business
+// Buyers, suppliers and freelancers connected to a business, with an optional responsible team member.
+
+/** Where a party lives: Buyer, Supplier (a registered supplier), SupplierListing (a supplier in the directory) or Freelancer. */
+export const PARTY_TYPES = ["BUYER", "SUPPLIER", "SUPPLIER_LISTING", "FREELANCER"] as const;
+export type PartyType = (typeof PARTY_TYPES)[number];
+export type PartyGroup = "BUYER" | "SUPPLIER" | "FREELANCER";
+
+export const PARTY_GROUPS: { id: PartyGroup; label: string; one: string }[] = [
+  { id: "BUYER", label: "Buyers", one: "buyer" },
+  { id: "SUPPLIER", label: "Suppliers", one: "supplier" },
+  { id: "FREELANCER", label: "Freelancers", one: "freelancer" },
+];
+
+/** Registered suppliers and directory listings are both "Suppliers" on the screen. */
+export const groupOfParty = (type: PartyType): PartyGroup => (type === "SUPPLIER_LISTING" ? "SUPPLIER" : type);
+export const isPartyType = (v: unknown): v is PartyType => (PARTY_TYPES as readonly string[]).includes(v as string);
+export const isPartyGroup = (v: unknown): v is PartyGroup => PARTY_GROUPS.some((g) => g.id === v);
+export const partyKey = (p: { type: PartyType; id: string }) => `${p.type}:${p.id}`;
+
+/** Someone who could be assigned (a search result). */
+export interface PartyCandidate {
+  type: PartyType;
+  id: string;
+  name: string;
+  /** "Mumbai, India", or a freelancer's location and skills. */
+  detail: string;
+}
+
+/** A party connected to a business. */
+export interface AssignedParty extends PartyCandidate {
+  businessCode: string;
+  /** The team member responsible for them, or empty. */
+  responsibleMemberCode: string;
+}
+
+export const partiesOf = (list: AssignedParty[], businessCode: string, group: PartyGroup) => list.filter((p) => p.businessCode === businessCode && groupOfParty(p.type) === group);
+
+/** Adds a party, or replaces it if it is already there (matched by type and id within the business). */
+export function withParty(list: AssignedParty[], party: AssignedParty): AssignedParty[] {
+  const same = (p: AssignedParty) => p.businessCode === party.businessCode && partyKey(p) === partyKey(party);
+  return list.some(same) ? list.map((p) => (same(p) ? party : p)) : [...list, party];
+}
+export const withoutParty = (list: AssignedParty[], businessCode: string, type: PartyType, id: string) => list.filter((p) => !(p.businessCode === businessCode && p.type === type && p.id === id));
