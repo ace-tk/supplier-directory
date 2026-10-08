@@ -69,7 +69,7 @@ function StageStepper({ index }: { index: number }) {
           <span
             className={cn(
               "flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium whitespace-nowrap",
-              i < index ? "text-emerald-600 dark:text-emerald-400" : i === index ? "bg-primary/10 text-primary" : "text-muted-foreground/50"
+              i < index ? "text-mint-ink " : i === index ? "bg-primary/10 text-primary" : "text-muted-foreground/50"
             )}
           >
             {i < index && <Check className="w-3 h-3" />}

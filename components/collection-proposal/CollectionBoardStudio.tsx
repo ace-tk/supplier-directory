@@ -428,7 +428,7 @@ export function CollectionBoardStudio({ openId, actions = REAL_ACTIONS }: { open
                       </div>
                     </button>
                     <div className="flex justify-end border-t border-border px-2 py-1">
-                      <button type="button" onClick={() => void handleDelete(item)} className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-red-600" aria-label={`Delete ${item.name}`}>
+                      <button type="button" onClick={() => void handleDelete(item)} className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-rose-ink" aria-label={`Delete ${item.name}`}>
                         <Trash2 className="h-3 w-3" /> Delete
                       </button>
                     </div>

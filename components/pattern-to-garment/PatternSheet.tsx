@@ -41,7 +41,7 @@ export const PatternSheet = forwardRef<HTMLDivElement, PatternSheetProps>(functi
   ].filter((v): v is { label: string; src: string } => !!v.src);
 
   return (
-    <div ref={ref} style={{ width: PATTERN_SHEET_WIDTH }} className="grid grid-cols-[400px_1fr] overflow-hidden rounded-xl bg-white text-[#1F2A44]">
+    <div ref={ref} style={{ width: PATTERN_SHEET_WIDTH }} className="grid grid-cols-[400px_1fr] overflow-hidden rounded-xl bg-card text-[#1F2A44]">
       {/* Garment */}
       <div className="flex flex-col bg-[#EFE9E0] p-6">
         <p className="text-[22px] font-semibold italic leading-tight text-[#2B2B2B]">{title || "Pattern to Garment"}</p>
@@ -56,7 +56,7 @@ export const PatternSheet = forwardRef<HTMLDivElement, PatternSheetProps>(functi
         {extraViews.length > 0 && (
           <div className="mt-4 grid grid-cols-2 gap-3">
             {extraViews.map((v) => (
-              <div key={v.label} className="rounded-lg bg-white/70 p-2">
+              <div key={v.label} className="rounded-lg bg-card/70 p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={v.src} alt={`${v.label} view`} className="h-40 w-full object-contain" />
                 <p className="mt-1 text-center text-[11px] font-semibold uppercase tracking-wider text-[#5A5A5A]">{v.label}</p>
@@ -81,7 +81,7 @@ export const PatternSheet = forwardRef<HTMLDivElement, PatternSheetProps>(functi
         </div>
         <div className="mt-6 grid grid-cols-2 gap-5">
           {pieces.map((p) => (
-            <div key={p.id} className="flex flex-col rounded-lg border border-[#D8D8D0] bg-white/90 p-3">
+            <div key={p.id} className="flex flex-col rounded-lg border border-[#D8D8D0] bg-card/90 p-3">
               <div className="flex h-56 items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.previewUrl} alt={p.name} className="max-h-full max-w-full object-contain" />

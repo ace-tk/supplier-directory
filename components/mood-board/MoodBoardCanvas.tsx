@@ -30,9 +30,9 @@ export function MoodBoardCanvas({
   onEditContent: (id: string, content: MoodBoardItemContent) => void;
 }) {
   return (
-    <div className="flex-1 overflow-auto bg-[#f0eeea]" onClick={onDeselect}>
+    <div className="flex-1 overflow-auto bg-surface" onClick={onDeselect}>
       <div
-        className="relative mx-auto my-8 bg-white shadow-sm origin-top"
+        className="relative mx-auto my-8 bg-card shadow-sm origin-top"
         style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})` }}
       >
         {items.length === 0 && (
@@ -55,7 +55,7 @@ export function MoodBoardCanvas({
         ))}
 
         {palette.length > 0 && (
-          <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg border border-border px-3 py-2 flex items-center gap-2">
+          <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur-sm rounded-lg border border-border px-3 py-2 flex items-center gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Color story</span>
             <div className="flex items-center gap-1">
               {palette.map((hex) => (

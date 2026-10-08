@@ -17,7 +17,7 @@ export function GarmentStudioCard({ card }: { card: GarmentStudioCardData }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={card.image} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
         {card.voice && (
-          <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[12.5px] font-semibold text-blue-600 shadow-sm">
+          <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-card/92 px-2.5 py-1 text-[12.5px] font-semibold text-sky-ink shadow-sm">
             <Mic className="h-3.5 w-3.5" /> Voice
           </span>
         )}
