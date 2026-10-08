@@ -1,5 +1,6 @@
 "use client";
 
+import { StitchLoader, useMinDuration } from "@/components/studio/StitchLoader";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImagePlus, Loader2, Download, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
@@ -138,6 +139,7 @@ export function CollectionBoardStudio({ openId, actions = REAL_ACTIONS }: { open
   const [exporting, setExporting] = useState(false);
 
   const busy = stage !== "idle";
+  const busyShown = useMinDuration(busy);
   const current = versions[shown] ?? null;
 
   const open = useCallback(
@@ -481,11 +483,8 @@ export function CollectionBoardStudio({ openId, actions = REAL_ACTIONS }: { open
                 After · {current ? `${current.collectionCount} look${current.collectionCount === 1 ? "" : "s"} · Collection board` : "Collection board"}
               </p>
               <div className="flex min-h-72 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
-                {busy ? (
-                  <div className="flex flex-col items-center gap-2 py-16 text-muted-foreground" role="status">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <p className="text-sm">{stage === "analyzing" ? "Reading the bestseller and planning the collection…" : `Drawing look ${Math.min(drawn + 1, count)} of ${count}… this takes a few minutes.`}</p>
-                  </div>
+                {busyShown ? (
+                  <StitchLoader className="py-16" label={stage === "analyzing" ? "Reading the bestseller and planning the collection…" : `Drawing look ${Math.min(drawn + 1, count)} of ${count}… this takes a few minutes.`} />
                 ) : current ? (
                   <div className="w-full">
                     <CollectionBoard boardRef={boardRef} looks={current.looks} coreDNA={current.coreDNA} lookImages={current.lookImages} />

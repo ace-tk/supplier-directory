@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, Check } from "lucide-react";
+import { StitchLoader } from "@/components/studio/StitchLoader";
 import { cn } from "@/lib/utils";
 
 export type GenerationStage = "extracting" | "generating" | "tiling";
@@ -16,6 +17,7 @@ export function GenerationProgress({ stage, elapsedSeconds, referenceImage }: { 
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 py-16">
+      <StitchLoader label={STAGES[Math.max(0, activeIndex)].caption} helperTexts={[]} />
       <div className="flex items-center gap-3">
         {STAGES.map((s, i) => (
           <div key={s.key} className="flex items-center gap-3">
