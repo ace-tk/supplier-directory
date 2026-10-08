@@ -52,7 +52,7 @@ export function FeaturedSlider({
             <p className="text-white/80 text-sm sm:text-base max-w-md mb-5">{slide.subtitle}</p>
             <button
               onClick={() => onSlideClick?.(slide.category)}
-              className="w-fit px-5 py-2.5 rounded-full bg-white text-slate-900 text-sm font-semibold hover:bg-white/90 active:scale-95 transition-all"
+              className="w-fit px-5 py-2.5 rounded-full bg-card text-foreground text-sm font-semibold hover:bg-card/90 active:scale-95 transition-all"
             >
               {slide.cta}
             </button>
@@ -85,7 +85,7 @@ export function FeaturedSlider({
             aria-label={`Go to slide ${i + 1}`}
             className={cn(
               "h-1.5 rounded-full transition-all",
-              i === index ? "w-6 bg-white" : "w-1.5 bg-white/40 hover:bg-white/60"
+              i === index ? "w-6 bg-card" : "w-1.5 bg-card/40 hover:bg-card/60"
             )}
           />
         ))}

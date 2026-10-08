@@ -124,8 +124,8 @@ export function CounterOfferModal({
       <DialogContent className="sm:max-w-md">
         {step === "done" ? (
           <div className="flex flex-col items-center text-center py-6 gap-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            <div className="w-12 h-12 rounded-full bg-mint flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-mint-ink" />
             </div>
             <div>
               <p className="font-semibold text-foreground">Offer sent</p>

@@ -101,7 +101,7 @@ export function BuyerRequirementAssistant() {
                 "Receive supplier recommendations",
               ].map((line) => (
                 <li key={line} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="text-emerald-500">✓</span> {line}
+                  <span className="text-mint-ink">✓</span> {line}
                 </li>
               ))}
             </ul>
@@ -150,7 +150,7 @@ export function BuyerRequirementAssistant() {
                   <p className="text-sm font-semibold text-foreground leading-tight truncate">
                     Buyer Requirement Assistant
                   </p>
-                  <span className="flex items-center gap-1 text-[10px] text-emerald-500 leading-tight">
+                  <span className="flex items-center gap-1 text-[10px] text-mint-ink leading-tight">
                     <span className="relative flex h-1.5 w-1.5">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
                       <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -212,7 +212,7 @@ export function BuyerRequirementAssistant() {
                   className={cn(
                     "flex items-center justify-center w-9 h-9 rounded-full border shrink-0 transition-colors",
                     isListening
-                      ? "bg-red-500/10 border-red-500/40 text-red-500 animate-pulse"
+                      ? "bg-rose border-rose-ink/40 text-rose-ink animate-pulse"
                       : "bg-muted border-border text-muted-foreground hover:text-foreground",
                     !isSupported && "opacity-40 cursor-not-allowed"
                   )}

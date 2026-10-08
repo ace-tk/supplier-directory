@@ -35,7 +35,7 @@ export function BuyerInterestPill({ product }: { product: Product }) {
           />
         }
       >
-        <BarChart3 className="w-3 h-3 text-sky-500" />
+        <BarChart3 className="w-3 h-3 text-sky-ink" />
         <span className="font-medium">{formatViews(totalViews)}</span>
         <span className="hidden sm:inline">Global Buyers</span>
       </PopoverTrigger>
@@ -46,8 +46,8 @@ export function BuyerInterestPill({ product }: { product: Product }) {
         className="w-72 p-4 space-y-3.5"
       >
         <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-sky-500/10 shrink-0">
-            <BarChart3 className="w-4 h-4 text-sky-500" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-sky shrink-0">
+            <BarChart3 className="w-4 h-4 text-sky-ink" />
           </div>
           <div>
             <p className="text-xs font-semibold text-foreground">Global Buyers</p>
@@ -97,11 +97,11 @@ export function BuyerInterestPill({ product }: { product: Product }) {
         </div>
 
         <div className="flex flex-wrap gap-x-3 gap-y-1 pt-2.5 border-t border-border/60 text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1 text-emerald-500 font-medium">
+          <span className="flex items-center gap-1 text-mint-ink font-medium">
             <TrendingUp className="w-3 h-3" /> Buyer Growth +{trendPercent}% this month
           </span>
           <span className="flex items-center gap-1">
-            <Flame className="w-3 h-3 text-orange-500" /> Trending in {trendingMarket}
+            <Flame className="w-3 h-3 text-peach-ink" /> Trending in {trendingMarket}
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" /> Updated {updatedMinutesAgo}m ago
