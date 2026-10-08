@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/navigation/sidebar";
 import { TopNavbar } from "@/components/navigation/top-navbar";
 import { SessionProvider } from "@/components/shared/session-provider";
 import type { PortalKey } from "@/lib/roles";
+import { PageTransition } from "@/components/layout/page-transition";
 import { cn } from "@/lib/utils";
 
 interface AppShellProps {
@@ -30,11 +31,11 @@ export async function AppShell({ children, className, portal }: AppShellProps) {
           <main
             className={cn(
               "flex-1 overflow-y-auto scrollbar-thin",
-              "px-6 py-6 lg:px-8 lg:py-8",
+              "px-4 py-6 sm:px-6 lg:px-8 lg:py-8",
               className
             )}
           >
-            {children}
+            <PageTransition>{children}</PageTransition>
           </main>
         </div>
       </div>

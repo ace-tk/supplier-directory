@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { MotionProvider } from "@/components/shared/motion-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -56,10 +57,12 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          <TooltipProvider delay={200}>
-            {children}
-            <Toaster position="bottom-right" richColors closeButton />
-          </TooltipProvider>
+          <MotionProvider>
+            <TooltipProvider delay={200}>
+              {children}
+              <Toaster position="bottom-right" richColors closeButton />
+            </TooltipProvider>
+          </MotionProvider>
         </ThemeProvider>
       </body>
     </html>
