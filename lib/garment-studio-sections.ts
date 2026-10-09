@@ -53,8 +53,7 @@ export const garmentStudioSections: GarmentStudioSection[] = [
     cards: [
       { title: "Back Design", description: "Upload the front style image and generate the corresponding back style in one click.", image: img("back-design.jpg"), href: workflowHref("garment-back-design") },
       { title: "Outfit Design", description: "One-click to generate matched garments from a single top or bottom for fast complete-set creation.", image: img("outfit-design.jpg"), href: "/design-studio/outfit-design" },
-      // TODO: route
-      { title: "Image to Design", description: "Create new style options from an existing garment image.", image: img("image-to-design.jpg") },
+      { title: "Image to Design", description: "Create new style options from an existing garment image.", image: img("image-to-design.jpg"), href: "/design-studio/image-to-design" },
       // TODO: route
       { title: "Voice to Design", description: "Describe an idea out loud and turn your spoken brief into quick apparel concept images.", image: img("voice-to-design.jpg"), voice: true },
       // Not in designStudioWorkflows on purpose — that list also drives the

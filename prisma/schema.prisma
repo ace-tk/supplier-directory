@@ -157,6 +157,7 @@ model User {
   collectionProposals CollectionProposal[] @relation("CollectionProposalOwner")
   detailDesigns          DetailDesign[]          @relation("DetailDesignOwner")
   outfitDesigns          OutfitDesign[]          @relation("OutfitDesignOwner")
+  imageDesigns           ImageDesign[]           @relation("ImageDesignOwner")
   businessEntities       BusinessEntity[]        @relation("BusinessEntityOwner")
   businesses             Business[]              @relation("BusinessOwner")
   businessLocations      BusinessLocation[]      @relation("BusinessLocationOwner")
@@ -3052,4 +3053,57 @@ model OutfitDesignVersion {
   createdAt DateTime @default(now())
 
   @@index([outfitId])
+}
+
+/// Design Studio — Image to Design. One uploaded garment image redesigned
+/// (new category / style / shape / custom change) into 1-4 new images. Admin-only.
+model ImageDesign {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("ImageDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Image Design")
+
+  // The uploaded garment photo (a data URL), kept exactly as sent so every
+  // Regenerate conditions on it, never on an earlier AI result.
+  sourceImage   String  @db.Text
+  // Optional: what the garment is ("Dresses"...).
+  styleCategory String?
+  // The AI's read of the garment, reused as grounding text.
+  analysis      String? @db.Text
+  // The AI's suggestions for the Target Style / Common Block Elements pickers.
+  styleOptions  String[] @db.Text
+  blockOptions  String[] @db.Text
+
+  versions ImageDesignVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model ImageDesignVersion {
+  id       String      @id @default(cuid())
+  designId String
+  design   ImageDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  // The 1-4 generated images of this run.
+  images      String[] @db.Text
+  // "category" | "style" | "shape" | "custom"
+  direction   String
+  // Target category / target style, if the direction has one.
+  target      String?
+  // Block elements kept (direction "shape").
+  blocks      String[]
+  description String?  @db.Text
+  // "standard" | "professional"
+  mode        String
+  // "1024x1024" | "1024x1536" | "1536x1024"
+  size        String
+  order       Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([designId])
 }
