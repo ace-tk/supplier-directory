@@ -64,8 +64,7 @@ export const garmentStudioSections: GarmentStudioSection[] = [
   {
     title: "Print",
     cards: [
-      // TODO: route
-      { title: "Graphic Extractor", description: "Detect and extract complete patterns from product or reference images.", image: img("graphic-extractor.jpg") },
+      { title: "Graphic Extractor", description: "Detect and extract complete patterns from product or reference images.", image: img("graphic-extractor.jpg"), href: "/design-studio/graphic-extractor" },
       // TODO: route
       { title: "Graphic Colorways", description: "Create dedicated colorway options for any print or graphic.", image: img("graphic-colorways.jpg") },
       // TODO: route

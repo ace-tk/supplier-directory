@@ -158,6 +158,7 @@ model User {
   detailDesigns          DetailDesign[]          @relation("DetailDesignOwner")
   outfitDesigns          OutfitDesign[]          @relation("OutfitDesignOwner")
   imageDesigns           ImageDesign[]           @relation("ImageDesignOwner")
+  graphicExtractions     GraphicExtraction[]     @relation("GraphicExtractionOwner")
   businessEntities       BusinessEntity[]        @relation("BusinessEntityOwner")
   businesses             Business[]              @relation("BusinessOwner")
   businessLocations      BusinessLocation[]      @relation("BusinessLocationOwner")
@@ -3106,4 +3107,52 @@ model ImageDesignVersion {
   createdAt DateTime @default(now())
 
   @@index([designId])
+}
+
+/// Design Studio — Graphic Extractor. One product/reference photo from which
+/// the complete graphic or pattern is detected and extracted as a flat asset
+/// (optionally craft-free and with a transparent background). Admin-only.
+model GraphicExtraction {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("GraphicExtractionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Extraction")
+
+  // The uploaded photo (a data URL), kept exactly as sent so every
+  // Regenerate conditions on it, never on an earlier AI result.
+  sourceImage String  @db.Text
+  // What the AI found on it: "all-over print", "embroidery"…
+  kind        String?
+  // The AI's read of the graphic, reused as grounding text.
+  description String? @db.Text
+  // Craft effects (embroidery, appliqué…) were visible on the source.
+  hasCraft    Boolean @default(false)
+
+  versions GraphicExtractionVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model GraphicExtractionVersion {
+  id           String            @id @default(cuid())
+  extractionId String
+  extraction   GraphicExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+
+  // The 1-4 extracted images of this run (PNG data URLs).
+  images      String[] @db.Text
+  removeCraft Boolean
+  transparent Boolean
+  // "standard" | "professional"
+  mode        String
+  // "1024x1024" | "1024x1536" | "1536x1024"
+  size        String
+  order       Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([extractionId])
 }
