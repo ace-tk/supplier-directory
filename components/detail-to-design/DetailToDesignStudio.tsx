@@ -19,6 +19,7 @@ import {
   DETAIL_UPLOAD_MAX_PX,
   type DetailOutputFormat,
   type DetailStyleCategory,
+  type ReferenceKind,
 } from "@/lib/detail-to-design";
 import {
   analyzeDetailAction,
@@ -48,6 +49,36 @@ const REAL_ACTIONS: DetailToDesignActions = {
   get: getDetailDesignAction,
   list: listDetailDesignsAction,
   remove: deleteDetailDesignAction,
+};
+
+/** The words that change between Detail to Design and Fabric to Design. */
+const COPY: Record<ReferenceKind, { upload: string; hint: string; alt: string; before: string; read: string; reading: string; heading: string; example: string; exampleAlt: string; begin: string; filePrefix: string }> = {
+  detail: {
+    upload: "Upload Detail Image",
+    hint: "A close-up of one detail — a neckline, sleeve, pocket, collar, cuff or trim.",
+    alt: "Detail reference",
+    before: "Before · Detail",
+    read: "Detail read by the AI",
+    reading: "Reading the detail…",
+    heading: "Turn a neckline, sleeve, pocket or other detail reference into multiple apparel concepts.",
+    example: "/garment-studio/detail-to-design.jpg",
+    exampleAlt: "Example: a close-up of a neckline detail on the left, apparel concepts built around it on the right",
+    begin: "Upload a detail, choose its category, then generate.",
+    filePrefix: "detail-to-design",
+  },
+  fabric: {
+    upload: "Upload Fabric Image",
+    hint: "A flat photo or close-up of the fabric — a swatch, print or textured cloth. Fill the frame with the cloth.",
+    alt: "Fabric reference",
+    before: "Before · Fabric",
+    read: "Fabric read by the AI",
+    reading: "Reading the fabric…",
+    heading: "Create apparel concepts that match the color, texture and drape of a fabric reference.",
+    example: "/garment-studio/fabric-to-design.jpg",
+    exampleAlt: "Example: a fabric swatch on the left, apparel concepts made from it on the right",
+    begin: "Upload a fabric, choose the category, then generate.",
+    filePrefix: "fabric-to-design",
+  },
 };
 
 interface Upload {
@@ -101,7 +132,8 @@ function StepTitle({ n, children, aside }: { n: number; children: React.ReactNod
   );
 }
 
-export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openId?: string; actions?: DetailToDesignActions }) {
+export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS, kind = "detail" }: { openId?: string; actions?: DetailToDesignActions; kind?: ReferenceKind }) {
+  const copy = COPY[kind];
   const inputRef = useRef<HTMLInputElement>(null);
   const [upload, setUpload] = useState<Upload | null>(null);
   const [reference, setReference] = useState("");
@@ -163,10 +195,10 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
   }, [openId, open]);
 
   const loadHistory = useCallback(async () => {
-    const result = await actions.list();
+    const result = await actions.list(kind);
     if (result.success) setHistory(result.data);
     else toast.error(result.error);
-  }, [actions]);
+  }, [actions, kind]);
 
   /** A new photo or a new category means a new design: the earlier analysis and results no longer apply. */
   function startFresh() {
@@ -203,7 +235,7 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
   }
 
   async function handleGenerate() {
-    if (!upload) return void toast.error("Upload a detail image.");
+    if (!upload) return void toast.error("Upload a " + kind + " image.");
     if (!category) return void toast.error("Choose a style category.");
 
     // Same photo and category as the last result: only a new sheet is needed, the analysis is reused.
@@ -220,6 +252,7 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
     const form = new FormData();
     form.append("images", new File([upload.blob], upload.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" }));
     form.set("styleCategory", category);
+    form.set("kind", kind);
     setStage("analyzing");
     const read = await actions.analyze(form);
     if (!read.success) {
@@ -247,7 +280,7 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
     if (!current) return;
     const a = document.createElement("a");
     a.href = current.image;
-    a.download = `detail-to-design-${(category ?? "designs").toLowerCase()}-${current.designCount}-concepts.png`;
+    a.download = `${copy.filePrefix}-${(category ?? "designs").toLowerCase()}-${current.designCount}-concepts.png`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -263,17 +296,17 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
   }
 
   const categories = DETAIL_STYLE_CATEGORIES.filter((c) => c.toLowerCase().includes(search.trim().toLowerCase()));
-  const generateLabel = stage === "analyzing" ? "Reading the detail…" : stage === "generating" ? "Designing concepts…" : designId ? "Generate again" : "Generate";
+  const generateLabel = stage === "analyzing" ? copy.reading : stage === "generating" ? "Designing concepts…" : designId ? "Generate again" : "Generate";
   const formatHint = DETAIL_OUTPUT_FORMATS.find((f) => f.id === format)?.hint;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
       {/* ------------------------------------------------------------ controls */}
       <div className="space-y-6">
-        <section aria-label="Upload detail image">
-          <StepTitle n={1}>Upload Detail Image</StepTitle>
+        <section aria-label={copy.upload}>
+          <StepTitle n={1}>{copy.upload}</StepTitle>
           <p className="mb-2 text-xs text-muted-foreground">
-            A close-up of one detail — a neckline, sleeve, pocket, collar, cuff or trim. {SUPPORTED_IMAGE_LABEL}, up to {MAX_IMAGE_BYTES / (1024 * 1024)}MB.
+            {copy.hint} {SUPPORTED_IMAGE_LABEL}, up to {MAX_IMAGE_BYTES / (1024 * 1024)}MB.
           </p>
           <div
             className={cn("relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl border border-dashed", dragOver ? "border-primary bg-primary/5" : "border-border bg-soft/40")}
@@ -291,15 +324,15 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
             {upload ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the user's own upload */}
-                <img src={upload.dataUrl} alt="Detail reference" className="h-full w-full object-contain" />
-                <button type="button" disabled={busy} aria-label="Remove detail image" onClick={removeUpload} className="absolute right-1.5 top-1.5 rounded-full bg-background/90 p-1 text-foreground shadow hover:bg-background disabled:opacity-50">
+                <img src={upload.dataUrl} alt={copy.alt} className="h-full w-full object-contain" />
+                <button type="button" disabled={busy} aria-label={`Remove ${kind} image`} onClick={removeUpload} className="absolute right-1.5 top-1.5 rounded-full bg-background/90 p-1 text-foreground shadow hover:bg-background disabled:opacity-50">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : (
-              <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} aria-label="Upload detail image" className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary disabled:opacity-50">
+              <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} aria-label={copy.upload} className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary disabled:opacity-50">
                 <ImagePlus className="h-7 w-7" />
-                <span className="text-sm">Upload Detail Image</span>
+                <span className="text-sm">{copy.upload}</span>
                 <span className="text-xs">or drop it here</span>
               </button>
             )}
@@ -398,7 +431,7 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
           <Sparkles className="h-4 w-4" />
           {generateLabel}
         </Button>
-        {!busy && (!upload || !category) && <p className="-mt-3 text-center text-xs text-muted-foreground">{!upload ? "Upload a detail image to begin." : "Choose a style category to continue."}</p>}
+        {!busy && (!upload || !category) && <p className="-mt-3 text-center text-xs text-muted-foreground">{!upload ? `Upload a ${kind} image to begin.` : "Choose a style category to continue."}</p>}
       </div>
 
       {/* ------------------------------------------------------------ result */}
@@ -457,27 +490,27 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
           <p className="py-16 text-center text-sm text-muted-foreground">Loading design…</p>
         ) : !current && !busy ? (
           <div role="tabpanel" aria-label="Current task" className="mx-auto max-w-2xl text-center">
-            <h2 className="mx-auto max-w-md text-xl font-semibold text-foreground">Turn a neckline, sleeve, pocket or other detail reference into multiple apparel concepts.</h2>
+            <h2 className="mx-auto max-w-md text-xl font-semibold text-foreground">{copy.heading}</h2>
             <div className="mt-6 overflow-hidden rounded-[20px] border border-border bg-soft/50">
               {/* eslint-disable-next-line @next/next/no-img-element -- a static illustration of the tool */}
-              <img src="/garment-studio/detail-to-design.jpg" alt="Example: a close-up of a neckline detail on the left, apparel concepts built around it on the right" className="w-full" />
+              <img src={copy.example} alt={copy.exampleAlt} className="w-full" />
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">Upload a detail, choose its category, then generate.</p>
+            <p className="mt-3 text-sm text-muted-foreground">{copy.begin}</p>
           </div>
         ) : (
           <div role="tabpanel" aria-label="Current task" className="grid gap-4 xl:grid-cols-[220px_1fr]">
             <div className="min-w-0">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Before · Detail</p>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{copy.before}</p>
               {upload && (
                 <div className="aspect-square overflow-hidden rounded-xl border border-border bg-soft/50">
                   {/* eslint-disable-next-line @next/next/no-img-element -- a local preview of the user's own upload */}
-                  <img src={upload.dataUrl} alt="Detail reference" className="h-full w-full object-cover" />
+                  <img src={upload.dataUrl} alt={copy.alt} className="h-full w-full object-cover" />
                 </div>
               )}
               {reference.trim() && <p className="mt-2 text-xs text-muted-foreground">Style: {reference.trim()}</p>}
               {analysis && (
                 <details className="mt-3 rounded-xl border border-border p-2 text-xs">
-                  <summary className="cursor-pointer font-medium text-foreground">Detail read by the AI</summary>
+                  <summary className="cursor-pointer font-medium text-foreground">{copy.read}</summary>
                   <p className="mt-2 whitespace-pre-wrap text-muted-foreground" data-analysis>
                     {analysis}
                   </p>
@@ -490,10 +523,10 @@ export function DetailToDesignStudio({ openId, actions = REAL_ACTIONS }: { openI
               </p>
               <div className="flex min-h-72 items-center justify-center overflow-hidden rounded-[20px] border border-border bg-surface">
                 {busyShown ? (
-                  <StitchLoader className="py-16" label={stage === "analyzing" ? "Reading the detail…" : `Designing ${count} concept${count === 1 ? "" : "s"}… this takes about a minute.`} />
+                  <StitchLoader className="py-16" label={stage === "analyzing" ? copy.reading : `Designing ${count} concept${count === 1 ? "" : "s"}… this takes about a minute.`} />
                 ) : current ? (
                   // eslint-disable-next-line @next/next/no-img-element -- the generated result (a data URL)
-                  <img src={current.image} alt={`${current.designCount} apparel concepts built around the detail`} className="max-h-[70vh] max-w-full object-contain" data-result />
+                  <img src={current.image} alt={`${current.designCount} apparel concepts built from the ${kind}`} className="max-h-[70vh] max-w-full object-contain" data-result />
                 ) : null}
               </div>
 

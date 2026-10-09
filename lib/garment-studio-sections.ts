@@ -46,8 +46,7 @@ export const garmentStudioSections: GarmentStudioSection[] = [
       { title: "Hit Collection Proposal", description: "Extend a bestseller into cohesive style variations while preserving its core design language.", image: img("hit-collection.jpg"), href: "/design-studio/hit-collection-proposal" },
       { title: "Collection Proposal", description: "Build a cohesive collection proposal around a bestseller with aligned themes, categories and design language.", image: img("collection-proposal.jpg"), href: "/design-studio/collection-proposal" },
       { title: "Detail to Design", description: "Turn a neckline, sleeve, pocket or other detail reference into multiple apparel concepts.", image: img("detail-to-design.jpg"), href: "/design-studio/detail-to-design" },
-      // TODO: route
-      { title: "Fabric to Design", description: "Create apparel concepts that match the color, texture and drape of a fabric reference.", image: img("fabric-to-design.jpg") },
+      { title: "Fabric to Design", description: "Create apparel concepts that match the color, texture and drape of a fabric reference.", image: img("fabric-to-design.jpg"), href: "/design-studio/fabric-to-design" },
     ],
   },
   {

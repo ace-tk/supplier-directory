@@ -16,14 +16,15 @@ import { runVisionChatCompletion, editImage, AIConfigError } from "@/lib/ai/open
 import { validateImage } from "@/lib/file-validation";
 import { gridLayout } from "@/lib/hit-collection";
 import {
-  buildDetailToDesignPrompt,
   clampDetailCount,
-  DETAIL_ANALYSIS_SYSTEM_PROMPT,
   isDetailOutputFormat,
   isDetailStyleCategory,
+  isReferenceKind,
+  REFERENCE_PROMPTS,
   validateDetailRequest,
   type DetailOutputFormat,
   type DetailStyleCategory,
+  type ReferenceKind,
 } from "@/lib/detail-to-design";
 
 export type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
@@ -66,7 +67,13 @@ function checkImage(images: Blob[]): string | null {
   return check.valid ? null : check.error!;
 }
 
-/** Stage 1 — a real vision read of the detail photo. */
+/** Detail to Design and Fabric to Design share this engine; the form says which one is calling. */
+function kindOf(form: FormData): ReferenceKind {
+  const k = form.get("kind");
+  return isReferenceKind(k) ? k : "detail";
+}
+
+/** Stage 1 — a real vision read of the reference photo (a detail or a fabric). */
 export async function analyzeDetailAction(form: FormData): Promise<ActionResult<string>> {
   const admin = await requireAdmin();
   if (!admin) return { success: false, error: "Admins only." };
@@ -77,9 +84,10 @@ export async function analyzeDetailAction(form: FormData): Promise<ActionResult<
   return withAiErrorHandling(async () => {
     const dataUrl = await blobToDataUrl(images[0]);
     const category = form.get("styleCategory");
+    const kind = kindOf(form);
     const text = await runVisionChatCompletion({
-      system: DETAIL_ANALYSIS_SYSTEM_PROMPT,
-      user: `Describe this garment detail${isDetailStyleCategory(category) ? ` (it will be used on ${category.toLowerCase()})` : ""}.`,
+      system: REFERENCE_PROMPTS[kind].analysis,
+      user: `Describe this ${REFERENCE_PROMPTS[kind].noun}${isDetailStyleCategory(category) ? ` (it will be used for ${category.toLowerCase()})` : ""}.`,
       images: [dataUrl],
       maxTokens: 220,
     });
@@ -97,6 +105,7 @@ export interface DetailDesignVersionRecord {
 
 export interface DetailDesignDetail {
   id: string;
+  kind: ReferenceKind;
   name: string;
   sourceImage: string;
   styleCategory: DetailStyleCategory;
@@ -116,10 +125,10 @@ export interface DetailDesignSummary {
   updatedAt: string;
 }
 
-async function generateSheet(image: Blob, styleCategory: DetailStyleCategory, outputFormat: DetailOutputFormat, count: number, analysis: string, referenceStyle: string): Promise<string> {
+async function generateSheet(kind: ReferenceKind, image: Blob, styleCategory: DetailStyleCategory, outputFormat: DetailOutputFormat, count: number, analysis: string, referenceStyle: string): Promise<string> {
   return editImage({
     image: [image],
-    prompt: buildDetailToDesignPrompt({ styleCategory, outputFormat, count, analysis, referenceStyle }),
+    prompt: REFERENCE_PROMPTS[kind].build({ styleCategory, outputFormat, count, analysis, referenceStyle }),
     size: gridLayout(count, outputFormat).size,
   });
 }
@@ -134,19 +143,21 @@ export async function generateDetailDesignAction(form: FormData): Promise<Action
   const count = Number(form.get("designCount"));
   const referenceStyle = String(form.get("referenceStyle") ?? "").trim();
   const analysis = String(form.get("analysis") ?? "").trim();
+  const kind = kindOf(form);
   const problem = checkImage(images) ?? validateDetailRequest({ imageCount: images.length, styleCategory, outputFormat, count, referenceStyle });
   if (problem) return { success: false, error: problem };
-  if (!analysis) return { success: false, error: "The detail has not been analysed yet." };
+  if (!analysis) return { success: false, error: `The ${REFERENCE_PROMPTS[kind].noun} has not been analysed yet.` };
   if (!isDetailStyleCategory(styleCategory) || !isDetailOutputFormat(outputFormat)) return { success: false, error: "Choose a style category and an output type." };
 
   return withAiErrorHandling(async () => {
     const n = clampDetailCount(count);
-    const image = await generateSheet(images[0], styleCategory, outputFormat, n, analysis, referenceStyle);
+    const image = await generateSheet(kind, images[0], styleCategory, outputFormat, n, analysis, referenceStyle);
     const sourceImage = await blobToDataUrl(images[0]);
     const design = await db.detailDesign.create({
       data: {
         ownerId: admin.id,
-        name: `${styleCategory} detail design`,
+        kind,
+        name: kind === "fabric" ? `${styleCategory} fabric design` : `${styleCategory} detail design`,
         sourceImage,
         styleCategory,
         referenceStyle: referenceStyle || null,
@@ -171,10 +182,11 @@ export async function regenerateDetailDesignAction(designId: string, outputForma
   if (problem) return { success: false, error: problem };
   if (!isDetailStyleCategory(design.styleCategory)) return { success: false, error: "This design has no valid style category." };
   const category = design.styleCategory;
+  const kind: ReferenceKind = isReferenceKind(design.kind) ? design.kind : "detail";
 
   return withAiErrorHandling(async () => {
     const n = clampDetailCount(designCount);
-    const image = await generateSheet(dataUrlToBlob(design.sourceImage), category, outputFormat, n, design.analysis ?? "", style);
+    const image = await generateSheet(kind, dataUrlToBlob(design.sourceImage), category, outputFormat, n, design.analysis ?? "", style);
     const count = await db.detailDesignVersion.count({ where: { designId } });
     const v = await db.detailDesignVersion.create({ data: { designId, image, outputFormat, designCount: n, order: count }, select: { id: true, createdAt: true } });
     await db.detailDesign.update({ where: { id: designId }, data: { updatedAt: new Date(), referenceStyle: style || null } });
@@ -191,6 +203,7 @@ export async function getDetailDesignAction(id: string): Promise<ActionResult<De
     success: true,
     data: {
       id: d.id,
+      kind: isReferenceKind(d.kind) ? d.kind : "detail",
       name: d.name,
       sourceImage: d.sourceImage,
       styleCategory: isDetailStyleCategory(d.styleCategory) ? d.styleCategory : "Tops",
@@ -202,11 +215,11 @@ export async function getDetailDesignAction(id: string): Promise<ActionResult<De
 }
 
 /** The admin's saved detail designs, newest first (the "History" tab). */
-export async function listDetailDesignsAction(): Promise<ActionResult<DetailDesignSummary[]>> {
+export async function listDetailDesignsAction(kind: ReferenceKind = "detail"): Promise<ActionResult<DetailDesignSummary[]>> {
   const admin = await requireAdmin();
   if (!admin) return { success: false, error: "Admins only." };
   const rows = await db.detailDesign.findMany({
-    where: { ownerId: admin.id },
+    where: { ownerId: admin.id, kind },
     orderBy: { updatedAt: "desc" },
     take: 30,
     select: { id: true, name: true, styleCategory: true, sourceImage: true, updatedAt: true, _count: { select: { versions: true } }, versions: { orderBy: { order: "desc" }, take: 1, select: { image: true } } },

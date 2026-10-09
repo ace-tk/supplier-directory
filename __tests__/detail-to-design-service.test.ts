@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const ai = vi.hoisted(() => ({ runVisionChatCompletion: vi.fn(), editImage: vi.fn() }));
 const session = vi.hoisted(() => ({ getUser: vi.fn() }));
 const store = vi.hoisted(() => ({
-  designs: new Map<string, { id: string; ownerId: string; sourceImage: string; styleCategory: string; referenceStyle: string | null; analysis: string | null; name: string }>(),
+  designs: new Map<string, { id: string; kind?: string; ownerId: string; sourceImage: string; styleCategory: string; referenceStyle: string | null; analysis: string | null; name: string }>(),
   versions: [] as { id: string; designId: string; designCount: number; order: number }[],
 }));
 
@@ -12,9 +12,9 @@ vi.mock("@/lib/session", () => ({ getUser: session.getUser }));
 vi.mock("@/lib/db", () => ({
   db: {
     detailDesign: {
-      create: async ({ data }: { data: { ownerId: string; sourceImage: string; styleCategory: string; referenceStyle: string | null; analysis: string; name: string; versions: { create: { designCount: number; order: number }[] } } }) => {
+      create: async ({ data }: { data: { kind?: string; ownerId: string; sourceImage: string; styleCategory: string; referenceStyle: string | null; analysis: string; name: string; versions: { create: { designCount: number; order: number }[] } } }) => {
         const id = `d${store.designs.size + 1}`;
-        store.designs.set(id, { id, ownerId: data.ownerId, sourceImage: data.sourceImage, styleCategory: data.styleCategory, referenceStyle: data.referenceStyle, analysis: data.analysis, name: data.name });
+        store.designs.set(id, { id, kind: data.kind, ownerId: data.ownerId, sourceImage: data.sourceImage, styleCategory: data.styleCategory, referenceStyle: data.referenceStyle, analysis: data.analysis, name: data.name });
         const v = { id: `v${store.versions.length + 1}`, designId: id, designCount: data.versions.create[0].designCount, order: 0 };
         store.versions.push(v);
         return { id, versions: [{ id: v.id, createdAt: new Date("2026-10-09T00:00:00Z") }] };
@@ -96,7 +96,7 @@ describe("generateDetailDesignAction", () => {
     if (r.success) expect(r.data.version).toMatchObject({ outputFormat: "on-model", designCount: 4, image: "data:image/png;base64,RESULT" });
   });
   it("will not generate before the detail has been analysed", async () => {
-    expect(await generateDetailDesignAction(form({ analysis: "" }))).toEqual({ success: false, error: "The detail has not been analysed yet." });
+    expect(await generateDetailDesignAction(form({ analysis: "" }))).toEqual({ success: false, error: "The garment detail has not been analysed yet." });
     expect(ai.editImage).not.toHaveBeenCalled();
   });
   it("rejects a bad category or count without calling the AI", async () => {
@@ -132,5 +132,31 @@ describe("regenerateDetailDesignAction", () => {
     store.designs.get("d1")!.ownerId = "someone-else";
     expect(await regenerateDetailDesignAction("d1", "flat-lay", 3)).toEqual({ success: false, error: "Detail design not found." });
     expect(await deleteDetailDesignAction("d1")).toEqual({ success: false, error: "Detail design not found." });
+  });
+});
+
+describe("Fabric to Design (same engine, kind = fabric)", () => {
+  it("reads a fabric with the fabric prompt", async () => {
+    await analyzeDetailAction(form({ kind: "fabric" }));
+    expect(ai.runVisionChatCompletion).toHaveBeenCalledWith(expect.objectContaining({ system: expect.stringContaining("FABRIC"), user: expect.stringContaining("fabric") }));
+  });
+  it("defaults to the detail prompt when no kind is sent", async () => {
+    await analyzeDetailAction(form());
+    expect(ai.runVisionChatCompletion).toHaveBeenCalledWith(expect.objectContaining({ system: expect.stringContaining("ONE garment detail") }));
+  });
+  it("generates with the fabric prompt and saves the design as a fabric design", async () => {
+    const r = await generateDetailDesignAction(form({ kind: "fabric" }));
+    expect(r.success).toBe(true);
+    expect(ai.editImage.mock.calls[0][0].prompt).toContain("made entirely from this fabric");
+    expect([...store.designs.values()][0].kind).toBe("fabric");
+    expect([...store.designs.values()][0].name).toBe("Dresses fabric design");
+  });
+  it("regenerates a saved fabric design with the fabric prompt", async () => {
+    store.designs.set("f1", { id: "f1", kind: "fabric", ownerId: ADMIN.id, sourceImage: PHOTO, styleCategory: "Tops", referenceStyle: null, analysis: "Silk satin. Fabric: satin.", name: "x" });
+    await regenerateDetailDesignAction("f1", "on-model", 2);
+    expect(ai.editImage.mock.calls[0][0].prompt).toContain("made entirely from this fabric");
+  });
+  it("says fabric, not detail, when it has not been analysed", async () => {
+    expect(await generateDetailDesignAction(form({ kind: "fabric", analysis: "" }))).toEqual({ success: false, error: "The fabric has not been analysed yet." });
   });
 });

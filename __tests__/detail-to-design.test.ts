@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDetailToDesignPrompt, validateDetailRequest, DETAIL_REFERENCE_MAX_CHARS, DETAIL_ANALYSIS_SYSTEM_PROMPT } from "@/lib/detail-to-design";
+import { buildFabricToDesignPrompt, FABRIC_ANALYSIS_SYSTEM_PROMPT, REFERENCE_PROMPTS, buildDetailToDesignPrompt, validateDetailRequest, DETAIL_REFERENCE_MAX_CHARS, DETAIL_ANALYSIS_SYSTEM_PROMPT } from "@/lib/detail-to-design";
 
 describe("buildDetailToDesignPrompt", () => {
   const base = { styleCategory: "Dresses" as const, outputFormat: "on-model" as const, count: 4, analysis: "A scalloped V-neckline with piping. Detail: scalloped V-neck." };
@@ -54,4 +54,31 @@ describe("validateDetailRequest", () => {
 it("the analysis prompt asks for the detail, not the whole outfit", () => {
   expect(DETAIL_ANALYSIS_SYSTEM_PROMPT).toContain("ONE garment detail");
   expect(DETAIL_ANALYSIS_SYSTEM_PROMPT).toContain("'Detail:'");
+});
+
+describe("buildFabricToDesignPrompt", () => {
+  const base = { styleCategory: "Tops" as const, outputFormat: "flat-lay" as const, count: 3, analysis: "Navy cotton twill with a small white polka dot. Fabric: dotted twill." };
+
+  it("makes every concept out of the fabric, keeping its colour, print scale and drape", () => {
+    const p = buildFabricToDesignPrompt(base);
+    expect(p).toContain("made entirely from this fabric");
+    expect(p).toContain("polka dot");
+    expect(p).toContain("drape");
+    expect(p).toContain("real-world scale");
+    expect(p).toContain("exactly 3 panels");
+    expect(p).toContain("Do not add colours or prints that are not in the fabric");
+  });
+
+  it("is a different prompt from the detail one", () => {
+    expect(buildFabricToDesignPrompt(base)).not.toBe(buildDetailToDesignPrompt(base));
+    expect(buildDetailToDesignPrompt(base)).toContain("hero feature");
+    expect(buildFabricToDesignPrompt(base)).not.toContain("hero feature");
+  });
+
+  it("picks the right analysis prompt and builder per kind", () => {
+    expect(REFERENCE_PROMPTS.fabric.analysis).toBe(FABRIC_ANALYSIS_SYSTEM_PROMPT);
+    expect(REFERENCE_PROMPTS.fabric.analysis).toContain("FABRIC");
+    expect(REFERENCE_PROMPTS.detail.analysis).toContain("ONE garment detail");
+    expect(REFERENCE_PROMPTS.fabric.build(base)).toBe(buildFabricToDesignPrompt(base));
+  });
 });

@@ -2969,6 +2969,8 @@ model EmbroideryDesign {
 /// sleeve, pocket…) turned into a grid of apparel concepts. Admin-only.
 model DetailDesign {
   id      String @id @default(cuid())
+  // "detail" (Detail to Design) or "fabric" (Fabric to Design): the same tool, a different reference.
+  kind    String @default("detail")
   ownerId String
   owner   User   @relation("DetailDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 

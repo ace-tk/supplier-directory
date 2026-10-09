@@ -96,3 +96,55 @@ export function validateDetailRequest(input: { imageCount: number; styleCategory
   if (typeof input.referenceStyle === "string" && input.referenceStyle.length > DETAIL_REFERENCE_MAX_CHARS) return `Reference brand or style must be at most ${DETAIL_REFERENCE_MAX_CHARS} characters.`;
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Fabric to Design — the same tool, but the reference is a fabric swatch and
+// the concepts must be made OF that fabric (its colour, texture and drape).
+// ---------------------------------------------------------------------------
+
+/** Which reference the tool works from. Stored on each saved design so History keeps them apart. */
+export type ReferenceKind = "detail" | "fabric";
+export const isReferenceKind = (v: unknown): v is ReferenceKind => v === "detail" || v === "fabric";
+
+export const FABRIC_ANALYSIS_SYSTEM_PROMPT = [
+  "You are a senior textile and fashion designer studying a reference photo of a FABRIC (a swatch, a flat shot or a close-up of cloth).",
+  "Describe it factually and concisely, in under 90 words: the likely fabric type and weave or knit; the colour palette;",
+  "any print, pattern, jacquard or embroidery and the real-world SCALE of its repeat (small, medium, large);",
+  "surface texture and sheen; apparent weight and drape (crisp, fluid, stretchy, heavy, sheer).",
+  "End with one line starting 'Fabric:' that names it in a few words. No preamble, no advice.",
+].join(" ");
+
+/**
+ * The generation prompt for Fabric to Design: ONE image holding a grid of
+ * different garments, every one cut from the uploaded fabric. The photo
+ * carries the real colour and texture; the analysis names what must hold.
+ */
+export function buildFabricToDesignPrompt(input: DetailPromptInput): string {
+  const n = clampGrid(input.count);
+  const layout = gridLayout(n, input.outputFormat);
+  const style = (input.referenceStyle ?? "").trim();
+  return [
+    `The attached photo shows a FABRIC reference (a swatch or close-up of cloth), not a garment. The garments to design are in the category "${input.styleCategory}".`,
+    `Design ${n === 1 ? "one new apparel concept" : `${n} new, clearly different apparel concepts`} in the "${input.styleCategory}" category, each one made entirely from this fabric.`,
+    `The fabric: ${input.analysis.trim()}`,
+    "Reproduce the fabric faithfully in every concept — the same colour, print or pattern, texture, sheen and weight. Show it as real cloth: it must drape, fold and gather the way this fabric would, and any print must be at a believable real-world scale on the body, not enlarged or shrunk to fill the panel.",
+    n === 1
+      ? "Everything else (silhouette, length, neckline, sleeves, construction details) is for you to design so it looks like a complete, wearable, commercial style that suits this fabric."
+      : "Everything else (silhouette, length, neckline, sleeves, construction details) should differ from concept to concept so each looks like a genuinely different design that suits this fabric. Do not repeat the same idea twice.",
+    "Do not add colours or prints that are not in the fabric, except small neutral trims such as buttons, zips or lining when they make sense.",
+    style ? `Style direction to lean towards: ${style}. Take the mood and design language from it; do not copy any logo, name or branding.` : "Choose a coherent, commercially appealing style direction that suits the fabric.",
+    `Every concept must be a ${input.styleCategory === "Sets" ? "set" : input.styleCategory.toLowerCase().replace(/s$/, "")} in the "${input.styleCategory}" category.`,
+    FORMAT_INSTRUCTION[input.outputFormat],
+    n === 1
+      ? "Output a single image showing that one concept."
+      : `Output ONE single image laid out as a clean contact sheet with exactly ${n} panels: ${describeLayout(layout)}. Every panel is the same size, shows exactly one complete concept fully inside its panel (nothing cropped), and is separated from its neighbours by a thin even white gutter.`,
+    "No text, no numbers, no labels, no captions, no logos, no watermarks, no borders other than the gutters.",
+    "Photorealistic, professional fashion design presentation quality, sharp garment details, accurate fabric rendering.",
+  ].join(" ");
+}
+
+/** The right analysis prompt and generation prompt for a kind of reference. */
+export const REFERENCE_PROMPTS: Record<ReferenceKind, { analysis: string; build: (input: DetailPromptInput) => string; noun: string }> = {
+  detail: { analysis: DETAIL_ANALYSIS_SYSTEM_PROMPT, build: buildDetailToDesignPrompt, noun: "garment detail" },
+  fabric: { analysis: FABRIC_ANALYSIS_SYSTEM_PROMPT, build: buildFabricToDesignPrompt, noun: "fabric" },
+};

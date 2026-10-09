@@ -78,3 +78,16 @@ describe("DetailToDesignStudio", () => {
     await waitFor(() => expect(screen.getByText(/No saved designs yet/)).toBeTruthy());
   });
 });
+
+describe("DetailToDesignStudio as Fabric to Design", () => {
+  it("uses fabric wording and the fabric kind for the history list", async () => {
+    const actions = fakeActions();
+    render(<DetailToDesignStudio kind="fabric" actions={actions} />);
+    expect(screen.getAllByText("Upload Fabric Image").length).toBeGreaterThan(0);
+    expect(screen.getByText("Upload a fabric image to begin.")).toBeTruthy();
+    expect(screen.getByText(/match the color, texture and drape of a fabric reference/)).toBeTruthy();
+    expect(screen.queryByText("Upload Detail Image")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "History" }));
+    await waitFor(() => expect(actions.list).toHaveBeenCalledWith("fabric"));
+  });
+});
