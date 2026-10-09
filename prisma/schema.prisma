@@ -156,6 +156,7 @@ model User {
   hitCollectionProposals HitCollectionProposal[] @relation("HitCollectionProposalOwner")
   collectionProposals CollectionProposal[] @relation("CollectionProposalOwner")
   detailDesigns          DetailDesign[]          @relation("DetailDesignOwner")
+  outfitDesigns          OutfitDesign[]          @relation("OutfitDesignOwner")
   businessEntities       BusinessEntity[]        @relation("BusinessEntityOwner")
   businesses             Business[]              @relation("BusinessOwner")
   businessLocations      BusinessLocation[]      @relation("BusinessLocationOwner")
@@ -3010,4 +3011,45 @@ model DetailDesignVersion {
   createdAt DateTime @default(now())
 
   @@index([designId])
+}
+
+/// Design Studio — Outfit Design. One uploaded top or bottom turned into a
+/// coordinated outfit image. Admin-only.
+model OutfitDesign {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("OutfitDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Outfit")
+
+  // The uploaded garment photo (a data URL), kept exactly as sent so every
+  // Regenerate conditions on it, never on an earlier AI result.
+  sourceImage String @db.Text
+  // The AI's read of the garment, reused as grounding text.
+  analysis    String? @db.Text
+
+  versions OutfitDesignVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model OutfitDesignVersion {
+  id       String       @id @default(cuid())
+  outfitId String
+  outfit   OutfitDesign @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+
+  image         String @db.Text
+  // "Upper" | "Lower", and the garment type chosen inside it ("Short Skirt"…).
+  matchGroup    String
+  matchCategory String
+  // "standard" | "professional"
+  mode          String
+  order         Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([outfitId])
 }

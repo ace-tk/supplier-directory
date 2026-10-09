@@ -132,6 +132,9 @@ export interface EditImageParams {
    * Artwork" export passes "transparent", using gpt-image-1's native
    * background support instead of a second AI integration. */
   background?: "transparent" | "opaque" | "auto";
+  /** Omitted by every existing caller (the model picks, as before). Outfit
+   * Design's "Professional" mode asks for "high"; "Standard" for "medium". */
+  quality?: "low" | "medium" | "high" | "auto";
 }
 
 /** Real image-conditioned editing/generation via the same client/API key
@@ -141,7 +144,7 @@ export interface EditImageParams {
  * without one, the whole image is used as strong conditioning for a new
  * interpretation. input_fidelity:"high" asks the model to match the
  * source as closely as possible rather than improvising. */
-export async function editImage({ image, mask, prompt, size = "1024x1024", background }: EditImageParams): Promise<string> {
+export async function editImage({ image, mask, prompt, size = "1024x1024", background, quality }: EditImageParams): Promise<string> {
   const client = getOpenAIClient();
   const images = Array.isArray(image) ? image : [image];
   const imageFiles = await Promise.all(images.map((img, i) => toFile(img, `image-${i}.png`, { type: "image/png" })));
@@ -155,6 +158,7 @@ export async function editImage({ image, mask, prompt, size = "1024x1024", backg
     size,
     input_fidelity: "high",
     ...(background ? { background } : {}),
+    ...(quality ? { quality } : {}),
   });
 
   const b64 = result.data?.[0]?.b64_json;

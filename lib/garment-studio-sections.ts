@@ -52,8 +52,7 @@ export const garmentStudioSections: GarmentStudioSection[] = [
     title: "Model to Product",
     cards: [
       { title: "Back Design", description: "Upload the front style image and generate the corresponding back style in one click.", image: img("back-design.jpg"), href: workflowHref("garment-back-design") },
-      // TODO: route
-      { title: "Outfit Design", description: "One-click to generate matched garments from a single top or bottom for fast complete-set creation.", image: img("outfit-design.jpg") },
+      { title: "Outfit Design", description: "One-click to generate matched garments from a single top or bottom for fast complete-set creation.", image: img("outfit-design.jpg"), href: "/design-studio/outfit-design" },
       // TODO: route
       { title: "Image to Design", description: "Create new style options from an existing garment image.", image: img("image-to-design.jpg") },
       // TODO: route
