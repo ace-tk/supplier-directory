@@ -75,7 +75,7 @@ export const HIT_ANALYSIS_SYSTEM_PROMPT = [
   "End with one line starting 'Signature:' naming the two or three things that make this style recognisable. No preamble, no advice.",
 ].join(" ");
 
-const FORMAT_INSTRUCTION: Record<HitOutputFormat, string> = {
+export const FORMAT_INSTRUCTION: Record<HitOutputFormat, string> = {
   "on-model":
     "Show each variation worn by a fashion model, full length, standing, facing the camera, on a plain light studio background. Use the same model (same face, hair, body and skin tone) in every panel, with consistent lighting and framing, so only the garment changes.",
   "flat-lay":
