@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Grid3x3, Shirt, Library, Scissors, Package, RotateCw } from "lucide-react";
+import { Grid3x3, Shirt, Library, Scissors, RotateCw } from "lucide-react";
 
 export interface DesignStudioWorkflow {
   id: string;
@@ -55,14 +55,6 @@ export const designStudioWorkflows: DesignStudioWorkflow[] = [
     description: "Convert artwork into an embroidery concept and preview it on a garment.",
     href: "/design-studio/print-to-embroidery",
     icon: Scissors,
-    status: "available",
-  },
-  {
-    id: "embroidery-assets",
-    name: "Embroidery Assets",
-    description: "A home for embroidery-ready assets — detailed categorization is coming later.",
-    href: "/design-studio/embroidery-assets",
-    icon: Package,
     status: "available",
   },
 ];

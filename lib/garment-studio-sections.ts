@@ -36,7 +36,6 @@ export const garmentStudioSections: GarmentStudioSection[] = [
       { title: "Garment Studio", description: "Generate garments with AI and edit them region by region.", image: img("garment-studio.jpg"), href: workflowHref("ai-garment-studio") },
       { title: "Pattern Library", description: "Browse, reuse and apply your saved seamless patterns.", image: img("pattern-library.jpg"), href: workflowHref("pattern-library") },
       { title: "Print → Embroidery", description: "Convert artwork into an embroidery concept and preview it on a garment.", image: img("print-embroidery.jpg"), href: workflowHref("print-to-embroidery") },
-      { title: "Embroidery Assets", description: "A home for embroidery-ready assets, with detailed categorization coming later.", image: img("embroidery-assets.jpg"), href: workflowHref("embroidery-assets") },
     ],
   },
   {
