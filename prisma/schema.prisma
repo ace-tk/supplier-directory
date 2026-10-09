@@ -155,6 +155,7 @@ model User {
   garmentBackDesigns GarmentBackDesign[]  @relation("GarmentBackDesignOwner")
   hitCollectionProposals HitCollectionProposal[] @relation("HitCollectionProposalOwner")
   collectionProposals CollectionProposal[] @relation("CollectionProposalOwner")
+  detailDesigns          DetailDesign[]          @relation("DetailDesignOwner")
   businessEntities       BusinessEntity[]        @relation("BusinessEntityOwner")
   businesses             Business[]              @relation("BusinessOwner")
   businessLocations      BusinessLocation[]      @relation("BusinessLocationOwner")
@@ -2962,4 +2963,49 @@ model EmbroideryDesign {
   updatedAt DateTime @updatedAt
 
   @@index([ownerId])
+}
+
+/// Design Studio — Detail to Design. One uploaded detail photo (neckline,
+/// sleeve, pocket…) turned into a grid of apparel concepts. Admin-only.
+model DetailDesign {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("DetailDesignOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name String @default("Untitled Detail Design")
+
+  // The uploaded detail photo (a data URL), kept exactly as sent so every
+  // Regenerate conditions on it, never on an earlier AI result.
+  sourceImage String @db.Text
+
+  styleCategory String
+  // Optional "Reference Brand or Style" text.
+  referenceStyle String? @db.Text
+  // The AI's read of the detail, reused as grounding text.
+  analysis       String? @db.Text
+
+  versions DetailDesignVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model DetailDesignVersion {
+  id       String       @id @default(cuid())
+  designId String
+  design   DetailDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  // One image holding the whole grid of concepts.
+  image        String @db.Text
+  // "on-model" | "flat-lay" | "original"
+  outputFormat String
+  // Concepts in the grid (1–9).
+  designCount  Int
+  order        Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([designId])
 }
