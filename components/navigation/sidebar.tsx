@@ -41,7 +41,12 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
           collapsed ? "flex-col items-center justify-center gap-1 px-2 py-2" : "items-center justify-between px-5"
         )}
       >
-        <div className={cn("flex items-center gap-2.5 min-w-0", collapsed && "justify-center")}>
+        <Link
+          href="/"
+          aria-label="SupplyBase home page"
+          title="SupplyBase home"
+          className={cn("flex items-center gap-2.5 min-w-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring", collapsed && "justify-center")}
+        >
           <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary shrink-0">
             <span className="text-primary-foreground font-bold text-sm">S</span>
           </div>
@@ -57,7 +62,7 @@ export function Sidebar({ user, portal = "admin", permissions = [] }: SidebarPro
               )}
             </div>
           )}
-        </div>
+        </Link>
 
         {collapsed ? (
           <Tooltip>
