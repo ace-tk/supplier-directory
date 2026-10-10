@@ -164,7 +164,11 @@ export function TopNavbar({ user, portal = "admin", permissions = [] }: TopNavba
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
         <SheetContent side="left" className="w-72 p-0">
           <SheetHeader className="border-b border-border">
-            <SheetTitle>SupplyBase</SheetTitle>
+            <SheetTitle>
+              <Link href="/" onClick={() => setMobileNavOpen(false)} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                SupplyBase
+              </Link>
+            </SheetTitle>
           </SheetHeader>
           <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6">
             {navGroups.map((group) => (
